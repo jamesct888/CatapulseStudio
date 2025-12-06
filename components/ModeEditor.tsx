@@ -2,8 +2,7 @@
 import React from 'react';
 import { ProcessDefinition, SectionDefinition, ElementDefinition, VisualTheme, StageDefinition } from '../types';
 import { RenderElement } from './FormElements';
-import { PanelBottom, RectangleVertical, Plus, Eye, CheckCircle2, FileText, Hash, Calendar, List, CheckSquare, MessageSquare, Sparkles, ArrowRight } from 'lucide-react';
-import { generateId } from '../utils/logic';
+import { PanelBottom, RectangleVertical, Plus, Eye, CheckCircle2, FileText, Hash, Calendar, List, CheckSquare, MessageSquare, Sparkles, ArrowRight, CircleDot } from 'lucide-react';
 
 interface ModeEditorProps {
     processDef: ProcessDefinition;
@@ -269,6 +268,7 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                                 { type: 'number', icon: Hash, label: 'Number' },
                                 { type: 'date', icon: Calendar, label: 'Date' },
                                 { type: 'select', icon: List, label: 'Select' },
+                                { type: 'radio', icon: CircleDot, label: 'Radio' },
                                 { type: 'checkbox', icon: CheckSquare, label: 'Check' },
                                 { type: 'static', icon: MessageSquare, label: 'Static' }
                             ].map(tool => (

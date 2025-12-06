@@ -178,6 +178,7 @@ const App: React.FC = () => {
   const [hasStarted, setHasStarted] = useState(false);
   const [processDef, setProcessDef] = useState<ProcessDefinition>(getInitialProcess());
   const [mode, setMode] = useState<'edit' | 'preview' | 'spec' | 'qa' | 'pega'>('edit');
+  const [pegaTab, setPegaTab] = useState<'blueprint' | 'manual'>('blueprint');
   
   // Selection State
   const [selectedStageId, setSelectedStageId] = useState<string>(processDef.stages[0].id);
@@ -188,6 +189,7 @@ const App: React.FC = () => {
   const [propertiesPanelTab, setPropertiesPanelTab] = useState<'general' | 'logic'>('general');
 
   // Tool States
+  const [personaPrompt, setPersonaPrompt] = useState('');
   const [userStories, setUserStories] = useState<UserStory[]>([]);
   const [storyStrategy, setStoryStrategy] = useState<StoryStrategy>('screen');
   const [testCases, setTestCases] = useState<TestCase[]>([]);
@@ -931,6 +933,7 @@ const App: React.FC = () => {
         }
         else if (step === 40) {
             setDemoMessage("We use the 'Persona Simulator' to test complex logic paths automatically.");
+            setPersonaPrompt("Married, 145k value, advice received.");
             setIsGenerating(true);
             timeoutId = setTimeout(() => setDemoStep(41), 5000);
         }
@@ -951,10 +954,12 @@ const App: React.FC = () => {
         else if (step === 43) {
             setDemoMessage("The 'Blueprint Accelerator' creates the specific prompt for Pega GenAI.");
             setMode('pega');
+            setPegaTab('blueprint');
             timeoutId = setTimeout(() => setDemoStep(44), 6000);
         }
         else if (step === 44) {
             setDemoMessage("And the 'Implementation Guide' gives developers the property definitions and rules.");
+            setPegaTab('manual');
             timeoutId = setTimeout(() => setDemoStep(45), 6000);
         }
         else if (step === 45) {
@@ -1330,9 +1335,9 @@ const App: React.FC = () => {
           </>
         )}
         
-        {mode === 'preview' && <div className="flex-1 bg-sw-lightGray overflow-y-auto"><ModePreview processDef={processDef} formData={formData} setFormData={setFormData} visualTheme={visualTheme} /></div>}
+        {mode === 'preview' && <div className="flex-1 bg-sw-lightGray overflow-y-auto"><ModePreview processDef={processDef} formData={formData} setFormData={setFormData} visualTheme={visualTheme} personaPrompt={personaPrompt} setPersonaPrompt={setPersonaPrompt} /></div>}
         {mode === 'spec' && <div className="flex-1 bg-sw-lightGray overflow-y-auto"><ModeSpec processDef={processDef} allElements={allProcessElements} /></div>}
-        {mode === 'pega' && <div className="flex-1 bg-sw-lightGray overflow-y-auto"><ModePega processDef={processDef} /></div>}
+        {mode === 'pega' && <div className="flex-1 bg-sw-lightGray overflow-y-auto"><ModePega processDef={processDef} pegaTab={pegaTab} setPegaTab={setPegaTab} /></div>}
         {mode === 'qa' && (
             <div className="flex-1 bg-sw-lightGray overflow-y-auto">
                 <ModeQA 

@@ -236,17 +236,17 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
         <div className={`${d.wrapper} group`}>
           <Label />
            {/* Segmented Control Style */}
-          <div className="inline-flex flex-wrap bg-gray-100 p-1 rounded-lg gap-1 border border-gray-200">
+          <div className="flex w-full flex-wrap bg-gray-100 p-1 rounded-lg gap-1 border border-gray-200">
             {radioOpts.map((opt, idx) => {
               const label = String(opt).trim();
               const isSelected = value === label;
               return (
                 <label key={idx} className={`
-                    cursor-pointer transition-all rounded-md flex items-center justify-center text-center select-none relative
-                    ${theme.density === 'dense' ? 'px-3 py-1 text-xs' : theme.density === 'compact' ? 'px-4 py-1.5 text-sm' : 'px-5 py-2 text-sm'}
+                    cursor-pointer transition-all rounded-md flex-1 flex items-center justify-center text-center select-none relative
+                    ${theme.density === 'dense' ? 'py-1 text-xs' : theme.density === 'compact' ? 'py-1.5 text-sm' : 'py-2 text-sm'}
                     ${isSelected 
-                        ? 'bg-sw-red text-white font-bold shadow-md' 
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                        ? 'bg-sw-teal text-white font-bold shadow-md' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
                     }
                     ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 `}>

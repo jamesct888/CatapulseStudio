@@ -1,7 +1,7 @@
 
 import React, { useRef } from 'react';
 import { CatapulseLogo } from '../App';
-import { Sparkles, ArrowRight, ScanLine, Play, Zap, FileText } from 'lucide-react';
+import { Sparkles, Zap, FileText } from 'lucide-react';
 
 interface OnboardingProps {
   startPrompt: string;

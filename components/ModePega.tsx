@@ -4,9 +4,13 @@ import { ProcessDefinition } from '../types';
 import { Rocket, Hammer, Copy } from 'lucide-react';
 import { CatapulseLogo } from '../App';
 
-export const ModePega: React.FC<{ processDef: ProcessDefinition }> = ({ processDef }) => {
-    const [pegaTab, setPegaTab] = useState<'blueprint' | 'manual'>('blueprint');
+interface ModePegaProps {
+    processDef: ProcessDefinition;
+    pegaTab: 'blueprint' | 'manual';
+    setPegaTab: (val: 'blueprint' | 'manual') => void;
+}
 
+export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPegaTab }) => {
     return (
         <div className="max-w-4xl mx-auto py-12 px-6">
             <div className="flex justify-center mb-8 bg-gray-100 p-1 rounded-lg inline-flex mx-auto">

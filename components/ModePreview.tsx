@@ -11,12 +11,13 @@ interface ModePreviewProps {
   formData: FormState;
   setFormData: React.Dispatch<React.SetStateAction<FormState>>;
   visualTheme: VisualTheme;
+  personaPrompt: string;
+  setPersonaPrompt: (val: string) => void;
 }
 
-export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, setFormData, visualTheme }) => {
+export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, setFormData, visualTheme, personaPrompt, setPersonaPrompt }) => {
   const [currentStageIdx, setCurrentStageIdx] = useState(0);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
-  const [personaPrompt, setPersonaPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
   const currentStage = processDef.stages[currentStageIdx];
