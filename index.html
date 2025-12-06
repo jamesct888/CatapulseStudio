@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Catapulse - Process Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              sw: {
+                teal: '#0b3239',
+                tealHover: '#062126',
+                red: '#e61126',
+                redHover: '#c40e20',
+                lightGray: '#eee',
+                lighterGray: '#fafafa',
+                purpleLight: '#ede9ff',
+                surface: '#ffffff',
+                text: '#0b3239',
+                error: '#db0f30'
+              }
+            },
+            fontFamily: {
+              sans: ['"GT Ultra Standard Regular"', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],
+              serif: ['"ABC Arizona Flare Medium"', 'Georgia', 'Times New Roman', 'serif'],
+            },
+            borderRadius: {
+              'xl': '12px',
+              '2xl': '16px',
+              'btn': '50px'
+            },
+            boxShadow: {
+              'card': '0 0 8px 0 rgba(11,50,57,.04), 0 2px 5px 0 rgba(11,50,57,.06)',
+              'input-focus': '0 0 0 2px #fff, 0 0 0 4px #0b3239'
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @font-face { font-family: 'GT Ultra Standard Regular'; src: local('Segoe UI'), local('Arial'); font-weight: 400; }
+      @font-face { font-family: 'GT Ultra Standard Bold'; src: local('Segoe UI Bold'), local('Arial Bold'); font-weight: 700; }
+      @font-face { font-family: 'ABC Arizona Flare Medium'; src: local('Georgia'), local('Times New Roman'); font-weight: 500; }
+      body { color: #0b3239; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-sw-lighterGray text-sw-text">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
