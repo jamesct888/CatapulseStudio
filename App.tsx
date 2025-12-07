@@ -4,7 +4,7 @@ import { ProcessDefinition, SectionDefinition, ElementDefinition, FormState, Vis
 import { modifyProcess, generateProcessStructure, analyzeTranscript, generateProcessFromImage } from './services/geminiService';
 import { generateId } from './utils/logic';
 import { PropertiesPanel } from './components/PropertiesPanel';
-import { demoProcess, demoUserStories, demoDigitizedProcess } from './services/demoData';
+import { demoProcess, demoUserStories, demoDigitizedProcess, demoTestCases, demoTranscript, demoFormData } from './services/demoData';
 import { 
   Layout, Play, Settings, Download, RefreshCw, Mic, ScanLine, FileText, CheckSquare, Rocket, X, ArrowRight, MessageSquare, Sparkles, CheckCircle2, Pause
 } from 'lucide-react';
@@ -37,6 +37,34 @@ export const CatapulseLogo = ({ theme = 'dark', scale = 1, align = 'left' }: { t
             </span>
         </div>
     );
+};
+
+// --- Scramble Text Component ---
+const ScrambleText = ({ text, className }: { text: string, className?: string }) => {
+    const [display, setDisplay] = useState(text);
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    
+    useEffect(() => {
+        let iterations = 0;
+        const interval = setInterval(() => {
+            setDisplay(
+                text.split("")
+                    .map((letter, index) => {
+                        if (index < iterations) {
+                            return text[index];
+                        }
+                        return chars[Math.floor(Math.random() * chars.length)];
+                    })
+                    .join("")
+            );
+            
+            if (iterations >= text.length) clearInterval(interval);
+            iterations += 1/3; 
+        }, 30);
+        return () => clearInterval(interval);
+    }, [text]);
+
+    return <span className={className}>{display}</span>;
 };
 
 // --- Demo Focus Overlay ---
@@ -423,7 +451,7 @@ const App: React.FC = () => {
 
   const handleLoadSampleTranscript = async () => {
     setIsAnalyzingWorkshop(true);
-    const suggestions = await analyzeTranscript(processDef, undefined);
+    const suggestions = await analyzeTranscript(processDef, demoTranscript);
     setWorkshopSuggestions(suggestions);
     setIsAnalyzingWorkshop(false);
   };
@@ -1166,21 +1194,69 @@ const App: React.FC = () => {
   const renderGenerationOverlay = () => {
       if (!showGenerationAnimation) return null;
       return (
-          <div className="fixed inset-0 z-[100] bg-sw-teal/90 backdrop-blur-md flex flex-col items-center justify-center text-white p-8">
-              {/* High Energy Spinner */}
-              <div className="relative w-32 h-32 mb-12">
-                  <div className="absolute inset-0 border-4 border-sw-purpleLight/30 rounded-full animate-[spin_3s_linear_infinite]"></div>
-                  <div className="absolute inset-2 border-4 border-t-sw-red border-r-transparent border-b-transparent border-l-transparent rounded-full animate-[spin_1.5s_linear_infinite]"></div>
-                  <div className="absolute inset-6 border-4 border-b-white border-t-transparent border-l-transparent border-r-transparent rounded-full animate-[spin_2s_linear_reverse_infinite]"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                       <Sparkles className="w-8 h-8 text-white animate-pulse" />
-                  </div>
-                  {/* Glow Effect */}
-                  <div className="absolute inset-0 bg-sw-teal rounded-full blur-3xl opacity-40 animate-pulse"></div>
+          <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center text-white p-8 animate-in fade-in duration-500 overflow-hidden">
+              
+              {/* Dynamic Rotating Background Rings */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
+                  <div className="absolute w-[40rem] h-[40rem] border border-white/50 rounded-full animate-[spin_20s_linear_infinite]"></div>
+                  <div className="absolute w-[30rem] h-[30rem] border border-dashed border-white/50 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
+                  <div className="absolute w-[50rem] h-[50rem] border border-dotted border-white/30 rounded-full animate-[spin_30s_linear_infinite]"></div>
               </div>
 
-              <h2 className="text-4xl font-serif font-bold mb-4 text-center animate-in fade-in slide-in-from-bottom-4">{currentMagicLog}</h2>
-              <p className="text-sw-purpleLight/70 font-mono text-sm animate-pulse">Processing business logic...</p>
+              {/* Impact Pulse Container */}
+              <div className="flex flex-col items-center mb-16 relative z-10 animate-heartbeat-impact">
+                  <h1 className="text-8xl font-serif font-bold text-white mb-8 tracking-tighter relative z-10">
+                      <ScrambleText text="Catapulse" />
+                  </h1>
+                  
+                  {/* Monitor Line Container */}
+                  <div className="w-96 h-24 relative flex items-center justify-center overflow-hidden">
+                    {/* The Line */}
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full h-0.5 bg-white/20"></div>
+                    </div>
+                    
+                    {/* The Pulse */}
+                    <svg viewBox="0 0 500 150" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,255,255,0.9)]">
+                         <path 
+                            d="M0 75 L150 75 L170 20 L190 130 L210 75 L500 75"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeDasharray="1000"
+                            strokeDashoffset="1000"
+                            className="animate-ecg"
+                         />
+                    </svg>
+                    
+                    {/* Inline Styles to guarantee animation execution */}
+                    <style>{`
+                        @keyframes ecgDraw {
+                            0% { stroke-dashoffset: 1000; opacity: 0; }
+                            10% { opacity: 1; }
+                            40% { stroke-dashoffset: 0; }
+                            100% { stroke-dashoffset: -1000; opacity: 0; }
+                        }
+                        .animate-ecg {
+                            animation: ecgDraw 2.5s ease-in-out infinite;
+                        }
+                        @keyframes impactPulse {
+                            0%, 25% { transform: scale(1); }
+                            28% { transform: scale(1.02); filter: drop-shadow(0 0 10px rgba(255,255,255,0.5)); }
+                            35% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+                            100% { transform: scale(1); }
+                        }
+                        .animate-heartbeat-impact {
+                            animation: impactPulse 2.5s ease-in-out infinite;
+                        }
+                    `}</style>
+                  </div>
+              </div>
+
+              <h2 className="text-3xl font-serif font-bold mb-4 text-center animate-pulse text-white relative z-10">{currentMagicLog}</h2>
+              <p className="text-sw-purpleLight/70 font-mono text-sm animate-pulse relative z-10">Initializing Catapulse Engine...</p>
           </div>
       );
   }
