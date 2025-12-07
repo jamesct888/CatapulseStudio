@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { ProcessDefinition } from '../types';
 import { Rocket, Hammer, Copy } from 'lucide-react';
-import { CatapulseLogo } from '../App';
+import { CatapulseLogo } from './Shared';
 
 interface ModePegaProps {
     processDef: ProcessDefinition;

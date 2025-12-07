@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { ProcessDefinition, StageDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy } from "../types";
+import { ProcessDefinition, StageDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage } from "../types";
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -216,55 +217,6 @@ export const generateProcessFromImage = async (base64Data: string, mimeType: str
     }
 }
 
-export const suggestElementsForSection = async (sectionTitle: string, stageTitle: string): Promise<ElementDefinition[]> => {
-  if (!apiKey) return [];
-
-  const prompt = `
-    Suggest 5-8 relevant data entry form elements for a section named "${sectionTitle}" within the stage "${stageTitle}" of a UK business process.
-    CONTEXT: UK Market. Use British terminology (e.g. Postcode, Sort Code, Mobile Number).
-    
-    Return a JSON array of element objects.
-    Ensure 'id' is camelCase derived from label.
-    Types allowed: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static'.
-  `;
-
-  try {
-    const response = await callWithRetry(async () => {
-        return await ai.models.generateContent({
-            model: modelId,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-            }
-        });
-    });
-
-    const text = response.text;
-    if (!text) return [];
-    let res: any;
-    try {
-        res = JSON.parse(text);
-    } catch (e) {
-        return [];
-    }
-    
-    // Strict array check and sanitization
-    if (!Array.isArray(res)) return [];
-    
-    return res.map((el: any) => ({
-        ...el,
-        visibilityConditions: el.visibilityConditions || [],
-        requiredConditions: el.requiredConditions || [],
-        options: Array.isArray(el.options) 
-            ? el.options.map((o: any) => typeof o === 'object' ? (o.label || o.value || String(o)) : String(o)) 
-            : el.options
-    }));
-  } catch (error) {
-    console.error("Error suggesting elements:", error);
-    return [];
-  }
-};
-
 export const modifyProcess = async (
   currentProcess: ProcessDefinition, 
   instruction: string, 
@@ -337,7 +289,6 @@ export const generateFormData = async (
 ): Promise<FormState | null> => {
     if (!apiKey) return null;
 
-    // Extract just the fields to save tokens, we don't need the full structure
     const fields = processDef.stages.flatMap(s => 
         s.sections.flatMap(sec => 
             sec.elements.map(el => ({ id: el.id, label: el.label, type: el.type, options: el.options }))
@@ -384,20 +335,83 @@ export const generateFormData = async (
     }
 }
 
+export const consultStrategyAdvisor = async (
+    processDef: ProcessDefinition, 
+    chatHistory: ChatMessage[],
+    userMessage: string
+): Promise<{ reply: string, recommendations: StrategyRecommendation[] }> => {
+    if (!apiKey) return { reply: "AI Service Unavailable", recommendations: [] };
+
+    const prompt = `
+        Act as a Senior Agile Coach and Business Analyst.
+        You are discussing User Story Splitting strategies for a specific process with a Customer Journey Manager (CJM).
+
+        PROCESS DEFINITION:
+        ${JSON.stringify(processDef)}
+
+        CHAT HISTORY:
+        ${chatHistory.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
+        USER: ${userMessage}
+
+        Your Goal:
+        1. Answer the user's question or provide advice on how to split user stories.
+        2. Be aware of SPECIFIC fields/logic in the process. Example: If there is a field "Liability Admitted" (Yes/No), suggest splitting stories by that outcome.
+        3. You can suggest "Hybrid" strategies or custom strategies tailored to this process.
+        
+        Output Schema (JSON):
+        {
+            "reply": "Your conversational response here...",
+            "recommendations": [
+                {
+                    "id": "rec_1",
+                    "strategyName": "Split by [Specific Aspect]",
+                    "strategyDescription": "Detailed instruction for the generator on how to split stories based on this aspect.",
+                    "pros": ["Pro 1"],
+                    "cons": ["Con 1"],
+                    "estimatedCount": 5,
+                    "recommendationLevel": "High"
+                }
+            ]
+        }
+
+        If the user is just asking a question and no NEW strategy is needed, return empty recommendations array.
+        If the user asks for suggestions, provide 2-3 specific ones.
+    `;
+
+    try {
+        const response = await callWithRetry(async () => {
+            return await ai.models.generateContent({
+                model: modelId,
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                }
+            });
+        });
+
+        const text = response.text;
+        if (!text) return { reply: "I couldn't analyze that.", recommendations: [] };
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("Error consulting strategy advisor:", e);
+        return { reply: "Sorry, I encountered an error analyzing your request.", recommendations: [] };
+    }
+};
+
 export const generateUserStories = async (processDef: ProcessDefinition, strategy: StoryStrategy): Promise<UserStory[]> => {
   if (!apiKey) return [];
 
-  const strategyPrompt = strategy === 'screen' 
-    ? "Split the stories by UI Component/Screen (one story per Section/Stage)."
-    : strategy === 'journey'
-    ? "Split the stories by End-to-End Business Journey (e.g. 'Happy Path', 'Exception Path')."
-    : "Split the stories by Persona (e.g. 'As a Case Worker', 'As a Manager').";
+  let strategyInstruction = "";
+  if (strategy === 'screen') strategyInstruction = "Split the stories by UI Component/Screen (one story per Section/Stage).";
+  else if (strategy === 'journey') strategyInstruction = "Split the stories by End-to-End Business Journey (e.g. 'Happy Path', 'Exception Path').";
+  else if (strategy === 'persona') strategyInstruction = "Split the stories by Persona (e.g. 'As a Case Worker', 'As a Manager').";
+  else strategyInstruction = strategy; // Custom strategy string from AI
 
   const prompt = `
     Act as a UK Business Analyst and Pega Product Owner.
     Based on the provided Process Definition, generate a set of detailed User Stories.
     
-    STRATEGY: ${strategyPrompt}
+    STRATEGY INSTRUCTION: ${strategyInstruction}
     CONTEXT: UK Business Context.
     
     Format Requirements:
@@ -405,6 +419,8 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
     2. Narrative: Standard "As a... I want... So that..." format.
     3. Acceptance Criteria (AC): 
        - MUST use GWT (Given/When/Then) format.
+       - STRICT RULE: 'When' clauses MUST describe a user ACTION (e.g., 'When I select...', 'When I click...', 'When I type...'). 
+       - Do NOT use 'When' for states (e.g., DO NOT say 'When the user is a policyholder'). Put states in the 'Given' clause.
        - The 'Given' clause must generally be: "Given I am a colleague working on a ${processDef.name} case And I am on the {Screen Name}..."
        - The 'Then' clause must use a list format for fields. Example:
          "Then make the following fields available:
@@ -412,6 +428,7 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
           * **[Field Label B]**"
        - CRITICAL: After the GWT block, you MUST include a Markdown Table describing the data elements for that story.
        - Table Columns: Label, Type, Mandatory, Visibility Logic, Options/Validation.
+    4. Dependencies: Identify dependencies. If Story B relies on Story A being done first, add Story A's ID to Story B's dependency list.
 
     Process Definition:
     ${JSON.stringify(processDef)}
@@ -423,7 +440,15 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
         "id": "US-001",
         "title": "Capture Personal Details",
         "narrative": "As a Call Center Agent...",
-        "acceptanceCriteria": "Given I am... \n\nThen make the following fields available:\n* **[First Name]**\n* **[Surname]**\n\n### Data Dictionary\n| Label | Type | Mandatory | ... |" 
+        "acceptanceCriteria": "Given I am... \n\nThen make the following fields available:\n* **[First Name]**\n* **[Surname]**\n\n### Data Dictionary\n| Label | Type | Mandatory | ... |",
+        "dependencies": [] 
+      },
+      {
+        "id": "US-002",
+        "title": "Review Personal Details",
+        "narrative": "...",
+        "acceptanceCriteria": "...",
+        "dependencies": ["US-001"]
       }
     ]
   `;
@@ -435,6 +460,7 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
+                systemInstruction: "You are a User Story generator. Generate valid JSON array.",
             }
         });
     });

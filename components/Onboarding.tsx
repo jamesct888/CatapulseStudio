@@ -1,7 +1,7 @@
 
 import React, { useRef } from 'react';
-import { CatapulseLogo } from '../App';
-import { Sparkles, Zap, FileText } from 'lucide-react';
+import { CatapulseLogo } from './Shared';
+import { Sparkles, Zap, FileText, ScanLine } from 'lucide-react';
 
 interface OnboardingProps {
   startPrompt: string;
@@ -94,15 +94,26 @@ export const Onboarding: React.FC<OnboardingProps> = ({
             ))}
         </div>
 
-        {/* Footer Links */}
-        <div className="pt-12 flex items-center justify-center gap-6 text-sm font-bold text-gray-400">
-            <button onClick={() => { setStartPrompt(''); handleStart(); }} className="hover:text-sw-teal transition-colors">
-                Skip & Start from Scratch
+        {/* Footer Links & Actions */}
+        <div className="pt-12 flex flex-col items-center gap-4">
+            <button 
+                id="card-digitize"
+                onClick={() => legacyInputRef.current?.click()}
+                className="flex items-center gap-2 text-sw-teal bg-white border border-gray-200 px-6 py-2 rounded-full font-bold text-sm hover:shadow-md hover:border-sw-teal transition-all group"
+            >
+                <ScanLine size={16} className="text-gray-400 group-hover:text-sw-teal transition-colors"/>
+                Import from Document / Legacy Form
             </button>
-            <span className="text-gray-300">|</span>
-            <button onClick={() => handleStart(true)} className="flex items-center gap-1.5 text-sw-red hover:text-sw-redHover transition-colors">
-                <Zap size={16} fill="currentColor" /> Demo Mode
-            </button>
+
+            <div className="flex items-center justify-center gap-6 text-sm font-bold text-gray-400">
+                <button onClick={() => { setStartPrompt(''); handleStart(); }} className="hover:text-sw-teal transition-colors">
+                    Skip & Start from Scratch
+                </button>
+                <span className="text-gray-300">|</span>
+                <button onClick={() => handleStart(true)} className="flex items-center gap-1.5 text-sw-red hover:text-sw-redHover transition-colors">
+                    <Zap size={16} fill="currentColor" /> Demo Mode
+                </button>
+            </div>
         </div>
 
         <p className="text-[10px] text-gray-300 pt-8 font-mono">

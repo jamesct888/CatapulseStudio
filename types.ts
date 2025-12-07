@@ -119,11 +119,29 @@ export interface TestCase {
   type: 'Positive' | 'Negative' | 'Boundary' | 'Security';
 }
 
-export type StoryStrategy = 'screen' | 'journey' | 'persona';
+export type StoryStrategy = 'screen' | 'journey' | 'persona' | string;
+
+export interface StrategyRecommendation {
+  id: string;
+  strategyName: string;
+  strategyDescription: string; // The instruction passed to the generator
+  pros: string[];
+  cons: string[];
+  estimatedCount: number;
+  recommendationLevel: 'High' | 'Medium' | 'Low';
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  recommendations?: StrategyRecommendation[];
+}
 
 export interface UserStory {
   id: string;
   title: string;
   narrative: string; // "As a... I want... So that..."
   acceptanceCriteria: string; // Markdown formatted GWT + Table
+  dependencies?: string[]; // IDs of other stories that this one depends on
 }

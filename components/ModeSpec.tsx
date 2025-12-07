@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ProcessDefinition } from '../types';
-import { CatapulseLogo } from '../App';
+import { CatapulseLogo } from './Shared';
 import { getValidationRegexString } from '../utils/logic';
 
 export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: any[] }> = ({ processDef, allElements }) => {

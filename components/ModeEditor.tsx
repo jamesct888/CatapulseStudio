@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ProcessDefinition, SectionDefinition, ElementDefinition, VisualTheme, StageDefinition } from '../types';
 import { RenderElement } from './FormElements';
-import { PanelBottom, RectangleVertical, Plus, Eye, CheckCircle2, FileText, Hash, Calendar, List, CheckSquare, MessageSquare, Sparkles, ArrowRight, CircleDot } from 'lucide-react';
+import { PanelBottom, RectangleVertical, Plus, Eye, CheckCircle2, FileText, Hash, Calendar, List, CheckSquare, MessageSquare, Sparkles, ArrowRight, CircleDot, GripVertical } from 'lucide-react';
 
 interface ModeEditorProps {
     processDef: ProcessDefinition;
@@ -31,6 +31,45 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
 }) => {
     
     const selectedStage = processDef.stages.find(s => s.id === selectedStageId);
+    const [draggedItem, setDraggedItem] = useState<{sectionId: string, index: number} | null>(null);
+
+    const handleDragStart = (e: React.DragEvent, sectionId: string, index: number) => {
+        setDraggedItem({ sectionId, index });
+        e.dataTransfer.effectAllowed = 'move';
+        // Set ghost image data if needed, basic text is fine for internal React DnD
+        e.dataTransfer.setData('text/plain', JSON.stringify({ sectionId, index }));
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault(); // Necessary to allow dropping
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = (e: React.DragEvent, targetSectionId: string, targetIndex: number) => {
+        e.preventDefault();
+        if (!draggedItem) return;
+
+        const newDef = { ...processDef };
+        const stage = newDef.stages.find(s => s.id === selectedStageId);
+        if (!stage) return;
+
+        const sourceSec = stage.sections.find(s => s.id === draggedItem.sectionId);
+        const targetSec = stage.sections.find(s => s.id === targetSectionId);
+
+        if (sourceSec && targetSec) {
+            // Remove from source
+            const [item] = sourceSec.elements.splice(draggedItem.index, 1);
+            // Insert at target
+            targetSec.elements.splice(targetIndex, 0, item);
+            
+            setProcessDef(newDef);
+            // Update selection if we moved the selected item
+            if (selectedElementId === item.id) {
+                setSelectedSectionId(targetSectionId);
+            }
+        }
+        setDraggedItem(null);
+    };
 
     return (
         <>
@@ -189,12 +228,17 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                                 </div>
                                 
                                 <div className={`p-6 grid gap-6 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                                    {section.elements.map((element) => {
+                                    {section.elements.map((element, index) => {
                                         const isSelected = selectedElementId === element.id;
+                                        const isDragging = draggedItem?.sectionId === section.id && draggedItem.index === index;
                                         return (
                                             <div 
                                                 key={element.id}
                                                 id={element.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, section.id, index)}
+                                                onDragOver={handleDragOver}
+                                                onDrop={(e) => handleDrop(e, section.id, index)}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setSelectedElementId(element.id);
@@ -205,9 +249,18 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                                                         ? 'border-sw-teal bg-sw-teal/5' 
                                                         : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
                                                     }
+                                                    ${isDragging ? 'opacity-40 border-dashed border-gray-400 bg-gray-50' : ''}
                                                 `}
                                             >
-                                                <div className="pointer-events-none">
+                                                {/* Drag Handle */}
+                                                <div 
+                                                    className="absolute top-4 left-2 text-gray-300 cursor-grab active:cursor-grabbing hover:text-sw-teal z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Drag to reorder"
+                                                >
+                                                    <GripVertical size={16} />
+                                                </div>
+
+                                                <div className="pointer-events-none pl-6">
                                                     <RenderElement 
                                                         element={element} 
                                                         value={element.defaultValue} 
@@ -251,8 +304,31 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                                             setSelectedElementId(newEl.id);
                                             setSelectedSectionId(section.id);
                                         }}
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => {
+                                            // Handle dropping onto the empty space (append to end)
+                                            e.preventDefault();
+                                            if (!draggedItem) return;
+                                            
+                                            // Only handle if dragging from same stage (for simplicity in this prototype)
+                                            // Logic mostly same as main drop but targetIndex is length
+                                            
+                                            const newDef = { ...processDef };
+                                            const stage = newDef.stages.find(s => s.id === selectedStageId);
+                                            if (!stage) return;
+
+                                            const sourceSec = stage.sections.find(s => s.id === draggedItem.sectionId);
+                                            const targetSec = stage.sections.find(s => s.id === section.id);
+
+                                            if (sourceSec && targetSec) {
+                                                const [item] = sourceSec.elements.splice(draggedItem.index, 1);
+                                                targetSec.elements.push(item);
+                                                setProcessDef(newDef);
+                                            }
+                                            setDraggedItem(null);
+                                        }}
                                     >
-                                        <div className="text-center text-gray-400 group-hover:text-sw-teal">
+                                        <div className="text-center text-gray-400 group-hover:text-sw-teal pointer-events-none">
                                             <Plus size={24} className="mx-auto mb-2" />
                                             <span className="text-sm font-bold">Add Field</span>
                                         </div>

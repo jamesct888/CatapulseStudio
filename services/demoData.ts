@@ -1,5 +1,4 @@
 
-
 import { ProcessDefinition, FormState, TestCase, UserStory } from "../types";
 
 export const demoProcess: ProcessDefinition = {
@@ -156,13 +155,15 @@ export const demoUserStories: UserStory[] = [
         "id": "US-01",
         "title": "Capture Personal Information",
         "narrative": "As a Customer Service Agent, I want to capture the member's personal details so that I can verify their identity.",
-        "acceptanceCriteria": "Given I am a colleague working on a Pension Transfer Request case\nAnd I am on the Member Details screen\nThen make the following fields available:\n* **[Member ID]**\n* **[National Insurance Number]**\n* **[Marital Status]**\n* **[Spouse Name]**\n\n### Data Definitions\n| Label | Type | Mandatory | Logic | Options |\n|---|---|---|---|---|\n| Member ID | Text | Yes | - | - |\n| National Insurance | Text | Yes | - | - |\n| Marital Status | Dropdown | Yes | - | Single, Married, Divorced |\n| Spouse Name | Text | No | Visible if Marital Status = Married | - |"
+        "acceptanceCriteria": "Given I am a colleague working on a Pension Transfer Request case\nAnd I am on the Member Details screen\nThen make the following fields available:\n* **[Member ID]**\n* **[National Insurance Number]**\n* **[Marital Status]**\n* **[Spouse Name]**\n\n### Data Definitions\n| Label | Type | Mandatory | Logic | Options |\n|---|---|---|---|---|\n| Member ID | Text | Yes | - | - |\n| National Insurance | Text | Yes | - | - |\n| Marital Status | Dropdown | Yes | - | Single, Married, Divorced |\n| Spouse Name | Text | No | Visible if Marital Status = Married | - |",
+        "dependencies": []
     },
     {
         "id": "US-02",
         "title": "Record Transfer Details",
         "narrative": "As a CSA, I want to record the ceding scheme details so that the transfer can be initiated.",
-        "acceptanceCriteria": "Given I am a colleague working on a Pension Transfer Request case\nAnd I am on the Transfer Details screen\nThen make the following fields available:\n* **[Previous Scheme Name]**\n* **[Transfer Value]**\n\n### Data Definitions\n| Label | Type | Mandatory | Logic |\n|---|---|---|---|\n| Previous Scheme Name | Text | Yes | - |\n| Transfer Value | Currency | Yes | - |"
+        "acceptanceCriteria": "Given I am a colleague working on a Pension Transfer Request case\nAnd I am on the Transfer Details screen\nThen make the following fields available:\n* **[Previous Scheme Name]**\n* **[Transfer Value]**\n\n### Data Definitions\n| Label | Type | Mandatory | Logic |\n|---|---|---|---|\n| Previous Scheme Name | Text | Yes | - |\n| Transfer Value | Currency | Yes | - |",
+        "dependencies": ["US-01"]
     }
 ];
 
