@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
@@ -272,7 +271,7 @@ const App: React.FC = () => {
             </main>
 
             {viewMode === 'editor' && (
-                <div className={`fixed right-0 top-16 bottom-0 w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-40 ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className={`fixed right-0 top-16 bottom-0 z-40 transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <PropertiesPanel 
                         selectedElement={selectedElement}
                         selectedSection={selectedSection}
@@ -285,6 +284,7 @@ const App: React.FC = () => {
                         onUpdateStage={updateStage}
                         onDeleteElement={deleteElement}
                         onDeleteSection={deleteSection}
+                        onClose={() => setIsSettingsOpen(false)}
                     />
                 </div>
             )}

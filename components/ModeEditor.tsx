@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ProcessDefinition, SectionDefinition, ElementDefinition, VisualTheme, StageDefinition } from '../types';
 import { RenderElement } from './FormElements';
@@ -193,7 +192,7 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
 
             {/* Canvas */}
             <div id="canvas" className="flex-1 bg-sw-lightGray p-8 overflow-y-auto flex justify-center relative">
-                <div className={`w-full max-w-4xl transition-all duration-300 ${isSettingsOpen ? 'mr-80' : ''}`}>
+                <div className={`w-full max-w-4xl transition-all duration-300 ${isSettingsOpen ? 'mr-[500px]' : ''}`}>
                     {/* Stage Title Header */}
                     <div className="mb-8">
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Stage {processDef.stages.findIndex(s => s.id === selectedStageId) + 1}</span>

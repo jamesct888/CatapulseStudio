@@ -75,10 +75,10 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                         {group.operator === 'AND' ? 'Match ALL (AND)' : 'Match ANY (OR)'}
                     </button>
                     <div className="flex gap-2">
-                        <button onClick={addCondition} className="text-[10px] bg-white border border-gray-300 px-2 py-1.5 rounded hover:border-sw-teal hover:text-sw-teal transition-colors flex items-center gap-1">
+                        <button onClick={addCondition} className="text-[10px] bg-white text-gray-700 border border-gray-300 px-2 py-1.5 rounded hover:border-sw-teal hover:text-sw-teal transition-colors flex items-center gap-1 shadow-sm">
                             <Plus size={12} /> Condition
                         </button>
-                        <button onClick={addSubGroup} className="text-[10px] bg-white border border-gray-300 px-2 py-1.5 rounded hover:border-sw-teal hover:text-sw-teal transition-colors flex items-center gap-1">
+                        <button onClick={addSubGroup} className="text-[10px] bg-white text-gray-700 border border-gray-300 px-2 py-1.5 rounded hover:border-sw-teal hover:text-sw-teal transition-colors flex items-center gap-1 shadow-sm">
                             <Plus size={12} /> Group
                         </button>
                     </div>
@@ -87,7 +87,7 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
 
             {/* Empty State */}
             {group.conditions.length === 0 && (!group.groups || group.groups.length === 0) && (
-                <div className="text-xs text-gray-400 italic text-center py-4 border-2 border-dashed border-gray-100 rounded-lg">
+                <div className="text-xs text-gray-400 italic text-center py-4 border-2 border-dashed border-gray-100 rounded-lg bg-white">
                     No rules defined. Add a condition to start.
                 </div>
             )}
@@ -98,7 +98,7 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                     <div key={cond.id || idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm relative group">
                         <button 
                             onClick={() => removeCondition(idx)} 
-                            className="absolute -top-2 -right-2 bg-white text-gray-300 hover:text-sw-red border border-gray-200 p-1 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-sw-red border border-gray-200 p-1 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
                             title="Remove Condition"
                         >
                             <X size={12} />

@@ -106,8 +106,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const data = selectedElement || selectedSection || selectedStage;
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Resizable sidebar state - Default to 400px
-  const [panelWidth, setPanelWidth] = useState(400);
+  // Resizable sidebar state - Default to 480px (increased from 400)
+  const [panelWidth, setPanelWidth] = useState(480);
   const [isResizing, setIsResizing] = useState(false);
 
   // Modal States
@@ -130,7 +130,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       const handleMouseMove = (e: MouseEvent) => {
           if (!isResizing) return;
           const newWidth = document.body.clientWidth - e.clientX;
-          if (newWidth > 300 && newWidth < 800) {
+          // Increased max width limit to 1200
+          if (newWidth > 300 && newWidth < 1200) {
               setPanelWidth(newWidth);
           }
       };
