@@ -50,13 +50,13 @@ export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: an
                                                     <td className="py-3 text-sm text-gray-500 capitalize">{el.type}</td>
                                                     <td className="py-3 text-sm">
                                                         {el.required ? <span className="text-sw-red font-bold">Yes</span> : 'No'}
-                                                        {el.requiredConditions && el.requiredConditions.length > 0 && <span className="text-xs text-sw-red block">(Conditional)</span>}
+                                                        {el.requiredLogic && el.requiredLogic.conditions.length > 0 && <span className="text-xs text-sw-red block">(Conditional)</span>}
                                                     </td>
                                                     <td className="py-3 text-sm text-gray-500 font-mono text-xs">
-                                                        {el.visibilityConditions?.map((c, i) => (
+                                                        {el.visibility?.conditions.map((c, i) => (
                                                             <div key={i}>Show if {allElements.find(e => e.id === c.targetElementId)?.label} {c.operator} {String(c.value)}</div>
                                                         ))}
-                                                        {!el.visibilityConditions?.length && '-'}
+                                                        {(!el.visibility || el.visibility.conditions.length === 0) && '-'}
                                                     </td>
                                                     <td className="py-3 text-sm text-gray-500">
                                                         {el.validation?.type !== 'none' && el.validation ? (

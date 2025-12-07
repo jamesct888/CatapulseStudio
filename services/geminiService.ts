@@ -33,8 +33,26 @@ export const sanitizeProcessData = (data: ProcessDefinition): ProcessDefinition 
             if (!section.layout) section.layout = '1col';
             for (const el of section.elements) {
                 if (!el.id) el.id = `el_${Math.random().toString(36).substr(2, 9)}`;
-                if (!el.visibilityConditions) el.visibilityConditions = [];
-                if (!el.requiredConditions) el.requiredConditions = [];
+                
+                // Fix: Handle legacy properties if AI generated them (cast to any to access missing props)
+                const anyEl = el as any;
+                if (anyEl.visibilityConditions && Array.isArray(anyEl.visibilityConditions) && anyEl.visibilityConditions.length > 0 && !el.visibility) {
+                    el.visibility = {
+                        id: `vis_${el.id}`,
+                        operator: 'AND',
+                        conditions: anyEl.visibilityConditions
+                    };
+                    delete anyEl.visibilityConditions;
+                }
+                
+                if (anyEl.requiredConditions && Array.isArray(anyEl.requiredConditions) && anyEl.requiredConditions.length > 0 && !el.requiredLogic) {
+                    el.requiredLogic = {
+                        id: `req_${el.id}`,
+                        operator: 'AND',
+                        conditions: anyEl.requiredConditions
+                    };
+                    delete anyEl.requiredConditions;
+                }
                 
                 // Fix options if they are objects (flatten to string)
                 if (el.options && Array.isArray(el.options)) {
@@ -75,8 +93,9 @@ export const generateProcessStructure = async (description: string): Promise<Pro
     2. Each Stage must have 1-3 Sections.
     3. Each Section must have 3-6 specific Data Elements (Fields).
     4. INCLUDE LOGIC:
-       - Add 'visibilityConditions' to some fields (e.g., Only show "Spouse Name" if "Marital Status" equals "Married").
-       - Add 'requiredConditions' to some fields.
+       - Add 'visibility' logic to some fields (e.g., Only show "Spouse Name" if "Marital Status" equals "Married").
+       - Logic Schema: "visibility": { "id": "vis_1", "operator": "AND", "conditions": [ { "targetElementId": "...", "operator": "equals", "value": "..." } ] }
+       - Add 'requiredLogic' to some fields if needed using same schema.
     5. Types allowed: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static'.
     6. For 'select'/'radio', provide realistic options in the 'options' array.
     
@@ -100,7 +119,7 @@ export const generateProcessStructure = async (description: string): Promise<Pro
                     "label": "Field Label",
                     "type": "text",
                     "required": true,
-                    "visibilityConditions": []
+                    "visibility": null
                  }
               ] 
             }
@@ -244,8 +263,9 @@ export const modifyProcess = async (
     3. Logic/Conditions: 
        - The user may ask for logic, e.g., "Only show Employer Name when Smoker is Yes".
        - You MUST find the 'Employer Name' element (target) and the 'Smoker' element (source) by fuzzy matching their labels in the JSON.
-       - Add a 'visibilityConditions' entry to the target element.
+       - Add a 'visibility' object to the target element.
        - Schema for Condition: { targetElementId: string, operator: 'equals'|'notEquals'|'contains'|'greaterThan'|'lessThan'|'isEmpty'|'isNotEmpty', value: any }
+       - Schema for LogicGroup: { id: string, operator: 'AND'|'OR', conditions: Condition[] }
        - "Populated" means operator 'isNotEmpty'.
        - "Empty" means operator 'isEmpty'.
     4. Preservation: Do NOT change IDs of existing elements unless explicitly asked to regenerate them. Keep the structure intact.

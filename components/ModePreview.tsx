@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProcessDefinition, FormState, VisualTheme } from '../types';
-import { isElementVisible, isElementRequired, isSectionVisible, validateValue } from '../utils/logic';
+import { isElementVisible, isElementRequired, isSectionVisible, validateValue, evaluateLogicGroup } from '../utils/logic';
 import { RenderElement } from './FormElements';
 import { generateFormData } from '../services/geminiService';
 import { User, Sparkles, PanelBottom, ArrowRight } from 'lucide-react';
+import { OperationsHUD } from './OperationsHUD';
 
 interface ModePreviewProps {
   processDef: ProcessDefinition;
@@ -19,9 +20,40 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   const [currentStageIdx, setCurrentStageIdx] = useState(0);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // HUD State
+  const [hudVisible, setHudVisible] = useState(false);
+  const [activeSkill, setActiveSkill] = useState<string>('');
+  const [skillReason, setSkillReason] = useState<string>('');
 
   const currentStage = processDef.stages[currentStageIdx];
   const visibleSections = currentStage.sections.filter(sec => isSectionVisible(sec, formData));
+
+  // Evaluate Skills on Stage Change
+  useEffect(() => {
+      if (!currentStage) return;
+      
+      let foundSkill = currentStage.defaultSkill || '';
+      let foundReason = '';
+
+      if (currentStage.skillLogic && currentStage.skillLogic.length > 0) {
+          for (const rule of currentStage.skillLogic) {
+              if (evaluateLogicGroup(rule.logic, formData)) {
+                  foundSkill = rule.requiredSkill;
+                  foundReason = "Logic match found";
+                  break;
+              }
+          }
+      }
+
+      if (foundSkill) {
+          setActiveSkill(foundSkill);
+          setSkillReason(foundReason);
+          setHudVisible(true);
+      } else {
+          setHudVisible(false);
+      }
+  }, [currentStageIdx, currentStage, formData, processDef]);
 
   const handleNext = () => {
     const errors: {[key: string]: string} = {};
@@ -68,7 +100,14 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-6">
+    <div className="max-w-4xl mx-auto py-12 px-6 relative">
+        <OperationsHUD 
+            isVisible={hudVisible} 
+            requiredSkill={activeSkill} 
+            reason={skillReason}
+            onDismiss={() => setHudVisible(false)}
+        />
+
         <div className="mb-8 flex justify-between items-end">
             <div>
                 <h2 className="text-3xl font-serif text-sw-teal mb-2">{processDef.name}</h2>
@@ -150,7 +189,6 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
             </div>
         </div>
         
-        {/* Sticky Summary Render */}
         <div className="mt-8 space-y-4">
              {processDef.stages.flatMap(s => s.sections).filter(s => s.variant === 'summary' && isSectionVisible(s, formData)).map(summarySec => (
                  <div key={summarySec.id} className="bg-sw-teal/5 border border-sw-teal/20 rounded-xl p-6">

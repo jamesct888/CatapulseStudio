@@ -272,12 +272,12 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                                                 
                                                 {/* Logic Indicators */}
                                                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {element.visibilityConditions && element.visibilityConditions.length > 0 && (
+                                                    {element.visibility && (element.visibility.conditions.length > 0 || (element.visibility.groups && element.visibility.groups.length > 0)) && (
                                                         <div className="bg-sw-purpleLight text-sw-teal p-1 rounded-md" title="Has Visibility Logic">
                                                             <Eye size={12} />
                                                         </div>
                                                     )}
-                                                    {element.requiredConditions && element.requiredConditions.length > 0 && (
+                                                    {element.requiredLogic && (element.requiredLogic.conditions.length > 0 || (element.requiredLogic.groups && element.requiredLogic.groups.length > 0)) && (
                                                         <div className="bg-red-100 text-sw-red p-1 rounded-md" title="Has Mandatory Logic">
                                                             <CheckCircle2 size={12} />
                                                         </div>
@@ -295,8 +295,7 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                                                 id: `el_${Date.now()}`,
                                                 label: 'New Field',
                                                 type: 'text',
-                                                required: false,
-                                                visibilityConditions: []
+                                                required: false
                                             };
                                             const newDef = {...processDef};
                                             newDef.stages.find(s => s.id === selectedStageId)?.sections.find(s => s.id === section.id)?.elements.push(newEl);
@@ -357,8 +356,7 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                                                 id: `el_${Date.now()}`,
                                                 label: 'New Field',
                                                 type: tool.type as any,
-                                                required: false,
-                                                visibilityConditions: []
+                                                required: false
                                             };
                                             const newDef = {...processDef};
                                             // Find section globally

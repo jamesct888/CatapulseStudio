@@ -1,69 +1,358 @@
 
-import React, { useEffect, useState } from 'react';
-import { ElementDefinition, SectionDefinition, Condition, ValidationType } from '../types';
-import { Plus, Trash2, AlertCircle, Cpu, Info, Layout, Database, PanelBottom, Layers, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { ElementDefinition, SectionDefinition, StageDefinition, SkillRule, LogicGroup } from '../types';
+import { Plus, Trash2, AlertCircle, Info, Layout, Briefcase, ShieldCheck, GitMerge, ArrowDown, Tag, X, Edit2, Maximize2, GripHorizontal, Eye, CheckCircle2 } from 'lucide-react';
+import { LogicBuilder } from './LogicBuilder';
 
 interface PropertiesPanelProps {
   selectedElement: ElementDefinition | null;
   selectedSection: SectionDefinition | null;
+  selectedStage: StageDefinition | null;
   allElements: ElementDefinition[];
   activeTab: 'general' | 'logic';
   onTabChange: (tab: 'general' | 'logic') => void;
   onUpdateElement: (updated: ElementDefinition) => void;
   onUpdateSection: (updated: SectionDefinition) => void;
+  onUpdateStage: (updated: StageDefinition) => void;
   onDeleteElement: (id: string) => void;
   onDeleteSection: (id: string) => void;
+  onClose: () => void;
 }
+
+const COMMON_SKILLS = [
+    "Customer Service", 
+    "Senior Underwriter", 
+    "Compliance Officer", 
+    "Claims Handler", 
+    "Finance Manager",
+    "System Admin"
+];
+
+interface ModalWrapperProps {
+  title: string;
+  icon: any;
+  children: React.ReactNode;
+  onClose: () => void;
+  modalSize: { width: number; height: number };
+  onResizeStart: () => void;
+}
+
+const ModalWrapper: React.FC<ModalWrapperProps> = ({ title, icon: Icon, children, onClose, modalSize, onResizeStart }) => {
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div 
+              className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative border border-gray-200"
+              style={{ width: modalSize.width, height: modalSize.height, maxWidth: '95vw', maxHeight: '95vh' }}
+            >
+                {/* Modal Header */}
+                <div className="bg-sw-teal p-6 flex justify-between items-center text-white shrink-0">
+                    <div>
+                        <h3 className="text-xl font-bold font-serif flex items-center gap-2">
+                            <Icon size={24} /> {title}
+                        </h3>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
+                    {children}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-4 border-t border-gray-200 bg-white flex justify-between items-center shrink-0 relative">
+                    <div className="text-xs text-gray-400 italic">Changes apply immediately</div>
+                    <button onClick={onClose} className="px-6 py-2 bg-sw-teal text-white rounded-lg font-bold hover:bg-sw-tealHover shadow-sm">
+                        Done
+                    </button>
+                    {/* Resize Handle */}
+                    <div 
+                      className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize flex items-end justify-end p-1 text-gray-300 hover:text-sw-teal"
+                      onMouseDown={onResizeStart}
+                    >
+                        <svg viewBox="0 0 10 10" className="w-3 h-3 fill-current">
+                            <path d="M10 10 L10 0 L0 10 Z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+};
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
   selectedElement, 
   selectedSection,
+  selectedStage,
   allElements, 
-  activeTab,
+  activeTab, 
   onTabChange,
   onUpdateElement,
   onUpdateSection, 
+  onUpdateStage,
   onDeleteElement,
-  onDeleteSection
+  onDeleteSection,
+  onClose
 }) => {
   
-  // Determine what we are editing
   const isEditingElement = !!selectedElement;
   const isEditingSection = !selectedElement && !!selectedSection;
-  const data = selectedElement || selectedSection;
-
-  // Local state for delete confirmation to avoid window.confirm sandbox issues
+  const isEditingStage = !selectedElement && !selectedSection && !!selectedStage;
+  
+  const data = selectedElement || selectedSection || selectedStage;
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Reset confirmation state if selection changes
+  // Resizable sidebar state - Default to 400px
+  const [panelWidth, setPanelWidth] = useState(400);
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Modal States
+  const [skillModalOpen, setSkillModalOpen] = useState(false);
+  const [activeRuleIndex, setActiveRuleIndex] = useState<number | null>(null);
+  
+  const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
+  const [validationModalOpen, setValidationModalOpen] = useState(false);
+  
+  // Shared Modal Resize State (persists across modals for consistency)
+  const [modalSize, setModalSize] = useState({ width: 900, height: 700 });
+  const [isResizingModal, setIsResizingModal] = useState(false);
+
   useEffect(() => {
     setConfirmDeleteId(null);
   }, [data?.id]);
 
-  // Updated input style class to match design system
+  // Sidebar Resizing
+  useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+          if (!isResizing) return;
+          const newWidth = document.body.clientWidth - e.clientX;
+          if (newWidth > 300 && newWidth < 800) {
+              setPanelWidth(newWidth);
+          }
+      };
+      const handleMouseUp = () => setIsResizing(false);
+
+      if (isResizing) {
+          window.addEventListener('mousemove', handleMouseMove);
+          window.addEventListener('mouseup', handleMouseUp);
+      }
+      return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [isResizing]);
+
+  // Modal Resizing Logic
+  useEffect(() => {
+      const handleModalMouseMove = (e: MouseEvent) => {
+          if (!isResizingModal) return;
+          setModalSize(prev => ({
+              width: Math.max(600, prev.width + e.movementX * 2),
+              height: Math.max(400, prev.height + e.movementY * 2)
+          }));
+      };
+      const handleModalMouseUp = () => setIsResizingModal(false);
+
+      if (isResizingModal) {
+          window.addEventListener('mousemove', handleModalMouseMove);
+          window.addEventListener('mouseup', handleModalMouseUp);
+      }
+      return () => {
+          window.removeEventListener('mousemove', handleModalMouseMove);
+          window.removeEventListener('mouseup', handleModalMouseUp);
+      };
+  }, [isResizingModal]);
+
+
   const inputClass = "w-full p-3 bg-white text-sw-text border border-gray-300 rounded-lg focus:outline-none focus:border-sw-teal focus:ring-1 focus:ring-sw-teal transition-all text-sm";
   const labelClass = "block text-xs font-bold text-sw-teal uppercase mb-2 tracking-wide";
 
+  // --- SPECIFIC MODAL CONTENTS ---
+
+  const renderSkillModal = () => {
+      if (!skillModalOpen || activeRuleIndex === null || !selectedStage) return null;
+      const rule = selectedStage.skillLogic?.[activeRuleIndex];
+      if (!rule) return null;
+
+      const handleModalUpdate = (updatedRule: SkillRule) => {
+          const newList = [...selectedStage.skillLogic!];
+          newList[activeRuleIndex] = updatedRule;
+          onUpdateStage({ ...selectedStage, skillLogic: newList });
+      };
+
+      return (
+          <ModalWrapper 
+            title={`Configure Routing Rule #${activeRuleIndex + 1}`} 
+            icon={Briefcase} 
+            onClose={() => setSkillModalOpen(false)}
+            modalSize={modalSize}
+            onResizeStart={() => setIsResizingModal(true)}
+          >
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+                  <div className="lg:col-span-2 space-y-4 flex flex-col">
+                      <div className="flex items-center gap-2 mb-2">
+                          <GitMerge className="text-sw-teal" size={20} />
+                          <h4 className="text-sm font-bold text-gray-700 uppercase tracking-widest">When these conditions are met...</h4>
+                      </div>
+                      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex-1 overflow-y-auto">
+                          <LogicBuilder 
+                              group={rule.logic} 
+                              onChange={(g) => handleModalUpdate({ ...rule, logic: g })} 
+                              availableTargets={availableTargets}
+                          />
+                      </div>
+                  </div>
+                  <div className="space-y-4 flex flex-col">
+                      <div className="flex items-center gap-2 mb-2">
+                          <ShieldCheck className="text-sw-teal" size={20} />
+                          <h4 className="text-sm font-bold text-gray-700 uppercase tracking-widest">Route to...</h4>
+                      </div>
+                      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
+                          <label className="block text-xs font-bold text-gray-400 mb-2">Required Skill / Work Queue</label>
+                          <input 
+                              type="text" 
+                              value={rule.requiredSkill}
+                              onChange={(e) => handleModalUpdate({ ...rule, requiredSkill: e.target.value })}
+                              className="w-full p-3 border border-sw-teal/30 rounded-lg font-bold text-sw-teal mb-4 focus:ring-2 focus:ring-sw-teal"
+                              placeholder="e.g. Senior Underwriter"
+                          />
+                          <div className="text-xs font-bold text-gray-400 mb-2">Quick Select:</div>
+                          <div className="flex flex-wrap gap-2 overflow-y-auto content-start">
+                              {COMMON_SKILLS.map(skill => (
+                                  <button
+                                      key={skill}
+                                      onClick={() => handleModalUpdate({ ...rule, requiredSkill: skill })}
+                                      className={`px-3 py-2 rounded-lg text-xs font-bold text-left transition-all ${rule.requiredSkill === skill ? 'bg-sw-teal text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-sw-teal/10'}`}
+                                  >
+                                      {skill}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </ModalWrapper>
+      );
+  };
+
+  const renderVisibilityModal = () => {
+      if (!visibilityModalOpen || !data) return null;
+      const logicGroup = (data as any).visibility;
+
+      return (
+          <ModalWrapper 
+            title="Configure Visibility Logic" 
+            icon={Eye} 
+            onClose={() => setVisibilityModalOpen(false)}
+            modalSize={modalSize}
+            onResizeStart={() => setIsResizingModal(true)}
+          >
+              <div className="max-w-4xl mx-auto">
+                  <p className="text-gray-500 mb-6">Define the rules that determine when this {isEditingElement ? 'field' : 'section'} should be visible.</p>
+                  <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
+                      <LogicBuilder 
+                          group={logicGroup} 
+                          onChange={(g) => handleChange('visibility', g)} 
+                          availableTargets={availableTargets}
+                      />
+                  </div>
+              </div>
+          </ModalWrapper>
+      );
+  }
+
+  const renderValidationModal = () => {
+      if (!validationModalOpen || !isEditingElement) return null;
+      const el = data as ElementDefinition;
+
+      return (
+          <ModalWrapper 
+            title="Field Validation Rules" 
+            icon={ShieldCheck} 
+            onClose={() => setValidationModalOpen(false)}
+            modalSize={modalSize}
+            onResizeStart={() => setIsResizingModal(true)}
+          >
+              <div className="max-w-2xl mx-auto space-y-8">
+                  <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
+                      <div>
+                          <label className={labelClass}>Validation Type</label>
+                          <select 
+                              value={el.validation?.type || 'none'} 
+                              onChange={(e) => handleValidationChange('type', e.target.value)}
+                              className={inputClass}
+                          >
+                              <option value="none">No Validation</option>
+                              <option value="email">Email Format</option>
+                              <option value="phone_uk">UK Mobile/Phone Number</option>
+                              <option value="nino_uk">UK National Insurance Number</option>
+                              <option value="date_future">Date must be in Future</option>
+                              <option value="date_past">Date must be in Past</option>
+                              <option value="custom">Custom Description</option>
+                          </select>
+                      </div>
+                      
+                      {el.validation?.type === 'custom' && (
+                          <div className="animate-in fade-in slide-in-from-top-2">
+                              <label className={labelClass}>Custom Rule Description</label>
+                              <textarea
+                                  value={el.validation?.customDescription || ''}
+                                  onChange={(e) => handleValidationChange('customDescription', e.target.value)}
+                                  className={inputClass}
+                                  rows={4}
+                                  placeholder="Describe the validation rule (e.g., 'Must start with 3 letters...')"
+                              />
+                              <p className="text-xs text-gray-400 mt-2">This description will be included in the generated user stories for developers.</p>
+                          </div>
+                      )}
+
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex gap-3">
+                          <Info className="text-blue-500 shrink-0" size={20} />
+                          <div className="text-sm text-blue-700">
+                              <p className="font-bold mb-1">Note:</p>
+                              <p>Standard validations (Email, Phone, NI) are automatically enforced in the Preview mode. Custom validations are documentation-only.</p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </ModalWrapper>
+      );
+  }
+
   if (!data) {
     return (
-      <div className="p-8 text-center text-gray-400 flex flex-col items-center justify-center h-full bg-white">
-        <Info size={48} className="mb-4 opacity-20" />
-        <p className="text-lg font-serif text-sw-teal mb-2">No Selection</p>
-        <p className="text-sm">Select an element or section on the canvas to edit its properties.</p>
+      <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col items-center justify-center bg-white border-l border-gray-200 shadow-2xl z-40 relative">
+         <div 
+            className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors"
+            onMouseDown={() => setIsResizing(true)}
+         ></div>
+         <button onClick={onClose} className="absolute top-4 right-4 text-gray-300 hover:text-gray-500">
+             <X size={20} />
+         </button>
+        <div className="p-8 text-center text-gray-400">
+            <Info size={48} className="mb-4 opacity-20 mx-auto" />
+            <p className="text-lg font-serif text-sw-teal mb-2">No Selection</p>
+            <p className="text-sm">Select an element, section, or stage to edit properties.</p>
+        </div>
       </div>
     );
   }
 
-  // Generic handler for root properties
+  // Generic handler
   const handleChange = (field: string, value: any) => {
     if (isEditingElement) {
         onUpdateElement({ ...selectedElement!, [field]: value });
     } else if (isEditingSection) {
         onUpdateSection({ ...selectedSection!, [field]: value });
+    } else if (isEditingStage) {
+        onUpdateStage({ ...selectedStage!, [field]: value });
     }
   };
 
-  // Validation Handler
   const handleValidationChange = (field: string, value: any) => {
     if (!isEditingElement) return;
     const currentValidation = selectedElement?.validation || { type: 'none' };
@@ -71,449 +360,191 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     onUpdateElement({ ...selectedElement!, validation: updatedValidation });
   };
 
-  const handleConditionChange = (
-    type: 'visibilityConditions' | 'requiredConditions',
-    index: number,
-    field: keyof Condition,
-    value: any
-  ) => {
-    const currentConditions = (data as any)[type] || [];
-    let newValue = value;
-    let newConditions = [...currentConditions];
-    
-    // Create updated condition object
-    const updatedCondition = { ...currentConditions[index], [field]: newValue };
-
-    if (field === 'operator' && (newValue === 'isEmpty' || newValue === 'isNotEmpty')) {
-        updatedCondition.value = '';
-    }
-
-    newConditions[index] = updatedCondition;
-
-    if (isEditingElement) {
-        onUpdateElement({ ...selectedElement!, [type]: newConditions });
-    } else {
-        onUpdateSection({ ...selectedSection!, [type]: newConditions });
-    }
-  };
-
-  const addCondition = (type: 'visibilityConditions' | 'requiredConditions') => {
-    const newCondition: Condition = {
-      targetElementId: allElements.filter(e => e.id !== data.id)[0]?.id || '',
-      operator: 'equals',
-      value: ''
-    };
-    const currentList = (data as any)[type] || [];
-    
-    if (isEditingElement) {
-        onUpdateElement({ ...selectedElement!, [type]: [...currentList, newCondition] });
-    } else {
-        onUpdateSection({ ...selectedSection!, [type]: [...currentList, newCondition] });
-    }
-  };
-
-  const removeCondition = (type: 'visibilityConditions' | 'requiredConditions', index: number) => {
-    const conditions = [...((data as any)[type] || [])];
-    conditions.splice(index, 1);
-    
-    if (isEditingElement) {
-        onUpdateElement({ ...selectedElement!, [type]: conditions });
-    } else {
-        onUpdateSection({ ...selectedSection!, [type]: conditions });
-    }
-  };
-
-  // Filter available targets to avoid self-reference or cyclic dependencies (simple check)
-  const availableTargets = allElements.filter(e => e.id !== data.id);
-
-  const renderConditionRow = (cond: Condition, idx: number, type: 'visibilityConditions' | 'requiredConditions') => {
-      const isUnary = cond.operator === 'isEmpty' || cond.operator === 'isNotEmpty';
-      return (
-        <div key={idx} id={`condition-${type}-${idx}`} className="p-4 bg-sw-lightGray rounded-xl relative text-sm border border-gray-200">
-            <button onClick={() => removeCondition(type, idx)} className="absolute top-2 right-2 text-gray-400 hover:text-sw-red transition-colors">
-            <Trash2 size={16} />
-            </button>
-            <div className="space-y-3 pt-2">
-            <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 mb-1 block">If Field</label>
-                <select 
-                    className={inputClass}
-                    value={cond.targetElementId}
-                    onChange={(e) => handleConditionChange(type, idx, 'targetElementId', e.target.value)}
-                >
-                    <option value="">Select Field...</option>
-                    {availableTargets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-            </div>
-            <div className="flex gap-3">
-                <div className={isUnary ? "w-full" : "w-1/2"}>
-                    <label className="text-[10px] uppercase font-bold text-gray-500 mb-1 block">Condition</label>
-                    <select 
-                        className={inputClass}
-                        value={cond.operator}
-                        onChange={(e) => handleConditionChange(type, idx, 'operator', e.target.value)}
-                    >
-                        <option value="equals">Equals</option>
-                        <option value="notEquals">Not Equals</option>
-                        <option value="contains">Contains</option>
-                        <option value="greaterThan">Greater Than</option>
-                        <option value="lessThan">Less Than</option>
-                        <option value="isNotEmpty">Is Not Empty</option>
-                        <option value="isEmpty">Is Empty</option>
-                    </select>
-                </div>
-                {!isUnary && (
-                    <div className="w-1/2">
-                        <label className="text-[10px] uppercase font-bold text-gray-500 mb-1 block">Value</label>
-                        <input 
-                            type="text" 
-                            className={inputClass}
-                            value={String(cond.value)}
-                            onChange={(e) => handleConditionChange(type, idx, 'value', e.target.value)}
-                        />
-                    </div>
-                )}
-            </div>
-            </div>
-        </div>
-      );
-  }
-
   const handleDelete = () => {
-      // 2-step confirmation to bypass sandbox window.confirm restrictions
       if (confirmDeleteId === data.id) {
           if (isEditingElement) onDeleteElement(data.id);
-          else onDeleteSection(data.id);
+          else if (isEditingSection) onDeleteSection(data.id);
           setConfirmDeleteId(null);
       } else {
           setConfirmDeleteId(data.id);
-          // Auto-reset after 3 seconds if not confirmed
           setTimeout(() => {
               setConfirmDeleteId(current => current === data.id ? null : current);
           }, 3000);
       }
   }
 
+  const availableTargets = allElements.filter(e => e.id !== data.id);
+
+  const ensureLogicGroup = (field: 'visibility' | 'requiredLogic') => {
+      const current = (data as any)[field];
+      if (!current) {
+          const newGroup: LogicGroup = { id: 'root', operator: 'AND', conditions: [] };
+          handleChange(field, newGroup);
+      }
+  };
+
+  // --- Render ---
   return (
-    <div id="panel" className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40">
-      <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
-        <div className="flex flex-col">
-            <h2 className="font-serif font-bold text-2xl text-sw-teal">
-                {isEditingElement ? 'Element' : 'Section'}
+    <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40 relative">
+      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors" onMouseDown={() => setIsResizing(true)}></div>
+
+      {renderSkillModal()}
+      {renderVisibilityModal()}
+      {renderValidationModal()}
+
+      {/* Header */}
+      <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
+        <div className="flex flex-col overflow-hidden max-w-[200px]">
+            <h2 className="font-serif font-bold text-2xl text-sw-teal truncate">
+                {isEditingElement ? 'Element' : isEditingSection ? 'Section' : 'Stage'}
             </h2>
-            <span className="text-xs text-gray-400 font-mono">{data.id}</span>
+            <span className="text-xs text-gray-400 font-mono truncate">{data.id}</span>
         </div>
-        <button 
-          onClick={handleDelete}
-          className={`p-2 rounded-full transition-all flex items-center gap-2 ${confirmDeleteId === data.id ? 'bg-sw-red text-white pr-4 shadow-md' : 'text-gray-400 hover:text-sw-red hover:bg-sw-lightGray'}`}
-          title={confirmDeleteId === data.id ? "Click again to confirm" : `Delete ${isEditingElement ? 'Element' : 'Section'}`}
-        >
-          <Trash2 size={20} />
-          {confirmDeleteId === data.id && <span className="text-xs font-bold animate-in fade-in">Confirm?</span>}
-        </button>
+        <div className="flex items-center gap-1">
+            {!isEditingStage && (
+                <button onClick={handleDelete} className={`p-2 rounded-full transition-all flex items-center gap-2 shrink-0 ${confirmDeleteId === data.id ? 'bg-sw-red text-white pr-4 shadow-md' : 'text-gray-400 hover:text-sw-red hover:bg-sw-lightGray'}`} title="Delete">
+                <Trash2 size={20} />
+                {confirmDeleteId === data.id && <span className="text-xs font-bold animate-in fade-in">Confirm?</span>}
+                </button>
+            )}
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-sw-lightGray transition-colors" title="Close Panel">
+                <X size={20} />
+            </button>
+        </div>
       </div>
 
-      <div className="flex border-b border-gray-200">
-        <button
-          id="tab-general"
-          className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'general' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`}
-          onClick={() => onTabChange('general')}
-        >
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 shrink-0">
+        <button className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'general' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`} onClick={() => onTabChange('general')}>
           General
         </button>
-        <button
-          id="tab-logic"
-          className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'logic' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`}
-          onClick={() => onTabChange('logic')}
-        >
-          Logic
+        <button className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'logic' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`} onClick={() => onTabChange('logic')}>
+          {isEditingStage ? 'Operations' : 'Logic'}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+      <div className="flex-1 overflow-y-auto p-8 space-y-8">
+        {/* --- GENERAL TAB --- */}
         {activeTab === 'general' && (
           <>
-            {isEditingElement ? (
-              /* Element Specific Fields */
-              <>
-                <div>
-                  <label className={labelClass}>Field Label</label>
-                  <input
-                    type="text"
-                    value={(data as ElementDefinition).label}
-                    onChange={(e) => handleChange('label', e.target.value)}
-                    className={inputClass}
-                    placeholder="Enter label text..."
-                  />
-                </div>
-
-                <div>
-                  <label className={labelClass}>Field Type</label>
-                  <select
-                    value={(data as ElementDefinition).type}
-                    onChange={(e) => handleChange('type', e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="text">Single Line Text</option>
-                    <option value="email">Email Address</option>
-                    <option value="textarea">Multi-line Text</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
-                    <option value="currency">Currency</option>
-                    <option value="select">Dropdown</option>
-                    <option value="radio">Radio Buttons</option>
-                    <option value="checkbox">Checkbox</option>
-                    <option value="static">Static Text / Read-Only</option>
-                  </select>
-                </div>
-                
-                {/* Static Element Specific: Data Source */}
-                {(data as ElementDefinition).type === 'static' && (
-                    <div className="p-4 bg-sw-lightGray rounded-xl border border-gray-200">
-                        <label className={labelClass}>Content Mode</label>
-                        <div className="flex bg-white p-1 rounded-lg border border-gray-300 mb-4">
-                            <button 
-                                onClick={() => handleChange('staticDataSource', 'manual')}
-                                className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${(data as ElementDefinition).staticDataSource !== 'field' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-sw-teal'}`}
-                            >
-                                Manual Text
-                            </button>
-                            <button 
-                                onClick={() => handleChange('staticDataSource', 'field')}
-                                className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${(data as ElementDefinition).staticDataSource === 'field' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-sw-teal'}`}
-                            >
-                                Value from Field
-                            </button>
-                        </div>
-
-                        {(data as ElementDefinition).staticDataSource === 'field' ? (
-                             <div>
-                                <label className={labelClass}>Source Field</label>
-                                <select
-                                    value={(data as ElementDefinition).sourceFieldId || ''}
-                                    onChange={(e) => handleChange('sourceFieldId', e.target.value)}
-                                    className={inputClass}
-                                >
-                                    <option value="">Select a field...</option>
-                                    {availableTargets.map(t => (
-                                        <option key={t.id} value={t.id}>{t.label}</option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-gray-500 mt-2 italic flex items-center gap-1">
-                                    <Database size={12}/> This field will display the value of the selected source.
-                                </p>
-                             </div>
-                        ) : (
-                             <div>
-                                <label className={labelClass}>Content</label>
-                                <textarea
-                                    value={data.description || ''}
-                                    onChange={(e) => handleChange('description', e.target.value)}
-                                    className={inputClass}
-                                    rows={4}
-                                    placeholder="Enter static text content here..."
-                                />
-                             </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Options for Select/Radio */}
-                {((data as ElementDefinition).type === 'select' || (data as ElementDefinition).type === 'radio') && (
-                  <div>
-                    <label className={labelClass}>Options (comma separated)</label>
-                    <textarea
-                      value={Array.isArray((data as ElementDefinition).options) ? ((data as ElementDefinition).options as string[]).join(',') : (data as ElementDefinition).options}
-                      onChange={(e) => handleChange('options', e.target.value.split(','))}
-                      className={inputClass}
-                      rows={3}
-                      placeholder="Option 1, Option 2, Option 3..."
-                    />
-                  </div>
-                )}
-
-                {/* Description for Input Fields */}
-                {((data as ElementDefinition).type === 'text' || (data as ElementDefinition).type === 'email' || (data as ElementDefinition).type === 'textarea') && (
-                  <div>
-                    <label className={labelClass}>Placeholder / Help Text</label>
-                    <textarea
-                      value={data.description || ''}
-                      onChange={(e) => handleChange('description', e.target.value)}
-                      className={inputClass}
-                      rows={3}
-                    />
-                  </div>
-                )}
-
-                {/* Mandatory Checkbox (Not available for Static) */}
-                {(data as ElementDefinition).type !== 'static' && (
-                    <div className="flex items-center gap-3 mt-6 p-4 bg-sw-lightGray rounded-xl">
-                    <input 
-                        type="checkbox" 
-                        id="req" 
-                        checked={(data as ElementDefinition).required} 
-                        onChange={(e) => handleChange('required', e.target.checked)}
-                        className="w-5 h-5 text-sw-teal border-gray-300 rounded focus:ring-sw-teal accent-sw-teal"
-                    />
-                    <label htmlFor="req" className="text-sm text-sw-teal font-bold">Mandatory Field</label>
-                    </div>
-                )}
-              </>
-            ) : (
-               /* Section Specific Fields */
-               <>
-                 <div>
-                    <label className={labelClass}>Section Title</label>
-                    <input
-                        type="text"
-                        value={(data as SectionDefinition).title}
-                        onChange={(e) => handleChange('title', e.target.value)}
-                        className={inputClass}
-                    />
-                 </div>
-                 
-                 {/* Section Variant Selector (Standard vs Summary) */}
-                 <div>
-                    <label className={labelClass}>Section Type</label>
-                    <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
-                        <button 
-                            onClick={() => handleChange('variant', 'standard')}
-                            className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${!(data as SectionDefinition).variant || (data as SectionDefinition).variant === 'standard' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                            <Layers size={14} /> Standard Flow
-                        </button>
-                        <button 
-                            onClick={() => handleChange('variant', 'summary')}
-                            className={`flex-1 py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${(data as SectionDefinition).variant === 'summary' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                            <PanelBottom size={14} /> Sticky Summary
-                        </button>
-                    </div>
-                    <p className="text-[10px] text-gray-500 mt-2 italic">
-                        {(data as SectionDefinition).variant === 'summary' 
-                            ? 'Appears at the bottom of the form across all stages. Read-only.' 
-                            : 'Appears in the normal form flow within its specific stage.'}
-                    </p>
-                 </div>
-
-                 <div>
+            {isEditingStage && (
+                <>
+                    <div><label className={labelClass}>Stage Title</label><input type="text" value={(data as StageDefinition).title} onChange={(e) => handleChange('title', e.target.value)} className={inputClass} /></div>
+                    <div><label className={labelClass}>Default Required Skill</label><input type="text" value={(data as StageDefinition).defaultSkill || ''} onChange={(e) => handleChange('defaultSkill', e.target.value)} className={inputClass} placeholder="e.g. Customer Service Rep" /></div>
+                </>
+            )}
+            {isEditingSection && (
+                <>
+                    <div><label className={labelClass}>Section Title</label><input type="text" value={(data as SectionDefinition).title} onChange={(e) => handleChange('title', e.target.value)} className={inputClass} /></div>
+                    <div>
                     <label className={labelClass}>Layout Grid</label>
                     <div className="grid grid-cols-3 gap-2">
                         {['1col', '2col', '3col'].map(l => (
-                            <button
-                                key={l}
-                                onClick={() => handleChange('layout', l)}
-                                className={`p-3 border rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${(data as SectionDefinition).layout === l ? 'border-sw-teal bg-sw-teal/5 text-sw-teal font-bold' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                            >
-                                <Layout size={20} />
-                                <span className="text-xs uppercase">{l.replace('col', ' Col')}</span>
-                            </button>
+                            <button key={l} onClick={() => handleChange('layout', l)} className={`p-3 border rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${(data as SectionDefinition).layout === l ? 'border-sw-teal bg-sw-teal/5 text-sw-teal font-bold' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}><Layout size={20} /><span className="text-xs uppercase">{l.replace('col', ' Col')}</span></button>
                         ))}
                     </div>
                  </div>
-
-                 <div>
-                    <label className={labelClass}>Description / Notes</label>
-                    <textarea
-                        value={data.description || ''}
-                        onChange={(e) => handleChange('description', e.target.value)}
-                        className={inputClass}
-                        rows={4}
-                        placeholder="Internal notes or description..."
-                    />
-                 </div>
-               </>
+                </>
+            )}
+            {isEditingElement && (
+                <>
+                    <div><label className={labelClass}>Field Label</label><input type="text" value={(data as ElementDefinition).label} onChange={(e) => handleChange('label', e.target.value)} className={inputClass} /></div>
+                    <div><label className={labelClass}>Field Type</label>
+                        <select value={(data as ElementDefinition).type} onChange={(e) => handleChange('type', e.target.value)} className={inputClass}>
+                            <option value="text">Single Line Text</option><option value="email">Email Address</option><option value="textarea">Multi-line Text</option><option value="number">Number</option><option value="date">Date</option><option value="currency">Currency</option><option value="select">Dropdown</option><option value="radio">Radio Buttons</option><option value="checkbox">Checkbox</option><option value="static">Static Text</option>
+                        </select>
+                    </div>
+                    {['select', 'radio'].includes((data as ElementDefinition).type) && (
+                        <div><label className={labelClass}>Options (comma separated)</label><textarea value={Array.isArray((data as ElementDefinition).options) ? ((data as ElementDefinition).options as string[]).join(',') : (data as ElementDefinition).options} onChange={(e) => handleChange('options', e.target.value.split(','))} className={inputClass} rows={3} /></div>
+                    )}
+                    {(data as ElementDefinition).type !== 'static' && (
+                        <div className="flex items-center gap-3 mt-4 p-4 bg-sw-lightGray rounded-xl">
+                            <input type="checkbox" checked={(data as ElementDefinition).required} onChange={(e) => handleChange('required', e.target.checked)} className="w-5 h-5 text-sw-teal rounded focus:ring-sw-teal" />
+                            <label className="text-sm text-sw-teal font-bold">Mandatory Field</label>
+                        </div>
+                    )}
+                </>
             )}
           </>
         )}
 
+        {/* --- LOGIC TAB --- */}
         {activeTab === 'logic' && (
-          <div className="space-y-10">
-             {/* Data Validation Section (Elements Only) */}
-             {isEditingElement && (data as ElementDefinition).type !== 'static' && (
-                <div className="pb-8 border-b border-gray-100">
-                    <div className="flex justify-between items-center mb-4">
-                        <label className="text-xs font-bold text-sw-teal uppercase flex items-center gap-2">
-                            <ShieldCheck size={16} /> Data Validation
-                        </label>
-                    </div>
-                    
-                    <div className="p-4 bg-sw-lightGray rounded-xl border border-gray-200 space-y-4">
-                         <div>
-                            <label className={labelClass}>Validation Type</label>
-                            <select 
-                                value={(data as ElementDefinition).validation?.type || 'none'} 
-                                onChange={(e) => handleValidationChange('type', e.target.value)}
-                                className={inputClass}
-                            >
-                                <option value="none">None</option>
-                                <option value="email">Email Format</option>
-                                <option value="phone_uk">UK Mobile/Phone Number</option>
-                                <option value="nino_uk">UK National Insurance Number</option>
-                                <option value="date_future">Date must be in Future</option>
-                                <option value="date_past">Date must be in Past</option>
-                                <option value="custom">Custom / Other</option>
-                            </select>
-                         </div>
-
-                         {(data as ElementDefinition).validation?.type === 'custom' && (
-                             <div className="animate-in fade-in slide-in-from-top-2">
-                                <label className={labelClass}>Custom Rule Description</label>
-                                <textarea
-                                    value={(data as ElementDefinition).validation?.customDescription || ''}
-                                    onChange={(e) => handleValidationChange('customDescription', e.target.value)}
-                                    className={inputClass}
-                                    rows={3}
-                                    placeholder="e.g. Must start with 'n' and be followed by 5 numbers..."
-                                />
-                                <p className="text-[10px] text-gray-400 mt-2 italic flex items-center gap-1">
-                                    <Info size={12}/> Used for documentation. Not enforced in preview.
-                                </p>
-                             </div>
-                         )}
+          <div className="space-y-6">
+            
+            {/* STAGE SKILLS */}
+            {isEditingStage && (
+                <div className="space-y-4">
+                    <div className="bg-sw-purpleLight/30 p-6 rounded-xl border border-sw-teal/10">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-sw-teal p-2 rounded-lg text-white"><Briefcase size={20} /></div>
+                                <div>
+                                    <h3 className="font-bold text-sw-teal">Skill Routing</h3>
+                                    <p className="text-xs text-gray-500">{(data as StageDefinition).skillLogic?.length || 0} Rules Configured</p>
+                                </div>
+                            </div>
+                            <button onClick={() => {
+                                const newRule: SkillRule = { logic: { id: Date.now().toString(), operator: 'AND', conditions: [] }, requiredSkill: '' };
+                                const newIndex = (selectedStage.skillLogic?.length || 0);
+                                onUpdateStage({ ...selectedStage!, skillLogic: [...(selectedStage?.skillLogic || []), newRule] });
+                                setActiveRuleIndex(newIndex);
+                                setSkillModalOpen(true);
+                            }} className="text-xs bg-sw-teal text-white px-3 py-2 rounded-lg font-bold hover:bg-sw-tealHover">+ Add Rule</button>
+                        </div>
+                        <div className="space-y-2">
+                            {(data as StageDefinition).skillLogic?.map((rule, idx) => (
+                                <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center text-sm group">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono text-xs text-gray-400">#{idx+1}</span>
+                                        <span className="font-bold text-gray-700">{rule.requiredSkill || 'Unassigned'}</span>
+                                    </div>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => { setActiveRuleIndex(idx); setSkillModalOpen(true); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-teal"><Edit2 size={14}/></button>
+                                        <button onClick={() => { const nl = [...selectedStage!.skillLogic!]; nl.splice(idx,1); onUpdateStage({...selectedStage!, skillLogic: nl}); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-red"><Trash2 size={14}/></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Visibility Logic (Common to both) */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <label className="text-xs font-bold text-sw-teal uppercase flex items-center gap-2">
-                   <AlertCircle size={16} /> Visibility Rules
-                </label>
-                <button onClick={() => addCondition('visibilityConditions')} className="text-xs bg-sw-teal text-white px-3 py-1.5 rounded-full hover:bg-sw-tealHover font-bold transition-all flex items-center gap-1 shadow-sm">
-                  <Plus size={14} /> Add Rule
-                </button>
-              </div>
-              <div className="space-y-4">
-                {(!data.visibilityConditions || data.visibilityConditions.length === 0) && (
-                   <div className="text-sm text-gray-400 italic p-4 border-2 border-dashed border-gray-200 rounded-xl text-center bg-gray-50">
-                     {isEditingElement ? 'Element' : 'Section'} is always visible.
-                   </div>
-                )}
-                {data.visibilityConditions?.map((cond, idx) => renderConditionRow(cond, idx, 'visibilityConditions'))}
-              </div>
-            </div>
-
-            {/* Required Logic (Only for Elements) */}
-            {isEditingElement && (data as ElementDefinition).type !== 'static' && (
-                <div>
-                <div className="flex justify-between items-center mb-4">
-                    <label className="text-xs font-bold text-sw-teal uppercase flex items-center gap-2">
-                    <Cpu size={16} /> Mandatory Rules
-                    </label>
-                    <button onClick={() => addCondition('requiredConditions')} className="text-xs bg-sw-teal text-white px-3 py-1.5 rounded-full hover:bg-sw-tealHover font-bold transition-all flex items-center gap-1 shadow-sm">
-                    <Plus size={14} /> Add Rule
-                    </button>
-                </div>
-                <div className="space-y-4">
-                    {(!(data as ElementDefinition).requiredConditions || (data as ElementDefinition).requiredConditions?.length === 0) && (
-                    <div className="text-sm text-gray-400 italic p-4 border-2 border-dashed border-gray-200 rounded-xl text-center bg-gray-50">
-                        Follows default mandatory setting.
+            {/* VISIBILITY CARD */}
+            {!isEditingStage && (
+                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => { ensureLogicGroup('visibility'); setVisibilityModalOpen(true); }}>
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="p-3 bg-sw-purpleLight rounded-lg text-sw-teal group-hover:bg-sw-teal group-hover:text-white transition-colors">
+                            <Eye size={24} />
+                        </div>
+                        <div className="text-right">
+                            <span className={`text-xs font-bold px-2 py-1 rounded ${((data as any).visibility?.conditions?.length > 0 || (data as any).visibility?.groups?.length > 0) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                                {((data as any).visibility?.conditions?.length || 0)} Conditions
+                            </span>
+                        </div>
                     </div>
-                    )}
-                    {(data as ElementDefinition).requiredConditions?.map((cond, idx) => renderConditionRow(cond, idx, 'requiredConditions'))}
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">Visibility Logic</h3>
+                    <p className="text-sm text-gray-500 mb-4">Control when this component appears based on other field values.</p>
+                    <button className="w-full py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 group-hover:bg-sw-teal group-hover:text-white group-hover:border-sw-teal transition-all">Configure Rules</button>
                 </div>
+            )}
+
+            {/* VALIDATION CARD */}
+            {isEditingElement && (data as ElementDefinition).type !== 'static' && (
+                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => setValidationModalOpen(true)}>
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="p-3 bg-red-50 rounded-lg text-sw-red group-hover:bg-sw-red group-hover:text-white transition-colors">
+                            <ShieldCheck size={24} />
+                        </div>
+                        <div className="text-right">
+                            <span className={`text-xs font-bold px-2 py-1 rounded ${(data as ElementDefinition).validation?.type !== 'none' && (data as ElementDefinition).validation ? 'bg-sw-teal text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                {(data as ElementDefinition).validation?.type || 'None'}
+                            </span>
+                        </div>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">Data Validation</h3>
+                    <p className="text-sm text-gray-500 mb-4">Set format rules like Email, UK Phone, or custom logic checks.</p>
+                    <button className="w-full py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 group-hover:bg-sw-red group-hover:text-white group-hover:border-sw-red transition-all">Setup Validation</button>
                 </div>
             )}
           </div>

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
 import { ModePreview } from './components/ModePreview';
@@ -7,59 +7,63 @@ import { ModeSpec } from './components/ModeSpec';
 import { ModeQA } from './components/ModeQA';
 import { ModePega } from './components/ModePega';
 import { PropertiesPanel } from './components/PropertiesPanel';
-import { CatapulseLogo, ScrambleText } from './components/Shared';
+import { AppHeader } from './components/AppHeader';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { DemoManager } from './components/DemoManager';
+import { DemoFocusOverlay } from './components/DemoFocusOverlay';
+import { useProcessState } from './hooks/useProcessState'; // New Hook
 import { 
   ProcessDefinition, FormState, VisualTheme, UserStory, TestCase, 
-  ElementDefinition, SectionDefinition, StoryStrategy 
+  ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy 
 } from './types';
 import { 
   generateProcessStructure, generateProcessFromImage, modifyProcess
 } from './services/geminiService';
 import { 
-  demoProcess, demoDigitizedProcess, demoFormData, demoUserStories, 
-  demoTestCases 
+  demoDigitizedProcess 
 } from './services/demoData';
-import { Edit3, Play, FileText, CheckSquare, Settings2, Code } from 'lucide-react';
 
 // --- Main App Component ---
 const App: React.FC = () => {
-  // State
+  // Use Custom Hook for Logic
+  const { 
+    processDef, setProcessDef, updateElement, updateSection, updateStage, deleteElement, deleteSection 
+  } = useProcessState();
+
+  // UI State
   const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');
-  const [processDef, setProcessDef] = useState<ProcessDefinition | null>(null);
   const [startPrompt, setStartPrompt] = useState('');
   const [showDemoDrop, setShowDemoDrop] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   
-  // Editor State
+  // Selection State
   const [selectedStageId, setSelectedStageId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  
+  // Tool State
   const [aiPrompt, setAiPrompt] = useState('');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const [activePropTab, setActivePropTab] = useState<'general' | 'logic'>('general');
-
-  // Preview State
   const [formData, setFormData] = useState<FormState>({});
   const [visualTheme, setVisualTheme] = useState<VisualTheme>({ density: 'default', radius: 'medium' });
   const [personaPrompt, setPersonaPrompt] = useState('');
-
-  // QA State
+  
+  // QA & Pega State
   const [qaTab, setQaTab] = useState<'stories' | 'cases'>('stories');
   const [storyStrategy, setStoryStrategy] = useState<StoryStrategy>('screen');
   const [userStories, setUserStories] = useState<UserStory[]>([]);
   const [testCases, setTestCases] = useState<TestCase[]>([]);
-
-  // Pega State
   const [pegaTab, setPegaTab] = useState<'blueprint' | 'manual'>('blueprint');
 
-  // Actions
+  // Demo State
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  // --- Handlers ---
+
   const handleStart = async (useDemo = false) => {
     if (useDemo) {
         setIsDemoMode(true);
-        // Reset state for demo start
         setStartPrompt('');
         setProcessDef(null); 
         setViewMode('onboarding');
@@ -67,7 +71,7 @@ const App: React.FC = () => {
     }
 
     if (!startPrompt.trim()) {
-        // Default start if empty
+        // Default blank start
         const defaultProcess: ProcessDefinition = {
             id: `proc_${Date.now()}`,
             name: "New Process",
@@ -136,71 +140,27 @@ const App: React.FC = () => {
       setIsGenerating(false);
   };
 
-  // --- Helpers for Property Panel Updates ---
-  const handleUpdateElement = (updated: ElementDefinition) => {
-      if (!processDef) return;
-      const newDef = { ...processDef };
-      newDef.stages.forEach(stg => {
-          stg.sections.forEach(sec => {
-              const idx = sec.elements.findIndex(e => e.id === updated.id);
-              if (idx !== -1) sec.elements[idx] = updated;
-          });
-      });
-      setProcessDef(newDef);
-  };
-
-  const handleUpdateSection = (updated: SectionDefinition) => {
-      if (!processDef) return;
-      const newDef = { ...processDef };
-      newDef.stages.forEach(stg => {
-          const idx = stg.sections.findIndex(s => s.id === updated.id);
-          if (idx !== -1) stg.sections[idx] = updated;
-      });
-      setProcessDef(newDef);
-  };
-
-  const handleDeleteElement = (id: string) => {
-      if (!processDef) return;
-      const newDef = { ...processDef };
-      newDef.stages.forEach(stg => {
-          stg.sections.forEach(sec => {
-              sec.elements = sec.elements.filter(e => e.id !== id);
-          });
-      });
-      setProcessDef(newDef);
-      setSelectedElementId(null);
-  };
-
-  const handleDeleteSection = (id: string) => {
-      if (!processDef) return;
-      const newDef = { ...processDef };
-      newDef.stages.forEach(stg => {
-          stg.sections = stg.sections.filter(s => s.id !== id);
-      });
-      setProcessDef(newDef);
-      setSelectedSectionId(null);
-  };
-
+  // Helper to resolve selection objects
   const getSelectedObjects = () => {
-      if (!processDef) return { el: null, sec: null };
+      if (!processDef) return { el: null, sec: null, stg: null };
+      let stg: StageDefinition | null = null;
       let sec: SectionDefinition | null = null;
       let el: ElementDefinition | null = null;
 
-      for (const stg of processDef.stages) {
-          const foundSec = stg.sections.find(s => s.id === selectedSectionId);
-          if (foundSec) {
-              sec = foundSec;
-              const foundEl = foundSec.elements.find(e => e.id === selectedElementId);
-              if (foundEl) el = foundEl;
-              break;
+      stg = processDef.stages.find(s => s.id === selectedStageId) || null;
+      if (stg) {
+          sec = stg.sections.find(s => s.id === selectedSectionId) || null;
+          if (sec) {
+              el = sec.elements.find(e => e.id === selectedElementId) || null;
           }
       }
-      return { el, sec };
+      return { el, sec, stg };
   };
 
-  const { el: selectedElement, sec: selectedSection } = getSelectedObjects();
+  const { el: selectedElement, sec: selectedSection, stg: selectedStage } = getSelectedObjects();
 
-  // If Onboarding
+  // --- Render ---
+
   if (viewMode === 'onboarding') {
       return (
           <>
@@ -236,59 +196,20 @@ const App: React.FC = () => {
       );
   }
 
-  // Loading Screen (Generation Overlay)
-  if (isGenerating && !processDef) {
-       return <LoadingOverlay />;
-  }
-
+  if (isGenerating && !processDef) return <LoadingOverlay />;
   if (!processDef) return null;
 
   return (
     <div className="min-h-screen bg-white flex flex-col overflow-hidden font-sans text-sw-text relative">
-        {/* Top Navigation Bar */}
-        <header className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-4 z-50 shrink-0">
-            <div className="flex items-center gap-6">
-                <CatapulseLogo scale={0.8} />
-                <div className="h-6 w-px bg-gray-200"></div>
-                <nav className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-                    {[
-                        { id: 'editor', icon: Edit3, label: 'Design' },
-                        { id: 'preview', icon: Play, label: 'Preview' },
-                        { id: 'spec', icon: FileText, label: 'Spec' },
-                        { id: 'qa', icon: CheckSquare, label: 'QA' },
-                        { id: 'pega', icon: Code, label: 'Pega' }
-                    ].map(mode => (
-                        <button 
-                            key={mode.id}
-                            onClick={() => setViewMode(mode.id as any)}
-                            className={`px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${viewMode === mode.id ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                            <mode.icon size={14} />
-                            {mode.label}
-                        </button>
-                    ))}
-                </nav>
-            </div>
-            
-            <div className="flex items-center gap-4">
-                 <div className="text-right">
-                    <p className="text-xs font-bold text-gray-900">{processDef.name}</p>
-                    <p className="text-[10px] text-gray-400 font-mono">{processDef.id}</p>
-                 </div>
-                 {viewMode === 'editor' && (
-                     <button 
-                        onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                        className={`p-2 rounded-lg transition-colors ${isSettingsOpen ? 'bg-sw-lightGray text-sw-teal' : 'text-gray-400 hover:text-sw-teal'}`}
-                     >
-                         <Settings2 size={20} />
-                     </button>
-                 )}
-            </div>
-        </header>
+        <AppHeader 
+            processDef={processDef} 
+            viewMode={viewMode} 
+            setViewMode={setViewMode} 
+            isSettingsOpen={isSettingsOpen} 
+            setIsSettingsOpen={setIsSettingsOpen}
+        />
 
-        {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden relative">
-            
             <main className="flex-1 overflow-hidden relative flex flex-col">
                 {isGenerating && (
                     <div className="absolute top-0 left-0 right-0 z-50">
@@ -332,58 +253,43 @@ const App: React.FC = () => {
                     </div>
                 )}
                 
-                {viewMode === 'spec' && (
-                    <div className="flex-1 overflow-y-auto bg-gray-50">
-                        <ModeSpec processDef={processDef} allElements={processDef.stages.flatMap(s=>s.sections).flatMap(sec=>sec.elements)} />
-                    </div>
-                )}
+                {viewMode === 'spec' && <div className="flex-1 overflow-y-auto bg-gray-50"><ModeSpec processDef={processDef} allElements={processDef.stages.flatMap(s=>s.sections).flatMap(sec=>sec.elements)} /></div>}
                 
                 {viewMode === 'qa' && (
                     <div className="flex-1 overflow-y-auto bg-gray-50">
                         <ModeQA 
                             processDef={processDef}
-                            qaTab={qaTab}
-                            setQaTab={setQaTab}
-                            storyStrategy={storyStrategy}
-                            setStoryStrategy={setStoryStrategy}
-                            userStories={userStories}
-                            setUserStories={setUserStories}
-                            testCases={testCases}
-                            setTestCases={setTestCases}
-                            isGenerating={isGenerating}
-                            setIsGenerating={setIsGenerating}
+                            qaTab={qaTab} setQaTab={setQaTab}
+                            storyStrategy={storyStrategy} setStoryStrategy={setStoryStrategy}
+                            userStories={userStories} setUserStories={setUserStories}
+                            testCases={testCases} setTestCases={setTestCases}
+                            isGenerating={isGenerating} setIsGenerating={setIsGenerating}
                         />
                     </div>
                 )}
                 
-                {viewMode === 'pega' && (
-                    <div className="flex-1 overflow-y-auto bg-gray-50">
-                        <ModePega processDef={processDef} pegaTab={pegaTab} setPegaTab={setPegaTab} />
-                    </div>
-                )}
+                {viewMode === 'pega' && <div className="flex-1 overflow-y-auto bg-gray-50"><ModePega processDef={processDef} pegaTab={pegaTab} setPegaTab={setPegaTab} /></div>}
             </main>
 
-            {/* Right Panel (Settings/Properties) */}
             {viewMode === 'editor' && (
-                <div 
-                    className={`fixed right-0 top-16 bottom-0 w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-40 ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'}`}
-                >
+                <div className={`fixed right-0 top-16 bottom-0 w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-40 ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <PropertiesPanel 
                         selectedElement={selectedElement}
                         selectedSection={selectedSection}
+                        selectedStage={selectedStage}
                         allElements={processDef.stages.flatMap(s=>s.sections).flatMap(sec=>sec.elements)}
                         activeTab={activePropTab}
                         onTabChange={setActivePropTab}
-                        onUpdateElement={handleUpdateElement}
-                        onUpdateSection={handleUpdateSection}
-                        onDeleteElement={handleDeleteElement}
-                        onDeleteSection={handleDeleteSection}
+                        onUpdateElement={updateElement}
+                        onUpdateSection={updateSection}
+                        onUpdateStage={updateStage}
+                        onDeleteElement={deleteElement}
+                        onDeleteSection={deleteSection}
                     />
                 </div>
             )}
         </div>
 
-        {/* Demo Mode Overlay - Now handled by DemoManager */}
         {isDemoMode && (
             <DemoManager 
                 setProcessDef={setProcessDef}
@@ -404,6 +310,7 @@ const App: React.FC = () => {
                 processDef={processDef}
             />
         )}
+        <DemoFocusOverlay area="none" highlightId={null} />
     </div>
   );
 };

@@ -17,33 +17,48 @@ export type ValidationType = 'none' | 'email' | 'phone_uk' | 'nino_uk' | 'date_f
 
 export interface ValidationRule {
   type: ValidationType;
-  customDescription?: string; // For "Must start with 'n'..."
+  customDescription?: string; 
 }
 
 export interface Condition {
+  id?: string; // unique id for UI handling
   targetElementId: string;
   operator: Operator;
   value: string | number | boolean;
+}
+
+export type LogicOperator = 'AND' | 'OR';
+
+export interface LogicGroup {
+  id: string;
+  operator: LogicOperator;
+  conditions: Condition[];
+  groups?: LogicGroup[]; // Recursive grouping for complex logic
+}
+
+// Operational Logic for Stages
+export interface SkillRule {
+  logic: LogicGroup; // Replaced simple condition with full logic group
+  requiredSkill: string;
 }
 
 export interface ElementDefinition {
   id: string;
   label: string;
   type: ElementType;
-  options?: string[]; // comma separated options for select/radio
+  options?: string[]; 
   defaultValue?: string;
-  description?: string; // Used for static text or tooltips
+  description?: string; 
   
-  // Static Element Configuration
   staticDataSource?: 'manual' | 'field';
   sourceFieldId?: string;
 
   // Logic
-  hidden?: boolean; // Base state
-  visibilityConditions?: Condition[]; // If met, show the element
+  hidden?: boolean; 
+  visibility?: LogicGroup; // New structure (Root group)
   
-  required?: boolean; // Base state
-  requiredConditions?: Condition[]; // If met, element becomes required
+  required?: boolean; 
+  requiredLogic?: LogicGroup; // New structure
 
   // Validation
   validation?: ValidationRule;
@@ -54,18 +69,22 @@ export interface SectionDefinition {
   title: string;
   description?: string;
   layout?: '1col' | '2col' | '3col';
-  variant?: 'standard' | 'summary'; // New property for Sticky Footer sections
+  variant?: 'standard' | 'summary'; 
   elements: ElementDefinition[];
   
   // Logic
   hidden?: boolean;
-  visibilityConditions?: Condition[];
+  visibility?: LogicGroup;
 }
 
 export interface StageDefinition {
   id: string;
   title: string;
   sections: SectionDefinition[];
+  
+  // Operational Context
+  defaultSkill?: string; 
+  skillLogic?: SkillRule[]; 
 }
 
 export interface ProcessDefinition {
@@ -75,39 +94,29 @@ export interface ProcessDefinition {
   stages: StageDefinition[];
 }
 
-// Form Runtime State
 export interface FormState {
   [elementId: string]: any;
 }
 
-// Visual Configuration
 export interface VisualTheme {
   density: 'dense' | 'compact' | 'default' | 'spacious';
   radius: 'none' | 'small' | 'medium' | 'large';
 }
 
-// Workshop / AI Analysis
 export interface WorkshopSuggestion {
   id: string;
   type: 'add' | 'remove' | 'modify';
   description: string;
   reasoning: string;
-  
-  // Action Payloads
-  targetLabel?: string; // For finding the element to remove/modify
-  
-  // For 'add'
+  targetLabel?: string; 
   newElement?: {
     label: string;
     type: ElementType;
-    sectionTitle?: string; // Where to put it
+    sectionTitle?: string; 
   };
-  
-  // For 'modify'
   updateData?: Partial<ElementDefinition>;
 }
 
-// QA & Testing
 export interface TestCase {
   id: string;
   title: string;
@@ -124,7 +133,7 @@ export type StoryStrategy = 'screen' | 'journey' | 'persona' | string;
 export interface StrategyRecommendation {
   id: string;
   strategyName: string;
-  strategyDescription: string; // The instruction passed to the generator
+  strategyDescription: string; 
   pros: string[];
   cons: string[];
   estimatedCount: number;
@@ -141,7 +150,7 @@ export interface ChatMessage {
 export interface UserStory {
   id: string;
   title: string;
-  narrative: string; // "As a... I want... So that..."
-  acceptanceCriteria: string; // Markdown formatted GWT + Table
-  dependencies?: string[]; // IDs of other stories that this one depends on
+  narrative: string; 
+  acceptanceCriteria: string; 
+  dependencies?: string[]; 
 }

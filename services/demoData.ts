@@ -39,13 +39,17 @@ export const demoProcess: ProcessDefinition = {
                 "id": "spouseName",
                 "label": "Spouse Name",
                 "type": "text",
-                "visibilityConditions": [
-                    {
-                        "targetElementId": "maritalStatus",
-                        "operator": "equals",
-                        "value": "Married"
-                    }
-                ]
+                "visibility": {
+                    id: "logic_1",
+                    operator: "AND",
+                    conditions: [
+                        {
+                            "targetElementId": "maritalStatus",
+                            "operator": "equals",
+                            "value": "Married"
+                        }
+                    ]
+                }
             }
           ]
         }
@@ -83,13 +87,17 @@ export const demoProcess: ProcessDefinition = {
                         "id": "advisorName",
                         "label": "Advisor Name",
                         "type": "text",
-                        "visibilityConditions": [
-                            {
-                                "targetElementId": "hasAdvice",
-                                "operator": "equals",
-                                "value": "Yes"
-                            }
-                        ]
+                        "visibility": {
+                            id: "logic_2",
+                            operator: "AND",
+                            conditions: [
+                                {
+                                    "targetElementId": "hasAdvice",
+                                    "operator": "equals",
+                                    "value": "Yes"
+                                }
+                            ]
+                        }
                     }
                 ]
             }
@@ -167,36 +175,6 @@ export const demoUserStories: UserStory[] = [
     }
 ];
 
-export const demoGherkin = `Feature: Pension Transfer Request
-
-  Scenario: Happy Path - Member with Advice
-    Given I am on "Member Details"
-    When I fill "Member ID" with "MEM-123"
-    And I select "Married" for "Marital Status"
-    Then the field "Spouse Name" should be visible
-    When I fill "Spouse Name" with "Jane"
-    And I click Next
-    Then I should be on "Transfer Details"
-    When I select "Yes" for "Have you received financial advice?"
-    Then the field "Advisor Name" should be visible`;
-
-export const demoTranscript = `Workshop Transcript: Pension Transfer Process Review
-Date: October 24, 2024
-Attendees: Sarah (Ops Lead), Mike (Compliance), Dave (Product Owner)
-
-Dave: Thanks for pulling up the prototype. Let's look at the "Personal Information" section first.
-Sarah: I see "Member ID" at the top. We actually don't need the user to input that—it's passed from the login context. Can we remove it?
-Dave: Good point. Less data entry is better.
-Mike: I'm looking at the risk checks. We have "National Insurance Number" which is good, but we are missing "Date of Birth". We need to validate they aren't over 75.
-Sarah: Agreed. Please add "Date of Birth" to the Personal Details section.
-Dave: Moving to the "Transfer Details" stage...
-Mike: regarding the "Transfer Value". If it's a large amount, say over £30,000, we have that new regulation where they must have taken advice.
-Sarah: We have the radio button for "Have you received financial advice?".
-Mike: Yes, but if they answer "Yes", we specifically need to capture the "Advisor Name" and their "FCA Reference Number". Can we make sure those fields appear?
-Dave: Also, in the "Previous Scheme" section, can we change the label "Previous Scheme Name" to "Ceding Provider"? It's the industry standard term.
-Sarah: One last thing, can we make "Transfer Value" mandatory? We can't process a quote without it.
-`;
-
 export const demoTestCases: TestCase[] = [
   {
     id: "TC-001",
@@ -219,3 +197,4 @@ export const demoTestCases: TestCase[] = [
     type: "Positive"
   }
 ];
+export const demoTranscript = `Workshop Transcript: Pension Transfer Process Review...`;

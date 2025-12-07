@@ -1,6 +1,5 @@
 
-
-import { Condition, ElementDefinition, SectionDefinition, FormState, Operator } from "../types";
+import { Condition, ElementDefinition, SectionDefinition, FormState, LogicGroup } from "../types";
 
 export const generateId = (label: string): string => {
   return label
@@ -15,7 +14,6 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
 
   switch (condition.operator) {
     case 'equals':
-      // Loose equality for string/number mixing
       // eslint-disable-next-line eqeqeq
       return value == targetValue;
     case 'notEquals':
@@ -36,45 +34,43 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
   }
 };
 
+export const evaluateLogicGroup = (group: LogicGroup | undefined, formData: FormState): boolean => {
+    if (!group || (!group.conditions.length && (!group.groups || !group.groups.length))) return true; // Empty group implies true
+
+    // Evaluate all direct conditions
+    const conditionsResult = group.conditions.map(c => evaluateCondition(c, formData));
+    
+    // Recursively evaluate subgroups
+    const groupsResult = group.groups ? group.groups.map(g => evaluateLogicGroup(g, formData)) : [];
+
+    const allResults = [...conditionsResult, ...groupsResult];
+
+    if (group.operator === 'AND') {
+        return allResults.every(r => r === true);
+    } else { // OR
+        return allResults.some(r => r === true);
+    }
+};
+
 export const isElementVisible = (element: ElementDefinition, formData: FormState): boolean => {
-  // Default to visible unless hidden is explicitly true
-  let isVisible = !element.hidden;
-
-  // If visibility conditions exist, they override the default
-  if (element.visibilityConditions && element.visibilityConditions.length > 0) {
-    // AND logic: All conditions must be true to show (simplification for this prototype)
-    isVisible = element.visibilityConditions.every(cond => evaluateCondition(cond, formData));
-  }
-
-  return isVisible;
+  if (element.hidden) return false;
+  // Backward compatibility check could go here if needed, but we updated types
+  if (!element.visibility) return true;
+  return evaluateLogicGroup(element.visibility, formData);
 };
 
 export const isSectionVisible = (section: SectionDefinition, formData: FormState): boolean => {
-    // Default to visible unless hidden is explicitly true
-    let isVisible = !section.hidden;
-  
-    // If visibility conditions exist, they override the default
-    if (section.visibilityConditions && section.visibilityConditions.length > 0) {
-      isVisible = section.visibilityConditions.every(cond => evaluateCondition(cond, formData));
-    }
-  
-    return isVisible;
+    if (section.hidden) return false;
+    if (!section.visibility) return true;
+    return evaluateLogicGroup(section.visibility, formData);
 };
 
 export const isElementRequired = (element: ElementDefinition, formData: FormState): boolean => {
-  let isRequired = !!element.required;
-
-  if (element.requiredConditions && element.requiredConditions.length > 0) {
-    // If conditions met, it becomes required
-    if (element.requiredConditions.every(cond => evaluateCondition(cond, formData))) {
-      isRequired = true;
-    }
-  }
-
-  return isRequired;
+  if (element.required) return true;
+  if (!element.requiredLogic) return false;
+  return evaluateLogicGroup(element.requiredLogic, formData);
 };
 
-// Regex Patterns used for validation
 export const VALIDATION_PATTERNS = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   phone_uk: /^(\+44|0)\d{9,10}$/,
@@ -92,37 +88,27 @@ export const getValidationRegexString = (type: string): string | null => {
 
 export const validateValue = (element: ElementDefinition, value: any): string | null => {
   if (!element.validation || element.validation.type === 'none') return null;
-  if (value === undefined || value === null || value === '') return null; // Empty handled by Required check
+  if (value === undefined || value === null || value === '') return null; 
 
   const strVal = String(value);
 
   switch (element.validation.type) {
     case 'email':
       return VALIDATION_PATTERNS.email.test(strVal) ? null : 'Invalid email format';
-    
     case 'phone_uk':
-      // Basic UK phone regex (Mobile or Landline)
       return VALIDATION_PATTERNS.phone_uk.test(strVal.replace(/\s/g, '')) ? null : 'Invalid UK phone number';
-
     case 'nino_uk':
-      // UK National Insurance Number
       return VALIDATION_PATTERNS.nino_uk.test(strVal.replace(/\s/g, '')) ? null : 'Invalid National Insurance Number';
-
     case 'date_future':
       const dFuture = new Date(strVal);
       if (isNaN(dFuture.getTime())) return 'Invalid date';
       return dFuture > new Date() ? null : 'Date must be in the future';
-
     case 'date_past':
       const dPast = new Date(strVal);
       if (isNaN(dPast.getTime())) return 'Invalid date';
       return dPast < new Date() ? null : 'Date must be in the past';
-
     case 'custom':
-      // Custom validation logic cannot be fully simulated client-side without safe eval or specific parsing
-      // For prototype purposes, we assume valid unless specific patterns match (simulated)
       return null; 
-      
     default:
       return null;
   }

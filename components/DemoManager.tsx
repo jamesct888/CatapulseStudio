@@ -10,7 +10,6 @@ import {
 } from '../services/demoData';
 
 interface DemoManagerProps {
-  // App State Setters
   setProcessDef: (val: ProcessDefinition | null) => void;
   setViewMode: (val: any) => void;
   setIsGenerating: (val: boolean) => void;
@@ -20,20 +19,12 @@ interface DemoManagerProps {
   setUserStories: (val: any) => void;
   setPersonaPrompt: (val: string) => void;
   setAiPrompt: (val: string) => void;
-  
-  // Selection Setters
   setSelectedStageId: (val: string) => void;
   setSelectedSectionId: (val: string | null) => void;
   setSelectedElementId: (val: string | null) => void;
-  
-  // UI Setters
   setIsSettingsOpen: (val: boolean) => void;
   setActivePropTab: (val: 'general' | 'logic') => void;
-  
-  // Control
   onStop: () => void;
-  
-  // Current Data (for updates)
   processDef: ProcessDefinition | null;
 }
 
@@ -50,7 +41,6 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
   const [zoomArea, setZoomArea] = useState<'none' | 'sidebar' | 'canvas' | 'panel' | 'modal' | 'full' | 'copilot'>('none');
   const [overlayPosition, setOverlayPosition] = useState<'bottom' | 'top'>('bottom');
 
-  // Helper to update sections/elements during demo
   const updateSection = (secId: string, updates: Partial<SectionDefinition>) => {
       if (!processDef) return;
       const newDef = { ...processDef };
@@ -65,7 +55,6 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
       const newStep = parseInt(e.target.value);
       setStep(newStep);
       setIsPaused(true);
-      // Basic state repair for scrubbing
       if (newStep <= 1) {
           setViewMode('onboarding');
           setStartPrompt(newStep === 1 ? "Pension Transfer Away" : "");
@@ -85,7 +74,6 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
     const runStep = () => {
-        // Reset overlay position default
         setOverlayPosition('bottom');
 
         if (step === 0) {
@@ -109,18 +97,11 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
         else if (step === 2) {
             setMessage("The structure is generated instantly. Stages are listed on the left, fields in the center.");
             setIsGenerating(false);
-            
-            // Reset demo data state
             const initialDemoData = JSON.parse(JSON.stringify(demoProcess));
-            const sec = initialDemoData.stages[0].sections[0];
-            const spouseField = sec.elements.find((e: any) => e.label === 'Spouse Name');
-            if (spouseField) spouseField.visibilityConditions = []; 
-            
             setProcessDef(initialDemoData);
             setSelectedStageId(initialDemoData.stages[0].id);
             setSelectedSectionId(initialDemoData.stages[0].sections[0].id);
             setViewMode('editor');
-            
             setZoomArea('sidebar');
             timeoutId = setTimeout(() => setStep(3), 6000);
         }
@@ -161,7 +142,6 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
         }
         else if (step === 7) {
             setMessage("We can tighten the screen density for power users or increase spacing for accessibility.");
-            // Visual theme update is global in App, simplified here for demo flow
             timeoutId = setTimeout(() => setStep(8), 4000);
         }
         else if (step === 8) {
@@ -173,7 +153,7 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
         else if (step === 9) {
             setMessage("To extend the form, simply click a component from the toolbox.");
             setHighlightId('toolbox');
-            setOverlayPosition('top'); // Move overlay up so toolbox is visible
+            setOverlayPosition('top'); 
             timeoutId = setTimeout(() => {
                 if (processDef) {
                     const newDef = JSON.parse(JSON.stringify(processDef));
@@ -201,8 +181,10 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
         }
         else if (step === 11) {
             setMessage("Use the Properties Panel to rename it to 'Transfer Date'.");
-            setIsSettingsOpen(true); // Open panel
-            setSelectedElementId('transferDate_demo'); // Ensure selection
+            setIsSettingsOpen(true); 
+            // FIX: Ensure selection is set
+            setSelectedSectionId(demoProcess.stages[0].sections[0].id);
+            setSelectedElementId('transferDate_demo');
             setZoomArea('panel');
             setHighlightId('panel');
             timeoutId = setTimeout(() => {
@@ -349,6 +331,7 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
             setZoomArea('canvas');
             timeoutId = setTimeout(() => setStep(33), 5000);
         }
+        
         else if (step === 33) {
             setMessage("Requirements are now synced. Let's see how we handle legacy assets.");
             setZoomArea('none');
@@ -382,12 +365,8 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
             setProcessDef(demoDigitizedProcess);
             setViewMode('editor');
             setIsGenerating(false);
-            if (demoDigitizedProcess.stages.length > 0) {
-                setSelectedStageId(demoDigitizedProcess.stages[0].id);
-                if (demoDigitizedProcess.stages[0].sections.length > 0) {
-                     setSelectedSectionId(demoDigitizedProcess.stages[0].sections[0].id);
-                }
-            }
+            setSelectedStageId(demoDigitizedProcess.stages[0].id);
+            setSelectedSectionId(demoDigitizedProcess.stages[0].sections[0].id);
             setSelectedElementId(null);
             setZoomArea('canvas');
             timeoutId = setTimeout(() => setStep(39), 5000);
@@ -421,7 +400,6 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
         else if (step === 43) {
             setMessage("The 'Blueprint Accelerator' creates the specific prompt for Pega GenAI.");
             setViewMode('pega');
-            // Assuming setPegaTab is managed in parent or defaulted
             timeoutId = setTimeout(() => setStep(44), 5000);
         }
         else if (step === 44) {
