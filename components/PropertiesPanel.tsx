@@ -1,9 +1,11 @@
 
+
 import React, { useEffect, useState } from 'react';
-import { ElementDefinition, SectionDefinition, StageDefinition, SkillRule, LogicGroup, RepeaterColumn } from '../types';
-import { Trash2, Info, Layout, Briefcase, ShieldCheck, GitMerge, Eye, X, Edit2, Plus, Table } from 'lucide-react';
+import { ElementDefinition, SectionDefinition, StageDefinition, SkillRule, LogicGroup, RepeaterColumn, VisualTheme } from '../types';
+import { Trash2, Info, Layout, Briefcase, ShieldCheck, GitMerge, Eye, X, Edit2, Plus, ArrowLeft, Palette } from 'lucide-react';
 import { LogicBuilder } from './LogicBuilder';
 import { ModalWrapper } from './ModalWrapper';
+import { formatLogicSummary } from '../utils/logic';
 
 interface PropertiesPanelProps {
   selectedElement: ElementDefinition | null;
@@ -18,6 +20,8 @@ interface PropertiesPanelProps {
   onDeleteElement: (id: string) => void;
   onDeleteSection: (id: string) => void;
   onDeleteStage: (id: string) => void;
+  visualTheme?: VisualTheme;
+  onUpdateTheme?: (theme: VisualTheme) => void;
   onClose: () => void;
 }
 
@@ -43,6 +47,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onDeleteElement,
   onDeleteSection,
   onDeleteStage,
+  visualTheme,
+  onUpdateTheme,
   onClose
 }) => {
   
@@ -52,8 +58,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   
   const data = selectedElement || selectedSection || selectedStage;
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  
+  // Toggle between Selection Properties and Global Settings
+  const [forceGlobalSettings, setForceGlobalSettings] = useState(false);
 
-  // Resizable sidebar state - Default to 480px (increased from 400)
+  // Resizable sidebar state - Default to 480px
   const [panelWidth, setPanelWidth] = useState(480);
   const [isResizing, setIsResizing] = useState(false);
 
@@ -71,13 +80,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   useEffect(() => {
     setConfirmDeleteId(null);
   }, [data?.id]);
+  
+  // When selection changes, switch back to item properties view automatically
+  useEffect(() => {
+    setForceGlobalSettings(false);
+  }, [selectedElement?.id, selectedSection?.id, selectedStage?.id]);
 
   // Sidebar Resizing
   useEffect(() => {
       const handleMouseMove = (e: MouseEvent) => {
           if (!isResizing) return;
           const newWidth = document.body.clientWidth - e.clientX;
-          // Increased max width limit to 1200
           if (newWidth > 300 && newWidth < 1200) {
               setPanelWidth(newWidth);
           }
@@ -271,21 +284,107 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       );
   }
 
-  if (!data) {
+  // --- RENDER GLOBAL SETTINGS IF NO SELECTION OR FORCED ---
+  if (!data || forceGlobalSettings) {
     return (
-      <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col items-center justify-center bg-white border-l border-gray-200 shadow-2xl z-40 relative">
+      <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40 relative">
          <div 
             className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors"
             onMouseDown={() => setIsResizing(true)}
          ></div>
-         <button onClick={onClose} className="absolute top-4 right-4 text-gray-300 hover:text-gray-500">
-             <X size={20} />
-         </button>
-        <div className="p-8 text-center text-gray-400">
-            <Info size={48} className="mb-4 opacity-20 mx-auto" />
-            <p className="text-lg font-serif text-sw-teal mb-2">No Selection</p>
-            <p className="text-sm">Select an element, section, or stage to edit properties.</p>
-        </div>
+
+         <div className="p-8 border-b border-gray-100 flex items-start gap-4">
+             {data && (
+                <button 
+                    onClick={() => setForceGlobalSettings(false)}
+                    className="mt-1 p-1 -ml-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-full transition-colors"
+                    title="Back to Selection"
+                >
+                    <ArrowLeft size={20} />
+                </button>
+             )}
+             <div className="flex-1">
+                <h2 className="font-serif font-bold text-2xl text-sw-teal">Global Settings</h2>
+                <p className="text-xs text-gray-400 mt-1">Application Styling & Themes</p>
+             </div>
+             <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
+                 <X size={20} />
+             </button>
+         </div>
+
+         {visualTheme && onUpdateTheme ? (
+             <div className="p-8 space-y-8 flex-1 overflow-y-auto">
+                 {/* Theme Mode Selector */}
+                 <div className="space-y-4">
+                     <label className={labelClass}>Color Theme</label>
+                     <div className="grid grid-cols-2 gap-3">
+                         <button 
+                            onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type1' })}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type1' ? 'border-sw-teal bg-sw-lightGray text-sw-teal ring-1 ring-sw-teal' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
+                         >
+                             <div className="w-12 h-8 bg-sw-teal border border-sw-teal rounded flex items-center justify-center shadow-sm">
+                                 <Palette size={16} className="text-white" />
+                             </div>
+                             <span className="text-xs font-bold">Type 1 (Teal)</span>
+                         </button>
+                         <button 
+                            onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type2' })}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type2' ? 'border-[#e61126] bg-[#ffe2e8] text-[#e61126] ring-1 ring-[#e61126]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
+                         >
+                             <div className="w-12 h-8 bg-[#e61126] border border-[#e61126] rounded flex items-center justify-center shadow-sm">
+                                 <Palette size={16} className="text-white" />
+                             </div>
+                             <span className="text-xs font-bold">Type 2 (Red/Pink)</span>
+                         </button>
+                     </div>
+                 </div>
+
+                 {/* Density Selector */}
+                 <div className="space-y-4">
+                     <label className={labelClass}>Screen Density</label>
+                     <div className="grid grid-cols-2 gap-2">
+                        {['dense', 'compact', 'default', 'spacious'].map((d) => (
+                            <button
+                                key={d}
+                                onClick={() => onUpdateTheme({ ...visualTheme, density: d as any })}
+                                className={`px-3 py-2 text-xs font-bold rounded-lg border capitalize transition-all ${visualTheme.density === d ? 'bg-sw-teal text-white border-sw-teal' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                            >
+                                {d}
+                            </button>
+                        ))}
+                     </div>
+                 </div>
+
+                 {/* Radius Selector */}
+                 <div className="space-y-4">
+                     <label className={labelClass}>Corner Radius</label>
+                     <div className="flex gap-2">
+                        {['none', 'small', 'medium', 'large'].map((r) => (
+                            <button
+                                key={r}
+                                onClick={() => onUpdateTheme({ ...visualTheme, radius: r as any })}
+                                className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border capitalize transition-all ${visualTheme.radius === r ? 'bg-sw-teal text-white border-sw-teal' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                            >
+                                {r}
+                            </button>
+                        ))}
+                     </div>
+                 </div>
+
+                 <div className="pt-6 border-t border-gray-100">
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex gap-3 text-sm text-blue-700">
+                        <Info className="shrink-0" size={18} />
+                        <p>These settings affect the Preview mode and exported HTML prototypes.</p>
+                    </div>
+                 </div>
+             </div>
+         ) : (
+             <div className="p-8 text-center text-gray-400">
+                <Info size={48} className="mb-4 opacity-20 mx-auto" />
+                <p className="text-lg font-serif text-sw-teal mb-2">No Selection</p>
+                <p className="text-sm">Select an element to edit properties.</p>
+            </div>
+         )}
       </div>
     );
   }
@@ -355,6 +454,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <span className="text-xs text-gray-400 font-mono truncate">{data.id}</span>
         </div>
         <div className="flex items-center gap-1">
+             <button 
+                onClick={() => setForceGlobalSettings(true)}
+                className="p-2 text-gray-400 hover:text-sw-teal rounded-full hover:bg-sw-lightGray transition-colors"
+                title="Global Theme Settings"
+            >
+                <Palette size={20} />
+            </button>
             <button onClick={handleDelete} className={`p-2 rounded-full transition-all flex items-center gap-2 shrink-0 ${confirmDeleteId === data.id ? 'bg-sw-red text-white pr-4 shadow-md' : 'text-gray-400 hover:text-sw-red hover:bg-sw-lightGray'}`} title="Delete">
             <Trash2 size={20} />
             {confirmDeleteId === data.id && <span className="text-xs font-bold animate-in fade-in">Confirm?</span>}
@@ -436,7 +542,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                     newCols[idx] = { ...newCols[idx], label: e.target.value };
                                                     handleRepeaterChange(newCols);
                                                 }}
-                                                className="w-full p-2 text-xs border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
+                                                className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
                                                 placeholder="Label"
                                             />
                                             <select 
@@ -446,7 +552,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                     newCols[idx] = { ...newCols[idx], type: e.target.value as any };
                                                     handleRepeaterChange(newCols);
                                                 }}
-                                                className="w-full p-2 text-xs border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
+                                                className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
                                             >
                                                 <option value="text">Text</option>
                                                 <option value="number">Number</option>
@@ -464,7 +570,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                     newCols[idx] = { ...newCols[idx], options: e.target.value.split(',') };
                                                     handleRepeaterChange(newCols);
                                                 }}
-                                                className="w-full p-2 text-xs border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
+                                                className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
                                                 placeholder="Options (comma separated)"
                                             />
                                         )}
@@ -520,21 +626,29 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                 onUpdateStage({ ...selectedStage!, skillLogic: [...(selectedStage?.skillLogic || []), newRule] });
                                 setActiveRuleIndex(newIndex);
                                 setSkillModalOpen(true);
-                            }} className="text-xs bg-sw-teal text-white px-3 py-2 rounded-lg font-bold hover:bg-sw-tealHover">+ Add Rule</button>
+                            }} className="text-xs bg-sw-teal text-white px-3 py-2 rounded-lg font-bold hover:bg-sw-tealHover">+ Add Routing Condition</button>
                         </div>
                         <div className="space-y-2">
-                            {(data as StageDefinition).skillLogic?.map((rule, idx) => (
-                                <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center text-sm group">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono text-xs text-gray-400">#{idx+1}</span>
-                                        <span className="font-bold text-gray-700">{rule.requiredSkill || 'Unassigned'}</span>
+                            {(data as StageDefinition).skillLogic?.map((rule, idx) => {
+                                const summary = formatLogicSummary(rule.logic, allElements);
+                                return (
+                                    <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center text-sm group">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-xs text-gray-400">#{idx+1}</span>
+                                                <span className="font-bold text-gray-700">{rule.requiredSkill || 'Unassigned'}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-400 ml-6 mt-1 font-mono bg-gray-50 p-1 rounded inline-block">
+                                                If: {summary}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => { setActiveRuleIndex(idx); setSkillModalOpen(true); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-teal"><Edit2 size={14}/></button>
+                                            <button onClick={() => { const nl = [...selectedStage!.skillLogic!]; nl.splice(idx,1); onUpdateStage({...selectedStage!, skillLogic: nl}); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-red"><Trash2 size={14}/></button>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => { setActiveRuleIndex(idx); setSkillModalOpen(true); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-teal"><Edit2 size={14}/></button>
-                                        <button onClick={() => { const nl = [...selectedStage!.skillLogic!]; nl.splice(idx,1); onUpdateStage({...selectedStage!, skillLogic: nl}); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-red"><Trash2 size={14}/></button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

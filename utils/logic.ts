@@ -113,3 +113,38 @@ export const validateValue = (element: ElementDefinition, value: any): string | 
       return null;
   }
 };
+
+export const formatLogicSummary = (group: LogicGroup | undefined, allElements: {id: string, label: string}[]): string => {
+    if (!group) return 'Always';
+    if (group.conditions.length === 0 && (!group.groups || group.groups.length === 0)) return 'Always';
+
+    const parts: string[] = [];
+
+    group.conditions.forEach(c => {
+        const el = allElements.find(e => e.id === c.targetElementId);
+        const label = el ? el.label : 'Unknown Field';
+        let op: string = c.operator;
+        switch(c.operator) {
+            case 'equals': op = '='; break;
+            case 'notEquals': op = '!='; break;
+            case 'greaterThan': op = '>'; break;
+            case 'lessThan': op = '<'; break;
+            case 'contains': op = 'contains'; break;
+            case 'isEmpty': op = 'is empty'; break;
+            case 'isNotEmpty': op = 'is populated'; break;
+        }
+        
+        const val = (c.operator === 'isEmpty' || c.operator === 'isNotEmpty') ? '' : `'${c.value}'`;
+        parts.push(`${label} ${op} ${val}`.trim());
+    });
+
+    if (group.groups && group.groups.length > 0) {
+        group.groups.forEach(g => {
+            const sub = formatLogicSummary(g, allElements);
+            if(sub !== 'Always') parts.push(`(${sub})`);
+        });
+    }
+
+    if (parts.length === 0) return 'Always';
+    return parts.join(` ${group.operator} `);
+};

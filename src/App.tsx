@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
@@ -46,7 +48,7 @@ const App: React.FC = () => {
   const [aiPrompt, setAiPrompt] = useState('');
   const [activePropTab, setActivePropTab] = useState<'general' | 'logic'>('general');
   const [formData, setFormData] = useState<FormState>({});
-  const [visualTheme, setVisualTheme] = useState<VisualTheme>({ density: 'default', radius: 'medium' });
+  const [visualTheme, setVisualTheme] = useState<VisualTheme>({ mode: 'type1', density: 'default', radius: 'medium' });
   const [personaPrompt, setPersonaPrompt] = useState('');
   
   // QA & Pega State
@@ -54,7 +56,7 @@ const App: React.FC = () => {
   const [storyStrategy, setStoryStrategy] = useState<StoryStrategy>('screen');
   const [userStories, setUserStories] = useState<UserStory[]>([]);
   const [testCases, setTestCases] = useState<TestCase[]>([]);
-  const [pegaTab, setPegaTab] = useState<'blueprint' | 'manual'>('blueprint');
+  const [pegaTab, setPegaTab] = useState<'blueprint' | 'manual' | 'data' | 'logic'>('blueprint');
 
   // Demo State
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -208,6 +210,7 @@ const App: React.FC = () => {
             setViewMode={setViewMode} 
             isSettingsOpen={isSettingsOpen} 
             setIsSettingsOpen={setIsSettingsOpen}
+            visualTheme={visualTheme}
         />
 
         <div className="flex-1 flex overflow-hidden relative">
@@ -312,6 +315,8 @@ const App: React.FC = () => {
                                 setSelectedElementId(null);
                             }
                         }}
+                        visualTheme={visualTheme}
+                        onUpdateTheme={setVisualTheme}
                         onClose={() => setIsSettingsOpen(false)}
                     />
                 </div>

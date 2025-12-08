@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { ProcessDefinition, StageDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage } from "../types";
+import { ProcessDefinition, StageDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage, DataObjectSuggestion } from "../types";
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -624,6 +624,59 @@ export const analyzeTranscript = async (
         return JSON.parse(text) as WorkshopSuggestion[];
     } catch (e) {
         console.error("Error analyzing transcript:", e);
+        return [];
+    }
+};
+
+export const generateDataMapping = async (
+    elements: { id: string; label: string; type: string }[]
+): Promise<DataObjectSuggestion[]> => {
+    if (!apiKey) return [];
+
+    const prompt = `
+        Act as a Pega System Architect.
+        I have a list of flattened UI elements from a prototype.
+        Your task is to analyze these fields and suggest a Normalized Data Model using Pega Class structures.
+
+        FIELDS:
+        ${JSON.stringify(elements)}
+
+        INSTRUCTIONS:
+        1. Group related fields into standard Pega Data Classes (e.g., 'Data-Address-Postal', 'Data-Party-Person', 'Data-Ins-Policy', 'Data-Fin-Account').
+        2. Suggest the Pega Property name for each field (e.g., 'Address Line 1' -> '.AddressLine1').
+        3. Create a clean, logical object model.
+        
+        OUTPUT FORMAT (JSON Array):
+        [
+            {
+                "className": "Data-Address-Postal", // Or "MyOrg-Data-Address"
+                "description": "Captures standard postal address details",
+                "mappings": [
+                    { "elementId": "el_123", "suggestedProperty": ".AddressLine1" },
+                    { "elementId": "el_456", "suggestedProperty": ".City" }
+                ]
+            }
+        ]
+        
+        If a field is standalone and doesn't fit a complex type, you can map it to 'Work-' (the main case) or group miscellaneous fields into a 'Data-CaseDetails' class.
+    `;
+
+    try {
+        const response = await callWithRetry(async () => {
+            return await ai.models.generateContent({
+                model: modelId,
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                }
+            });
+        });
+
+        const text = response.text;
+        if (!text) return [];
+        return JSON.parse(text) as DataObjectSuggestion[];
+    } catch (e) {
+        console.error("Error generating data mapping:", e);
         return [];
     }
 }

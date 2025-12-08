@@ -2,6 +2,17 @@
 import { ProcessDefinition } from '../types';
 
 export const generateFigmaSVG = (processDef: ProcessDefinition): string => {
+  // Helper to escape XML special characters
+  const escapeXml = (unsafe: string | undefined): string => {
+    if (!unsafe) return '';
+    return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+  };
+
   // Constants for Layout
   const STAGE_WIDTH = 400;
   const STAGE_GAP = 100;
@@ -22,8 +33,8 @@ export const generateFigmaSVG = (processDef: ProcessDefinition): string => {
   let maxHeight = 800;
 
   // Header
-  const title = `<text x="0" y="-100" font-family="Arial" font-size="48" font-weight="bold" fill="${COL_TEAL}">${processDef.name}</text>`;
-  const desc = `<text x="0" y="-60" font-family="Arial" font-size="20" fill="${COL_TEXT_LIGHT}">${processDef.description}</text>`;
+  const title = `<text x="0" y="-100" font-family="Arial" font-size="48" font-weight="bold" fill="${COL_TEAL}">${escapeXml(processDef.name)}</text>`;
+  const desc = `<text x="0" y="-60" font-family="Arial" font-size="20" fill="${COL_TEXT_LIGHT}">${escapeXml(processDef.description)}</text>`;
   
   // Iterate Stages
   processDef.stages.forEach((stage, i) => {
@@ -32,7 +43,7 @@ export const generateFigmaSVG = (processDef: ProcessDefinition): string => {
 
     // Stage Title Background
     stageContent += `<rect x="${currentStageX}" y="0" width="${STAGE_WIDTH}" height="${HEADER_HEIGHT}" fill="${COL_TEAL}" rx="8" />`;
-    stageContent += `<text x="${currentStageX + 24}" y="50" font-family="Arial" font-size="24" font-weight="bold" fill="white">${i+1}. ${stage.title}</text>`;
+    stageContent += `<text x="${currentStageX + 24}" y="50" font-family="Arial" font-size="24" font-weight="bold" fill="white">${i+1}. ${escapeXml(stage.title)}</text>`;
 
     // Stage Body Background (Placeholder height, fixed at end)
     const bodyStartY = HEADER_HEIGHT;
@@ -44,7 +55,7 @@ export const generateFigmaSVG = (processDef: ProcessDefinition): string => {
 
       // Section Title
       stageContent += `<text x="${currentStageX + SECTION_PADDING}" y="${sectionY + 20}" font-family="Arial" font-size="14" font-weight="bold" fill="${COL_TEXT_LIGHT}" letter-spacing="1">
-        ${section.title.toUpperCase()}
+        ${escapeXml(section.title.toUpperCase())}
       </text>`;
       stageContent += `<line x1="${currentStageX + SECTION_PADDING}" y1="${sectionY + 30}" x2="${currentStageX + STAGE_WIDTH - SECTION_PADDING}" y2="${sectionY + 30}" stroke="${COL_STROKE}" stroke-width="1" />`;
 
@@ -52,7 +63,7 @@ export const generateFigmaSVG = (processDef: ProcessDefinition): string => {
       section.elements.forEach(el => {
         // Label
         stageContent += `<text x="${currentStageX + SECTION_PADDING}" y="${elY}" font-family="Arial" font-size="14" font-weight="bold" fill="${COL_TEAL}">
-          ${el.label} ${el.required ? '*' : ''}
+          ${escapeXml(el.label)} ${el.required ? '*' : ''}
         </text>`;
 
         // Input Box
@@ -71,7 +82,7 @@ export const generateFigmaSVG = (processDef: ProcessDefinition): string => {
              // Add fake options
              const opts = el.options ? (Array.isArray(el.options) ? el.options : String(el.options).split(',')) : ['Option 1', 'Option 2'];
              opts.slice(0,3).forEach((opt, idx) => {
-                 inputVisual += `<text x="${currentStageX + SECTION_PADDING + 16 + (idx * 80)}" y="${inputY + 25}" font-family="Arial" font-size="12" fill="${COL_TEXT}">${String(opt).trim()}</text>`;
+                 inputVisual += `<text x="${currentStageX + SECTION_PADDING + 16 + (idx * 80)}" y="${inputY + 25}" font-family="Arial" font-size="12" fill="${COL_TEXT}">${escapeXml(String(opt).trim())}</text>`;
              });
              elY += 40 + 20 + EL_GAP;
         } else {
@@ -114,7 +125,7 @@ export const generateFigmaSVG = (processDef: ProcessDefinition): string => {
     <svg width="${totalWidth}" height="${totalHeight}" viewBox="-50 -150 ${totalWidth + 100} ${totalHeight + 100}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&amp;display=swap');
         </style>
       </defs>
       <rect x="-50" y="-150" width="${totalWidth + 100}" height="${totalHeight + 100}" fill="white" />

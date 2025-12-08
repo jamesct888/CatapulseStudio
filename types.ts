@@ -1,4 +1,5 @@
 
+
 export type ElementType = 
   | 'text' 
   | 'email'
@@ -50,6 +51,11 @@ export interface RepeaterColumn {
   options?: string[]; // For select types within the repeater
 }
 
+export interface DataMapping {
+    dataObject: string; // The class name, e.g., "Data-Address" or "MyOrg-Data-Policy"
+    property: string;   // The property name, e.g., ".Postcode"
+}
+
 export interface ElementDefinition {
   id: string;
   label: string;
@@ -73,6 +79,9 @@ export interface ElementDefinition {
 
   // Validation
   validation?: ValidationRule;
+
+  // Data Model
+  dataMapping?: DataMapping;
 }
 
 export interface SectionDefinition {
@@ -110,6 +119,7 @@ export interface FormState {
 }
 
 export interface VisualTheme {
+  mode: 'type1' | 'type2';
   density: 'dense' | 'compact' | 'default' | 'spacious';
   radius: 'none' | 'small' | 'medium' | 'large';
 }
@@ -164,4 +174,13 @@ export interface UserStory {
   narrative: string; 
   acceptanceCriteria: string; 
   dependencies?: string[]; 
+}
+
+export interface DataObjectSuggestion {
+    className: string;
+    description: string;
+    mappings: {
+        elementId: string;
+        suggestedProperty: string;
+    }[];
 }

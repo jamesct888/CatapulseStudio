@@ -1,12 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ProcessDefinition, LogicGroup, Condition, ElementDefinition } from '../types';
 import { CatapulseLogo } from './Shared';
 import { getValidationRegexString } from '../utils/logic';
 import { generateFigmaSVG } from '../services/figmaExporter';
-import { Figma, Users, Briefcase } from 'lucide-react';
+import { Figma, Users, Briefcase, HelpCircle } from 'lucide-react';
 
 export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: ElementDefinition[] }> = ({ processDef, allElements }) => {
+    const [showFigmaHelp, setShowFigmaHelp] = useState(false);
     
     const handleFigmaExport = () => {
         const svgContent = generateFigmaSVG(processDef);
@@ -48,11 +49,11 @@ export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: El
     };
 
     // 1. Gather all unique logic signatures (Criteria) to form the X-Axis columns
-    const distinctCriteria = Array.from(new Set(
+    const distinctCriteria: string[] = Array.from(new Set(
         processDef.stages.flatMap(s => 
             s.skillLogic?.map(rule => formatLogicGroup(rule.logic)) || []
         )
-    )).filter(Boolean);
+    )).filter((c): c is string => !!c);
 
     return (
         <div className="max-w-5xl mx-auto py-12 px-8 bg-white shadow-2xl min-h-screen my-8 rounded-xl print:shadow-none print:m-0">
@@ -66,13 +67,30 @@ export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: El
                         <p className="text-xs font-bold text-gray-400 uppercase">Version</p>
                         <p className="font-mono text-sw-teal">1.0.0-draft</p>
                     </div>
-                    <button 
-                        onClick={handleFigmaExport}
-                        className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg font-bold hover:bg-gray-800 transition-all text-sm shadow-md"
-                        title="Download as SVG to import into Figma"
-                    >
-                        <Figma size={16} /> Export to Figma
-                    </button>
+                    
+                    <div className="relative flex items-center gap-2">
+                        <button 
+                            onClick={handleFigmaExport}
+                            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg font-bold hover:bg-gray-800 transition-all text-sm shadow-md"
+                            title="Download as SVG to import into Figma"
+                        >
+                            <Figma size={16} /> Export to Figma
+                        </button>
+                        <button 
+                            className="text-gray-400 hover:text-sw-teal transition-colors p-1"
+                            onClick={() => setShowFigmaHelp(!showFigmaHelp)}
+                            onMouseEnter={() => setShowFigmaHelp(true)}
+                            onMouseLeave={() => setShowFigmaHelp(false)}
+                        >
+                            <HelpCircle size={18} />
+                        </button>
+                        {showFigmaHelp && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-gray-800 text-white text-xs p-3 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-2">
+                                <p className="font-bold mb-1 text-gray-200">How to Import:</p>
+                                <p className="leading-relaxed text-gray-400">Simply drag & drop the downloaded <code className="text-white">.svg</code> file directly onto your Figma canvas to get editable layers.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

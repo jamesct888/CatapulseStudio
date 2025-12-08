@@ -23,7 +23,12 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
 
     const updateCondition = (idx: number, field: string, value: any) => {
         const newConds = [...group.conditions];
-        newConds[idx] = { ...newConds[idx], [field]: value };
+        // If changing the target field, reset the value to avoid mismatch types
+        if (field === 'targetElementId') {
+            newConds[idx] = { ...newConds[idx], [field]: value, value: '' };
+        } else {
+            newConds[idx] = { ...newConds[idx], [field]: value };
+        }
         onChange({ ...group, conditions: newConds });
     };
 
@@ -94,67 +99,98 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
 
             {/* Conditions List */}
             <div className="space-y-3">
-                {group.conditions.map((cond, idx) => (
-                    <div key={cond.id || idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm relative group">
-                        <button 
-                            onClick={() => removeCondition(idx)} 
-                            className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-sw-red border border-gray-200 p-1 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                            title="Remove Condition"
-                        >
-                            <X size={12} />
-                        </button>
-                        
-                        {/* 2-Row Grid Layout for Inputs */}
-                        <div className="flex flex-col gap-2">
-                            {/* Row 1: Field & Operator */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Field</label>
-                                    <select 
-                                        className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
-                                        value={cond.targetElementId}
-                                        onChange={(e) => updateCondition(idx, 'targetElementId', e.target.value)}
-                                    >
-                                        <option value="">Select Field...</option>
-                                        {availableTargets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Operator</label>
-                                    <select 
-                                        className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
-                                        value={cond.operator}
-                                        onChange={(e) => updateCondition(idx, 'operator', e.target.value)}
-                                    >
-                                        <option value="equals">Equals</option>
-                                        <option value="notEquals">Doesn't Equal</option>
-                                        <option value="contains">Contains</option>
-                                        <option value="greaterThan">Greater Than &gt;</option>
-                                        <option value="lessThan">Less Than &lt;</option>
-                                        <option value="isNotEmpty">Is Populated</option>
-                                        <option value="isEmpty">Is Empty</option>
-                                        <option value="dateInLast">Date in last (days)</option>
-                                        <option value="dateInNext">Date in next (days)</option>
-                                    </select>
-                                </div>
-                            </div>
+                {group.conditions.map((cond, idx) => {
+                    const targetEl = availableTargets.find(t => t.id === cond.targetElementId);
+                    
+                    // Logic to check if we should show a dropdown for the Value field
+                    let valueOptions: string[] = [];
+                    const isSelectOrRadio = targetEl && (targetEl.type === 'select' || targetEl.type === 'radio');
+                    
+                    if (isSelectOrRadio) {
+                        if (Array.isArray(targetEl.options)) {
+                            valueOptions = targetEl.options;
+                        } else if (typeof targetEl.options === 'string') {
+                            valueOptions = (targetEl.options as string).split(',');
+                        }
+                    }
 
-                            {/* Row 2: Value (Full Width) */}
-                            {cond.operator !== 'isEmpty' && cond.operator !== 'isNotEmpty' && (
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Value</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 placeholder-gray-400 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
-                                        value={String(cond.value)}
-                                        onChange={(e) => updateCondition(idx, 'value', e.target.value)}
-                                        placeholder="Value to match..."
-                                    />
+                    const showValueDropdown = isSelectOrRadio && valueOptions.length > 0;
+
+                    return (
+                        <div key={cond.id || idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm relative group">
+                            <button 
+                                onClick={() => removeCondition(idx)} 
+                                className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-sw-red border border-gray-200 p-1 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                title="Remove Condition"
+                            >
+                                <X size={12} />
+                            </button>
+                            
+                            {/* 2-Row Grid Layout for Inputs */}
+                            <div className="flex flex-col gap-2">
+                                {/* Row 1: Field & Operator */}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Field</label>
+                                        <select 
+                                            className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                            value={cond.targetElementId}
+                                            onChange={(e) => updateCondition(idx, 'targetElementId', e.target.value)}
+                                        >
+                                            <option value="">Select Field...</option>
+                                            {availableTargets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Operator</label>
+                                        <select 
+                                            className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                            value={cond.operator}
+                                            onChange={(e) => updateCondition(idx, 'operator', e.target.value)}
+                                        >
+                                            <option value="equals">Equals</option>
+                                            <option value="notEquals">Doesn't Equal</option>
+                                            <option value="contains">Contains</option>
+                                            <option value="greaterThan">Greater Than &gt;</option>
+                                            <option value="lessThan">Less Than &lt;</option>
+                                            <option value="isNotEmpty">Is Populated</option>
+                                            <option value="isEmpty">Is Empty</option>
+                                            <option value="dateInLast">Date in last (days)</option>
+                                            <option value="dateInNext">Date in next (days)</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            )}
+
+                                {/* Row 2: Value (Full Width) */}
+                                {cond.operator !== 'isEmpty' && cond.operator !== 'isNotEmpty' && (
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Value</label>
+                                        {showValueDropdown ? (
+                                            <select
+                                                className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                                value={String(cond.value)}
+                                                onChange={(e) => updateCondition(idx, 'value', e.target.value)}
+                                            >
+                                                <option value="">Select Value...</option>
+                                                {valueOptions.map((opt: string, i: number) => (
+                                                    <option key={i} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input 
+                                                type="text" 
+                                                className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 placeholder-gray-400 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                                value={String(cond.value)}
+                                                onChange={(e) => updateCondition(idx, 'value', e.target.value)}
+                                                placeholder="Value to match..."
+                                            />
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Recursive Sub-Groups */}

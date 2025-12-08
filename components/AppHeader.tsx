@@ -1,8 +1,8 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { CatapulseLogo } from './Shared';
-import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload } from 'lucide-react';
-import { ProcessDefinition } from '../types';
+import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload, Share } from 'lucide-react';
+import { ProcessDefinition, VisualTheme } from '../types';
+import { generateStandaloneHTML } from '../services/htmlExporter';
 
 interface AppHeaderProps {
   processDef: ProcessDefinition;
@@ -11,10 +11,11 @@ interface AppHeaderProps {
   setViewMode: (mode: any) => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (val: boolean) => void;
+  visualTheme?: VisualTheme;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ 
-  processDef, setProcessDef, viewMode, setViewMode, isSettingsOpen, setIsSettingsOpen 
+  processDef, setProcessDef, viewMode, setViewMode, isSettingsOpen, setIsSettingsOpen, visualTheme
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -43,6 +44,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
+  };
+  
+  const handleExportHTML = () => {
+    const themeToUse = visualTheme || { mode: 'type1', density: 'default', radius: 'medium' };
+    const htmlContent = generateStandaloneHTML(processDef, themeToUse); 
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${processDef.name.replace(/\s+/g, '_')}_prototype.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,6 +125,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                         title="Save Process (JSON)"
                     >
                         <Download size={18} />
+                    </button>
+                    <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                     <button 
+                        onClick={handleExportHTML}
+                        className="p-2 text-white bg-sw-teal hover:bg-sw-tealHover rounded-lg transition-colors flex items-center gap-2 text-xs font-bold px-3 shadow-md"
+                        title="Export Standalone HTML Prototype"
+                    >
+                        <Share size={14} /> Share Prototype
                     </button>
                 </div>
                 <div className="h-6 w-px bg-gray-200"></div>

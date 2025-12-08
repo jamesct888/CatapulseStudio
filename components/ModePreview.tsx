@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { ProcessDefinition, FormState, VisualTheme } from '../types';
 import { isElementVisible, isElementRequired, isSectionVisible, validateValue, evaluateLogicGroup } from '../utils/logic';
@@ -28,6 +29,8 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
 
   const currentStage = processDef.stages[currentStageIdx];
   const visibleSections = currentStage.sections.filter(sec => isSectionVisible(sec, formData));
+  
+  const isType2 = visualTheme.mode === 'type2';
 
   // Evaluate Skills on Stage Change
   useEffect(() => {
@@ -99,7 +102,18 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
       setIsGenerating(false);
   }
 
+  // --- Theme Classes ---
+  // Type 2 uses Pink Background (#ffe2e8) and Red Headers (#e61126)
+  const containerBg = isType2 ? 'bg-white border-[#ffe2e8]' : 'bg-white border-gray-100';
+  const stageHeaderBg = isType2 ? 'bg-[#e61126]' : 'bg-sw-teal';
+  const sectionTitleColor = isType2 ? 'text-[#e61126] border-gray-100' : 'text-gray-800 border-gray-100';
+  const pageBg = isType2 ? 'bg-[#ffe2e8]' : 'bg-sw-lighterGray';
+  
+  // Text Colors
+  const headerTextColor = isType2 ? 'text-[#0b3239]' : 'text-sw-teal';
+
   return (
+    <div className={`h-full overflow-y-auto ${pageBg}`}>
     <div className="max-w-4xl mx-auto py-12 px-6 relative">
         <OperationsHUD 
             isVisible={hudVisible} 
@@ -110,22 +124,22 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
 
         <div className="mb-8 flex justify-between items-end">
             <div>
-                <h2 className="text-3xl font-serif text-sw-teal mb-2">{processDef.name}</h2>
+                <h2 className={`text-3xl font-serif mb-2 ${headerTextColor}`}>{processDef.name}</h2>
                 <div className="flex gap-2">
                     {processDef.stages.map((s, i) => (
-                        <div key={s.id} className={`h-1.5 w-12 rounded-full ${i <= currentStageIdx ? 'bg-sw-teal' : 'bg-gray-200'}`} />
+                        <div key={s.id} className={`h-1.5 w-12 rounded-full ${i <= currentStageIdx ? (isType2 ? 'bg-[#e61126]' : 'bg-sw-red') : 'bg-white/50'}`} />
                     ))}
                 </div>
             </div>
             
-            <div className="flex gap-2 items-center bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
-                <User size={16} className="text-gray-400 ml-2" />
+            <div className={`flex gap-2 items-center p-2 rounded-xl border shadow-sm ${isType2 ? 'bg-white border-white' : 'bg-white border-gray-200'}`}>
+                <User size={16} className={'text-gray-400 ml-2'} />
                 <input 
                     type="text" 
                     value={personaPrompt}
                     onChange={(e) => setPersonaPrompt(e.target.value)}
                     placeholder="Persona (e.g. Married, High Value)..."
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:ring-1 focus:ring-sw-teal w-48 text-sw-text bg-white placeholder-gray-400"
+                    className={`text-sm border-none focus:ring-0 w-48 bg-transparent placeholder-gray-400 text-sw-text`}
                 />
                 <button 
                     onClick={handleAutoFill}
@@ -137,15 +151,15 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
             </div>
         </div>
 
-        <div className="bg-white shadow-card rounded-2xl border border-gray-100 overflow-hidden min-h-[600px] relative">
-            <div className="bg-sw-teal text-white p-6">
-                <h3 className="text-xl font-bold">{currentStage.title}</h3>
+        <div className={`shadow-card rounded-2xl border overflow-hidden min-h-[600px] relative transition-colors duration-300 ${containerBg}`}>
+            <div className={`p-6 ${stageHeaderBg}`}>
+                <h3 className="text-xl font-bold text-white">{currentStage.title}</h3>
             </div>
             
             <div className="p-8 space-y-8">
                 {visibleSections.map(section => (
                     <div key={section.id}>
-                        <h4 className="font-bold text-gray-800 border-b border-gray-100 pb-2 mb-6 uppercase text-sm tracking-wide">{section.title}</h4>
+                        <h4 className={`font-bold pb-2 mb-6 uppercase text-sm tracking-wide ${sectionTitleColor}`}>{section.title}</h4>
                         <div className={`grid gap-x-8 gap-y-2 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
                             {section.elements.filter(el => isElementVisible(el, formData)).map(el => (
                                 <RenderElement
@@ -171,17 +185,17 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                 ))}
             </div>
 
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+            <div className={`p-6 border-t flex justify-between items-center ${isType2 ? 'bg-gray-50 border-gray-100' : 'bg-gray-50 border-gray-100'}`}>
                 <button 
                     onClick={() => setCurrentStageIdx(prev => Math.max(0, prev - 1))}
                     disabled={currentStageIdx === 0}
-                    className="px-6 py-2 rounded-lg font-bold text-gray-500 hover:text-sw-teal disabled:opacity-30"
+                    className={`px-6 py-2 rounded-lg font-bold disabled:opacity-30 ${isType2 ? 'text-gray-500 hover:text-[#e61126]' : 'text-gray-500 hover:text-sw-teal'}`}
                 >
                     Back
                 </button>
                 <button 
                     onClick={handleNext}
-                    className="px-8 py-3 bg-sw-teal text-white rounded-full font-bold shadow-lg hover:bg-sw-tealHover transition-all flex items-center gap-2"
+                    className={`px-8 py-3 rounded-full font-bold shadow-lg transition-all flex items-center gap-2 text-white ${isType2 ? 'bg-[#0b3239] hover:bg-[#062126]' : 'bg-sw-red hover:bg-sw-redHover'}`}
                 >
                     {currentStageIdx === processDef.stages.length - 1 ? 'Submit' : 'Next Step'}
                     <ArrowRight size={18} />
@@ -191,18 +205,19 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
         
         <div className="mt-8 space-y-4">
              {processDef.stages.flatMap(s => s.sections).filter(s => s.variant === 'summary' && isSectionVisible(s, formData)).map(summarySec => (
-                 <div key={summarySec.id} className="bg-sw-teal/5 border border-sw-teal/20 rounded-xl p-6">
-                     <h4 className="text-xs font-bold text-sw-teal uppercase tracking-widest mb-4 flex items-center gap-2">
+                 <div key={summarySec.id} className={`${isType2 ? 'bg-white border-[#ffe2e8]' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6`}>
+                     <h4 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 ${isType2 ? 'text-[#e61126]' : 'text-sw-teal'}`}>
                         <PanelBottom size={14} /> {summarySec.title}
                      </h4>
                      <div className={`grid gap-4 ${summarySec.layout === '2col' ? 'grid-cols-2' : summarySec.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
                         {summarySec.elements.filter(el => isElementVisible(el, formData)).map(el => (
-                            <RenderElement key={el.id} element={el} value={formData[el.id]} onChange={()=>{}} disabled theme={{density: 'compact', radius: 'small'}} />
+                            <RenderElement key={el.id} element={el} value={formData[el.id]} onChange={()=>{}} disabled theme={{...visualTheme, density: 'compact', radius: 'small'}} />
                         ))}
                      </div>
                  </div>
              ))}
         </div>
+    </div>
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ProcessDefinition, LogicGroup, Condition, ElementDefinition } from '../types';
 import { CatapulseLogo } from './Shared';
@@ -47,11 +48,11 @@ export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: El
     };
 
     // 1. Gather all unique logic signatures (Criteria) to form the X-Axis columns
-    const distinctCriteria = Array.from(new Set(
+    const distinctCriteria: string[] = Array.from(new Set(
         processDef.stages.flatMap(s => 
             s.skillLogic?.map(rule => formatLogicGroup(rule.logic)) || []
         )
-    )).filter(Boolean);
+    )).filter((c): c is string => !!c);
 
     return (
         <div className="max-w-5xl mx-auto py-12 px-8 bg-white shadow-2xl min-h-screen my-8 rounded-xl print:shadow-none print:m-0">

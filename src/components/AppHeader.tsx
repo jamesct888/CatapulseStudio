@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { CatapulseLogo } from './Shared';
 import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload } from 'lucide-react';
-import { ProcessDefinition } from '../types';
+import { ProcessDefinition, VisualTheme } from '../types';
 
 interface AppHeaderProps {
   processDef: ProcessDefinition;
@@ -10,10 +10,11 @@ interface AppHeaderProps {
   setViewMode: (mode: any) => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (val: boolean) => void;
+  visualTheme?: VisualTheme;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ 
-  processDef, setProcessDef, viewMode, setViewMode, isSettingsOpen, setIsSettingsOpen 
+  processDef, setProcessDef, viewMode, setViewMode, isSettingsOpen, setIsSettingsOpen, visualTheme 
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   

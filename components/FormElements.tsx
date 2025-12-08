@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { ElementDefinition, VisualTheme } from '../types';
 import { Plus, Trash2 } from 'lucide-react';
@@ -12,7 +14,7 @@ interface FormElementProps {
   theme?: VisualTheme;
 }
 
-export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { density: 'default', radius: 'medium' } }) => {
+export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' } }) => {
   // Style Configuration Maps
   const densityConfig = {
     dense: {
@@ -80,12 +82,34 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
     large: "rounded-2xl"
   };
 
+  const isType2 = theme.mode === 'type2';
+
+  // --- THEME COLOR CLASSES ---
+  // Backgrounds: Both use white inputs generally, Type 2 handles page background elsewhere
+  const inputBgClass = 'bg-white';
+  
+  // Text
+  const inputTextClass = isType2 ? 'text-[#0b3239] placeholder-gray-400' : 'text-sw-teal placeholder-gray-400';
+  
+  // Borders
+  // Type 1: Teal Border
+  // Type 2: Light Gray Border, Bright Red Focus
+  const inputBorderClass = isType2 
+    ? 'border-gray-300 focus:border-[#e61126] focus:ring-[#e61126]' 
+    : 'border-sw-teal focus:border-sw-teal focus:ring-sw-teal';
+    
+  // Label Text
+  const labelTextClass = isType2 ? 'text-[#0b3239]' : 'text-sw-teal';
+  
+  // Static Text
+  const staticTextClass = isType2 ? 'text-[#0b3239]' : 'text-sw-teal';
+
   const d = densityConfig[theme.density];
   const r = radiusConfig[theme.radius];
 
   // Base input class construction
-  const baseClasses = `w-full ${d.inputHeight} ${d.padding} ${d.fontSize} border border-sw-teal ${r} focus:outline-none focus:shadow-input-focus transition-all bg-white text-sw-teal placeholder-gray-400 font-sans`;
-  const errorClasses = error ? "border-sw-error bg-[#fff6f5] focus:border-sw-error focus:ring-1 focus:ring-sw-error" : "hover:border-sw-teal";
+  const baseClasses = `w-full ${d.inputHeight} ${d.padding} ${d.fontSize} border ${inputBorderClass} ${r} focus:outline-none focus:shadow-input-focus focus:ring-1 transition-all ${inputBgClass} ${inputTextClass} font-sans`;
+  const errorClasses = error ? "border-sw-error bg-[#fff6f5] text-sw-red focus:border-sw-error focus:ring-1 focus:ring-sw-error" : isType2 ? "hover:border-[#e61126]" : "hover:border-sw-teal";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     onChange(e.target.value);
@@ -106,31 +130,31 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
     }
 
     return (
-      <div className={`prose prose-teal text-sw-teal max-w-none ${d.wrapper}`}>
+      <div className={`prose max-w-none ${d.wrapper}`}>
         {/* Show label if it exists and isn't the default 'New Field' which might be distracting for pure text */}
         {element.label && element.label !== 'New Field' && (
-             <label className={`block font-bold text-sw-teal ${d.labelSize} ${d.labelMb}`}>
+             <label className={`block font-bold ${labelTextClass} ${d.labelSize} ${d.labelMb}`}>
                 {element.label}
              </label>
         )}
         
         {isReflection ? (
-             <div className={`w-full px-0 ${d.fontSize} text-gray-800 ${r} min-h-[${theme.density === 'dense' ? '30px' : '50px'}] flex items-center`}>
+             <div className={`w-full px-0 ${d.fontSize} ${staticTextClass} ${r} min-h-[${theme.density === 'dense' ? '30px' : '50px'}] flex items-center`}>
                 {displayContent ? (
                     <span>{displayContent}</span>
                 ) : (
-                    <span className="text-gray-400 italic opacity-60">Empty value</span>
+                    <span className={`italic opacity-60 text-gray-400`}>Empty value</span>
                 )}
              </div>
         ) : (
-            <p className={`font-sans ${d.fontSize} whitespace-pre-wrap`}>{displayContent}</p>
+            <p className={`font-sans ${d.fontSize} whitespace-pre-wrap ${staticTextClass}`}>{displayContent}</p>
         )}
       </div>
     );
   }
 
   const Label = () => (
-    <label className={`block font-bold text-sw-teal ${d.labelSize} ${d.labelMb}`}>
+    <label className={`block font-bold ${labelTextClass} ${d.labelSize} ${d.labelMb}`}>
       {element.label}
       {element.required && <span className="text-sw-red ml-1" title="Required">*</span>}
     </label>
@@ -163,7 +187,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
           <Label />
           <div className="relative w-full">
             {element.type === 'currency' && (
-              <span className={`absolute left-2 top-0 bottom-0 flex items-center text-sw-teal font-bold ${d.fontSize}`}>£</span>
+              <span className={`absolute left-2 top-0 bottom-0 flex items-center font-bold ${d.fontSize} ${isType2 ? 'text-[#e61126]' : 'text-sw-teal'}`}>£</span>
             )}
             <input
               type="number"
@@ -216,15 +240,15 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
           <div className="relative w-full">
             <select
               disabled={disabled}
-              className={`${baseClasses} ${errorClasses} appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2716%27%20height%3D%2716%27%20fill%3D%27none%27%3E%3Cpath%20fill%3D%27%230b3239%27%20d%3D%27M3.766%204.212h8.468c.613%200%20.965.703.587%201.173l-4.234%205.293a.75.75%200%200%201-1.174%200L3.18%205.385c-.378-.47-.026-1.173.587-1.173z%27%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:16px] bg-[position:calc(100%-12px)_center]`}
+              className={`${baseClasses} ${errorClasses}`}
               value={value || ''}
               onChange={handleChange}
               onBlur={onBlur}
             >
-              <option value="">Please Select...</option>
+              <option value="" className="text-gray-500">Please Select...</option>
               {options.map((opt, idx) => {
                 const label = String(opt).trim();
-                return <option key={idx} value={label}>{label}</option>;
+                return <option key={idx} value={label} className="text-gray-900">{label}</option>;
               })}
             </select>
           </div>
@@ -233,11 +257,15 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       );
     case 'radio':
       const radioOpts = element.options ? (Array.isArray(element.options) ? element.options : String(element.options).split(',')) : [];
+      const radioContainerClass = isType2 ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200';
+      const radioUnselectedClass = 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50';
+      const radioSelectedClass = isType2 ? 'bg-[#e61126] text-white' : 'bg-sw-red text-white';
+
       return (
         <div className={`${d.wrapper} group`}>
           <Label />
            {/* Segmented Control Style */}
-          <div className="flex w-full flex-wrap bg-gray-100 p-1 rounded-lg gap-1 border border-gray-200">
+          <div className={`flex w-full flex-wrap p-1 rounded-lg gap-1 border ${radioContainerClass}`}>
             {radioOpts.map((opt, idx) => {
               const label = String(opt).trim();
               const isSelected = value === label;
@@ -246,8 +274,8 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                     cursor-pointer transition-all rounded-md flex-1 flex items-center justify-center text-center select-none relative
                     ${theme.density === 'dense' ? 'py-1 text-xs' : theme.density === 'compact' ? 'py-1.5 text-sm' : 'py-2 text-sm'}
                     ${isSelected 
-                        ? 'bg-sw-teal text-white font-bold shadow-md' 
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+                        ? `${radioSelectedClass} font-bold shadow-md` 
+                        : radioUnselectedClass
                     }
                     ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 `}>
@@ -270,10 +298,15 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
         </div>
       );
       case 'checkbox':
+        const checkWrapperClass = isType2 ? 'border-gray-300 hover:bg-[#ffe2e8] bg-white' : 'border-sw-teal hover:bg-sw-teal/5 bg-white';
+        const checkTextClass = isType2 ? 'text-[#0b3239]' : 'text-sw-text';
+        const checkSquareClass = isType2 ? 'border-[#e61126] bg-white' : 'border-sw-teal bg-white';
+        const checkSquareActive = isType2 ? 'bg-[#e61126] border-[#e61126]' : 'bg-sw-red border-sw-red';
+
         return (
             <div className={`${d.wrapper} group`}>
-                <label className={`flex items-center gap-3 cursor-pointer group/checkbox ${d.checkboxWrapper} border border-sw-teal ${r} hover:bg-sw-teal/5 transition-colors bg-white`}>
-                    <div className={`${d.checkboxSize} border ${radiusConfig.small} flex items-center justify-center ${value === true || value === 'true' ? 'bg-sw-teal border-sw-teal' : 'border-sw-teal bg-white'}`}>
+                <label className={`flex items-center gap-3 cursor-pointer group/checkbox ${d.checkboxWrapper} border ${r} transition-colors ${checkWrapperClass}`}>
+                    <div className={`${d.checkboxSize} border ${radiusConfig.small} flex items-center justify-center ${(value === true || value === 'true') ? checkSquareActive : checkSquareClass}`}>
                         {(value === true || value === 'true') && (
                              <svg className={`${d.iconSize} text-white`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -287,7 +320,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                         onBlur={onBlur}
                         className="hidden"
                     />
-                     <span className={`${d.fontSize} font-bold text-sw-text`}>
+                     <span className={`${d.fontSize} font-bold ${checkTextClass}`}>
                         {element.label}
                         {element.required && <span className="text-sw-red ml-1">*</span>}
                     </span>
@@ -316,22 +349,27 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
             onChange(newRows);
         };
 
+        const listContainerClass = isType2 ? 'border-gray-300 bg-white' : 'border-sw-teal/30 bg-white';
+        const listHeaderClass = isType2 ? 'bg-[#ffe2e8] border-gray-200' : 'bg-sw-lightGray border-gray-200';
+        const listHeaderLabelClass = isType2 ? 'text-[#e61126]' : 'text-gray-500';
+        const listInputClass = isType2 ? 'bg-white border-gray-300 focus:border-[#e61126] text-[#0b3239]' : 'bg-white border-gray-200 focus:border-sw-teal text-sw-text';
+
         return (
             <div className={`${d.wrapper} group`}>
                 <Label />
-                <div className="border border-sw-teal/30 rounded-lg overflow-hidden bg-white shadow-sm">
+                <div className={`border rounded-lg overflow-hidden shadow-sm ${listContainerClass}`}>
                     {/* Header */}
-                    <div className="bg-sw-lightGray border-b border-gray-200 grid gap-2 px-4 py-2" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr) 40px` }}>
+                    <div className={`border-b grid gap-2 px-4 py-2 ${listHeaderClass}`} style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr) 40px` }}>
                         {columns.map(col => (
-                            <div key={col.id} className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                            <div key={col.id} className={`text-xs font-bold uppercase tracking-wide ${listHeaderLabelClass}`}>
                                 {col.label}
                             </div>
                         ))}
-                        <div className="text-xs font-bold text-gray-500 uppercase"></div>
+                        <div className={`text-xs font-bold uppercase ${listHeaderLabelClass}`}></div>
                     </div>
 
                     {/* Rows */}
-                    <div className="divide-y divide-gray-100">
+                    <div className={`divide-y divide-gray-100`}>
                         {rows.map((row, rowIdx) => (
                             <div key={rowIdx} className="grid gap-2 px-4 py-2 items-start" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr) 40px` }}>
                                 {columns.map(col => (
@@ -339,13 +377,13 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                                         {col.type === 'select' ? (
                                             <select
                                                 disabled={disabled}
-                                                className={`w-full text-xs p-2 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal bg-white text-sw-text`}
+                                                className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
                                                 value={row[col.id] || ''}
                                                 onChange={(e) => handleRowChange(rowIdx, col.id, e.target.value)}
                                             >
-                                                <option value="">Select...</option>
+                                                <option value="" className="text-gray-500">Select...</option>
                                                 {col.options?.map((opt, i) => (
-                                                    <option key={i} value={opt}>{opt}</option>
+                                                    <option key={i} value={opt} className="text-gray-900">{opt}</option>
                                                 ))}
                                             </select>
                                         ) : col.type === 'checkbox' ? (
@@ -360,7 +398,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                                             <input
                                                 type={col.type}
                                                 disabled={disabled}
-                                                className={`w-full text-xs p-2 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal bg-white text-sw-text`}
+                                                className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
                                                 value={row[col.id] || ''}
                                                 onChange={(e) => handleRowChange(rowIdx, col.id, e.target.value)}
                                                 placeholder={col.label}
@@ -378,18 +416,22 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                             </div>
                         ))}
                         {rows.length === 0 && (
-                            <div className="p-8 text-center text-sm text-gray-400 italic bg-gray-50/50">
+                            <div className={`p-8 text-center text-sm italic text-gray-400 bg-gray-50/50`}>
                                 No items added yet.
                             </div>
                         )}
                     </div>
                     
                     {/* Footer */}
-                    <div className="bg-gray-50 border-t border-gray-200 p-2">
+                    <div className={`border-t p-2 ${isType2 ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-gray-200'}`}>
                         <button 
                             onClick={handleAddRow}
                             disabled={disabled}
-                            className="w-full py-2 border border-dashed border-gray-300 rounded text-xs font-bold text-gray-500 hover:border-sw-teal hover:text-sw-teal hover:bg-white transition-all flex items-center justify-center gap-2"
+                            className={`w-full py-2 border border-dashed rounded text-xs font-bold transition-all flex items-center justify-center gap-2 
+                                ${isType2 
+                                    ? 'border-gray-300 text-gray-500 hover:border-[#e61126] hover:text-[#e61126] hover:bg-white' 
+                                    : 'border-gray-300 text-gray-500 hover:border-sw-teal hover:text-sw-teal hover:bg-white'
+                                }`}
                         >
                             <Plus size={14} /> Add {element.label || 'Item'}
                         </button>
