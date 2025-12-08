@@ -1,5 +1,6 @@
 import React from 'react';
 import { ElementDefinition, VisualTheme } from '../types';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface FormElementProps {
   element: ElementDefinition;
@@ -271,7 +272,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       case 'checkbox':
         return (
             <div className={`${d.wrapper} group`}>
-                <label className={`flex items-center gap-3 cursor-pointer group/checkbox ${d.checkboxWrapper} border border-sw-teal ${r} hover:bg-sw-teal/5 transition-colors`}>
+                <label className={`flex items-center gap-3 cursor-pointer group/checkbox ${d.checkboxWrapper} border border-sw-teal ${r} hover:bg-sw-teal/5 transition-colors bg-white`}>
                     <div className={`${d.checkboxSize} border ${radiusConfig.small} flex items-center justify-center ${value === true || value === 'true' ? 'bg-sw-teal border-sw-teal' : 'border-sw-teal bg-white'}`}>
                         {(value === true || value === 'true') && (
                              <svg className={`${d.iconSize} text-white`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -293,7 +294,111 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                 </label>
                  <ErrorMsg />
             </div>
-        )
+        );
+      
+      case 'repeater':
+        const columns = element.columns || [];
+        const rows = Array.isArray(value) ? value : [];
+
+        const handleAddRow = () => {
+            onChange([...rows, {}]); // Add empty object
+        };
+
+        const handleRemoveRow = (index: number) => {
+            const newRows = [...rows];
+            newRows.splice(index, 1);
+            onChange(newRows);
+        };
+
+        const handleRowChange = (index: number, field: string, val: any) => {
+            const newRows = [...rows];
+            newRows[index] = { ...newRows[index], [field]: val };
+            onChange(newRows);
+        };
+
+        return (
+            <div className={`${d.wrapper} group`}>
+                <Label />
+                <div className="border border-sw-teal/30 rounded-lg overflow-hidden bg-white shadow-sm">
+                    {/* Header */}
+                    <div className="bg-sw-lightGray border-b border-gray-200 grid gap-2 px-4 py-2" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr) 40px` }}>
+                        {columns.map(col => (
+                            <div key={col.id} className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                                {col.label}
+                            </div>
+                        ))}
+                        <div className="text-xs font-bold text-gray-500 uppercase"></div>
+                    </div>
+
+                    {/* Rows */}
+                    <div className="divide-y divide-gray-100">
+                        {rows.map((row, rowIdx) => (
+                            <div key={rowIdx} className="grid gap-2 px-4 py-2 items-start" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr) 40px` }}>
+                                {columns.map(col => (
+                                    <div key={col.id}>
+                                        {col.type === 'select' ? (
+                                            <select
+                                                disabled={disabled}
+                                                className={`w-full text-xs p-2 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal bg-white text-sw-text`}
+                                                value={row[col.id] || ''}
+                                                onChange={(e) => handleRowChange(rowIdx, col.id, e.target.value)}
+                                            >
+                                                <option value="">Select...</option>
+                                                {col.options?.map((opt, i) => (
+                                                    <option key={i} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                        ) : col.type === 'checkbox' ? (
+                                            <input 
+                                                type="checkbox"
+                                                disabled={disabled}
+                                                checked={row[col.id] === true}
+                                                onChange={(e) => handleRowChange(rowIdx, col.id, e.target.checked)}
+                                                className="mt-2"
+                                            />
+                                        ) : (
+                                            <input
+                                                type={col.type}
+                                                disabled={disabled}
+                                                className={`w-full text-xs p-2 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal bg-white text-sw-text`}
+                                                value={row[col.id] || ''}
+                                                onChange={(e) => handleRowChange(rowIdx, col.id, e.target.value)}
+                                                placeholder={col.label}
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+                                <button 
+                                    onClick={() => handleRemoveRow(rowIdx)}
+                                    disabled={disabled}
+                                    className="text-gray-400 hover:text-sw-red p-2 transition-colors flex justify-center"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        ))}
+                        {rows.length === 0 && (
+                            <div className="p-8 text-center text-sm text-gray-400 italic bg-gray-50/50">
+                                No items added yet.
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Footer */}
+                    <div className="bg-gray-50 border-t border-gray-200 p-2">
+                        <button 
+                            onClick={handleAddRow}
+                            disabled={disabled}
+                            className="w-full py-2 border border-dashed border-gray-300 rounded text-xs font-bold text-gray-500 hover:border-sw-teal hover:text-sw-teal hover:bg-white transition-all flex items-center justify-center gap-2"
+                        >
+                            <Plus size={14} /> Add {element.label || 'Item'}
+                        </button>
+                    </div>
+                </div>
+                <ErrorMsg />
+            </div>
+        );
+
     default:
       return <div className="text-sw-red p-4 border border-sw-red bg-[#fff6f5] rounded-xl">Unknown type: {element.type}</div>;
   }

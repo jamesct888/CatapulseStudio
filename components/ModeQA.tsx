@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ProcessDefinition, TestCase, UserStory, StoryStrategy, ChatMessage } from '../types';
 import { BookOpen, ClipboardList, RefreshCw, Sparkles, Split, BrainCircuit, ThumbsUp, ThumbsDown, Send, FileText, Bot, User, LayoutGrid, Network } from 'lucide-react';
@@ -120,7 +119,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                 <select 
                                     value={['screen', 'journey', 'persona'].includes(storyStrategy) ? storyStrategy : 'custom'} 
                                     onChange={(e) => setStoryStrategy(e.target.value as StoryStrategy)}
-                                    className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-sw-teal focus:border-sw-teal w-full"
+                                    className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-sw-teal focus:border-sw-teal w-full text-sw-text"
                                 >
                                     <option value="screen">By Screen / Component</option>
                                     <option value="journey">By User Journey</option>
@@ -234,7 +233,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                             onChange={(e) => setInputMessage(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                             placeholder="Ask a follow-up question or suggest a hybrid approach..."
-                                            className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sw-teal focus:border-transparent"
+                                            className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sw-teal focus:border-transparent text-sw-text"
                                         />
                                         <button 
                                             onClick={handleSendMessage}

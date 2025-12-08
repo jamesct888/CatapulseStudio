@@ -125,7 +125,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                     value={personaPrompt}
                     onChange={(e) => setPersonaPrompt(e.target.value)}
                     placeholder="Persona (e.g. Married, High Value)..."
-                    className="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:ring-1 focus:ring-sw-teal w-48 text-sw-text bg-white placeholder-gray-400"
+                    className="text-sm border-none focus:ring-0 w-48 text-sw-text bg-transparent placeholder-gray-400"
                 />
                 <button 
                     onClick={handleAutoFill}

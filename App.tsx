@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
@@ -5,12 +6,13 @@ import { ModePreview } from './components/ModePreview';
 import { ModeSpec } from './components/ModeSpec';
 import { ModeQA } from './components/ModeQA';
 import { ModePega } from './components/ModePega';
+import { ModeFlow } from './components/ModeFlow';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { AppHeader } from './components/AppHeader';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { DemoManager } from './components/DemoManager';
 import { DemoFocusOverlay } from './components/DemoFocusOverlay';
-import { useProcessState } from './hooks/useProcessState'; // New Hook
+import { useProcessState } from './hooks/useProcessState'; 
 import { 
   ProcessDefinition, FormState, VisualTheme, UserStory, TestCase, 
   ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy 
@@ -26,11 +28,11 @@ import {
 const App: React.FC = () => {
   // Use Custom Hook for Logic
   const { 
-    processDef, setProcessDef, updateElement, updateSection, updateStage, deleteElement, deleteSection 
+    processDef, setProcessDef, updateElement, updateSection, updateStage, deleteElement, deleteSection, deleteStage
   } = useProcessState();
 
   // UI State
-  const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');
+  const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');
   const [startPrompt, setStartPrompt] = useState('');
   const [showDemoDrop, setShowDemoDrop] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -202,6 +204,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-white flex flex-col overflow-hidden font-sans text-sw-text relative">
         <AppHeader 
             processDef={processDef} 
+            setProcessDef={setProcessDef}
             viewMode={viewMode} 
             setViewMode={setViewMode} 
             isSettingsOpen={isSettingsOpen} 
@@ -236,6 +239,12 @@ const App: React.FC = () => {
                             visualTheme={visualTheme}
                             isSettingsOpen={isSettingsOpen}
                         />
+                    </div>
+                )}
+
+                {viewMode === 'flow' && (
+                    <div className="flex-1 overflow-hidden bg-gray-50">
+                        <ModeFlow processDef={processDef} />
                     </div>
                 )}
                 
@@ -284,6 +293,26 @@ const App: React.FC = () => {
                         onUpdateStage={updateStage}
                         onDeleteElement={deleteElement}
                         onDeleteSection={deleteSection}
+                        onDeleteStage={(id) => {
+                            if (!processDef) return;
+                            if (processDef.stages.length <= 1) {
+                                alert("Cannot delete the only stage in the process.");
+                                return;
+                            }
+                            deleteStage(id);
+                            // Update selection if needed
+                            if (selectedStageId === id) {
+                                const remaining = processDef.stages.filter(s => s.id !== id);
+                                if (remaining.length > 0) {
+                                    setSelectedStageId(remaining[0].id);
+                                    setSelectedSectionId(remaining[0].sections[0]?.id || null);
+                                } else {
+                                    setSelectedStageId('');
+                                    setSelectedSectionId(null);
+                                }
+                                setSelectedElementId(null);
+                            }
+                        }}
                         onClose={() => setIsSettingsOpen(false)}
                     />
                 </div>

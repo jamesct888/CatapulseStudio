@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { ProcessDefinition, ElementDefinition, SectionDefinition, StageDefinition } from '../types';
 

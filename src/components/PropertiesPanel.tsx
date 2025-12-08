@@ -436,7 +436,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                     newCols[idx] = { ...newCols[idx], label: e.target.value };
                                                     handleRepeaterChange(newCols);
                                                 }}
-                                                className="w-full p-2 text-xs border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
+                                                className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
                                                 placeholder="Label"
                                             />
                                             <select 
@@ -446,7 +446,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                     newCols[idx] = { ...newCols[idx], type: e.target.value as any };
                                                     handleRepeaterChange(newCols);
                                                 }}
-                                                className="w-full p-2 text-xs border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
+                                                className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
                                             >
                                                 <option value="text">Text</option>
                                                 <option value="number">Number</option>
@@ -464,7 +464,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                     newCols[idx] = { ...newCols[idx], options: e.target.value.split(',') };
                                                     handleRepeaterChange(newCols);
                                                 }}
-                                                className="w-full p-2 text-xs border border-gray-300 rounded-lg bg-white text-gray-900 focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
+                                                className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
                                                 placeholder="Options (comma separated)"
                                             />
                                         )}

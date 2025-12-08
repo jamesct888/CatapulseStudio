@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { CatapulseLogo } from './Shared';
 import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload } from 'lucide-react';

@@ -9,7 +9,8 @@ export type ElementType =
   | 'select' 
   | 'radio' 
   | 'checkbox' 
-  | 'static';
+  | 'static'
+  | 'repeater'; // Added repeater type
 
 export type Operator = 'equals' | 'notEquals' | 'contains' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 
@@ -42,6 +43,13 @@ export interface SkillRule {
   requiredSkill: string;
 }
 
+export interface RepeaterColumn {
+  id: string;
+  label: string;
+  type: 'text' | 'date' | 'number' | 'select' | 'checkbox';
+  options?: string[]; // For select types within the repeater
+}
+
 export interface ElementDefinition {
   id: string;
   label: string;
@@ -50,6 +58,9 @@ export interface ElementDefinition {
   defaultValue?: string;
   description?: string; 
   
+  // Repeater Configuration
+  columns?: RepeaterColumn[];
+
   staticDataSource?: 'manual' | 'field';
   sourceFieldId?: string;
 

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ProcessDefinition, LogicGroup, Condition, ElementDefinition } from '../types';
 import { CatapulseLogo } from './Shared';
