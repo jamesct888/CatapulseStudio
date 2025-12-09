@@ -31,6 +31,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   const visibleSections = currentStage.sections.filter(sec => isSectionVisible(sec, formData));
   
   const isType2 = visualTheme.mode === 'type2';
+  const isType3 = visualTheme.mode === 'type3';
 
   // Evaluate Skills on Stage Change
   useEffect(() => {
@@ -103,14 +104,51 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   }
 
   // --- Theme Classes ---
-  // Type 2 uses Pink Background (#ffe2e8) and Red Headers (#e61126)
-  const containerBg = isType2 ? 'bg-white border-[#ffe2e8]' : 'bg-white border-gray-100';
-  const stageHeaderBg = isType2 ? 'bg-[#e61126]' : 'bg-sw-teal';
-  const sectionTitleColor = isType2 ? 'text-[#e61126] border-gray-100' : 'text-gray-800 border-gray-100';
-  const pageBg = isType2 ? 'bg-[#ffe2e8]' : 'bg-sw-lighterGray';
+  // Type 2: Red/Pink/White
+  // Type 3: Green (#006a4d)/Gray(#f1f1f1)/White
+  
+  const containerBg = isType2 
+    ? 'bg-white border-[#e0e0e0]' 
+    : isType3
+        ? 'bg-white border-gray-200'
+        : 'bg-white border-gray-100';
+        
+  const stageHeaderBg = isType2 
+    ? 'bg-[#e61126]' 
+    : isType3
+        ? 'bg-[#006a4d]'
+        : 'bg-sw-teal';
+        
+  const sectionTitleColor = isType2 
+    ? 'text-[#e61126] border-gray-100' 
+    : isType3
+        ? 'text-[#006a4d] border-gray-200'
+        : 'text-gray-800 border-gray-100';
+        
+  const pageBg = isType2 
+    ? 'bg-[#e0e0e0]' 
+    : isType3
+        ? 'bg-[#f1f1f1]'
+        : 'bg-sw-lighterGray';
   
   // Text Colors
-  const headerTextColor = isType2 ? 'text-[#0b3239]' : 'text-sw-teal';
+  const headerTextColor = isType2 
+    ? 'text-[#0b3239]' 
+    : isType3
+        ? 'text-[#006a4d]'
+        : 'text-sw-teal';
+        
+  const primaryButtonClass = isType2
+    ? 'bg-[#0b3239] hover:bg-[#062126] text-white'
+    : isType3
+        ? 'bg-[#006a4d] hover:bg-[#00482f] text-white'
+        : 'bg-sw-red hover:bg-sw-redHover text-white';
+
+  const backButtonClass = isType2
+    ? 'text-gray-500 hover:text-[#e61126]'
+    : isType3
+        ? 'text-gray-500 hover:text-[#006a4d]'
+        : 'text-gray-500 hover:text-sw-teal';
 
   return (
     <div className={`h-full overflow-y-auto ${pageBg}`}>
@@ -127,7 +165,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                 <h2 className={`text-3xl font-serif mb-2 ${headerTextColor}`}>{processDef.name}</h2>
                 <div className="flex gap-2">
                     {processDef.stages.map((s, i) => (
-                        <div key={s.id} className={`h-1.5 w-12 rounded-full ${i <= currentStageIdx ? (isType2 ? 'bg-[#e61126]' : 'bg-sw-red') : 'bg-white/50'}`} />
+                        <div key={s.id} className={`h-1.5 w-12 rounded-full ${i <= currentStageIdx ? (isType2 ? 'bg-[#e61126]' : isType3 ? 'bg-[#006a4d]' : 'bg-sw-red') : 'bg-gray-300/50'}`} />
                     ))}
                 </div>
             </div>
@@ -189,13 +227,13 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                 <button 
                     onClick={() => setCurrentStageIdx(prev => Math.max(0, prev - 1))}
                     disabled={currentStageIdx === 0}
-                    className={`px-6 py-2 rounded-lg font-bold disabled:opacity-30 ${isType2 ? 'text-gray-500 hover:text-[#e61126]' : 'text-gray-500 hover:text-sw-teal'}`}
+                    className={`px-6 py-2 rounded-lg font-bold disabled:opacity-30 ${backButtonClass}`}
                 >
                     Back
                 </button>
                 <button 
                     onClick={handleNext}
-                    className={`px-8 py-3 rounded-full font-bold shadow-lg transition-all flex items-center gap-2 text-white ${isType2 ? 'bg-[#0b3239] hover:bg-[#062126]' : 'bg-sw-red hover:bg-sw-redHover'}`}
+                    className={`px-8 py-3 rounded-full font-bold shadow-lg transition-all flex items-center gap-2 ${primaryButtonClass}`}
                 >
                     {currentStageIdx === processDef.stages.length - 1 ? 'Submit' : 'Next Step'}
                     <ArrowRight size={18} />
@@ -205,8 +243,8 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
         
         <div className="mt-8 space-y-4">
              {processDef.stages.flatMap(s => s.sections).filter(s => s.variant === 'summary' && isSectionVisible(s, formData)).map(summarySec => (
-                 <div key={summarySec.id} className={`${isType2 ? 'bg-white border-[#ffe2e8]' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6`}>
-                     <h4 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 ${isType2 ? 'text-[#e61126]' : 'text-sw-teal'}`}>
+                 <div key={summarySec.id} className={`${isType2 ? 'bg-white border-[#ffe2e8]' : isType3 ? 'bg-white border-gray-200' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6`}>
+                     <h4 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}`}>
                         <PanelBottom size={14} /> {summarySec.title}
                      </h4>
                      <div className={`grid gap-4 ${summarySec.layout === '2col' ? 'grid-cols-2' : summarySec.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>

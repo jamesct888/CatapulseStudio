@@ -52,7 +52,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
       }
     </script>
     <style>
-      body { background-color: ${theme.mode === 'type2' ? '#e0e0e0' : '#fafafa'}; color: #0b3239; }
+      body { background-color: ${theme.mode === 'type2' ? '#e0e0e0' : theme.mode === 'type3' ? '#f1f1f1' : '#fafafa'}; color: #0b3239; }
       /* Custom scrollbar for better feel */
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -152,6 +152,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
         const RenderElement = ({ element, value, onChange, onBlur, error, disabled }) => {
             const theme = THEME;
             const isType2 = theme.mode === 'type2';
+            const isType3 = theme.mode === 'type3';
             
             const densityMap = {
                 dense: { wrapper: "mb-2", inputHeight: "h-[30px]", padding: "px-2 py-0.5", fontSize: "text-xs", labelMb: "mb-0.5", labelSize: "text-xs" },
@@ -165,11 +166,13 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             // Dynamic Classes based on Theme Type
             const inputBorderClass = isType2 
                 ? 'border-gray-300 focus:border-[#e61126] focus:ring-[#e61126]' 
-                : 'border-sw-teal focus:border-sw-teal focus:ring-sw-teal';
+                : isType3
+                    ? 'border-gray-300 focus:border-[#006a4d] focus:ring-[#006a4d]'
+                    : 'border-sw-teal focus:border-sw-teal focus:ring-sw-teal';
             
-            const inputTextClass = isType2 ? 'text-[#0b3239]' : 'text-sw-teal';
-            const labelTextClass = isType2 ? 'text-[#0b3239]' : 'text-sw-teal';
-            const errorHover = isType2 ? 'hover:border-[#e61126]' : 'hover:border-sw-teal';
+            const inputTextClass = isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#323233]' : 'text-sw-teal';
+            const labelTextClass = isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal';
+            const errorHover = isType2 ? 'hover:border-[#e61126]' : isType3 ? 'hover:border-[#006a4d]' : 'hover:border-sw-teal';
 
             const baseClasses = \`w-full \${d.inputHeight} \${d.padding} \${d.fontSize} border \${inputBorderClass} \${r} focus:outline-none focus:shadow-input-focus focus:ring-1 transition-all bg-white \${inputTextClass} placeholder-gray-400 font-sans\`;
             const errorClasses = error ? "border-sw-error bg-[#fff6f5] focus:border-sw-error focus:ring-1 focus:ring-sw-error" : errorHover;
@@ -217,7 +220,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             
             if (element.type === 'radio') {
                 const options = element.options ? (Array.isArray(element.options) ? element.options : String(element.options).split(',')) : [];
-                const radioSelectedClass = isType2 ? 'bg-[#e61126] text-white' : 'bg-sw-teal text-white';
+                const radioSelectedClass = isType2 ? 'bg-[#e61126] text-white' : isType3 ? 'bg-[#006a4d] text-white' : 'bg-sw-teal text-white';
                 return (
                     <div className={d.wrapper}>
                         <Label />
@@ -239,8 +242,8 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             }
 
             if (element.type === 'checkbox') {
-                 const checkActive = isType2 ? 'bg-[#e61126] border-[#e61126]' : 'bg-sw-teal border-sw-teal';
-                 const checkInactive = isType2 ? 'border-[#e61126] bg-white' : 'border-sw-teal bg-white';
+                 const checkActive = isType2 ? 'bg-[#e61126] border-[#e61126]' : isType3 ? 'bg-[#006a4d] border-[#006a4d]' : 'bg-sw-teal border-sw-teal';
+                 const checkInactive = isType2 ? 'border-[#e61126] bg-white' : isType3 ? 'border-[#006a4d] bg-white' : 'border-sw-teal bg-white';
                  return (
                     <div className={d.wrapper}>
                         <label className={\`flex items-center gap-3 cursor-pointer p-3 border \${inputBorderClass} \${r} hover:bg-opacity-5 transition-colors bg-white\`}>
@@ -262,14 +265,14 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                 const handleRemove = (idx) => { const n = [...rows]; n.splice(idx, 1); onChange(n); };
                 const handleRowChange = (idx, field, val) => { const n = [...rows]; n[idx] = { ...n[idx], [field]: val }; onChange(n); };
                 
-                const headerBg = isType2 ? 'bg-[#ffe2e8]' : 'bg-sw-lightGray';
+                const headerBg = isType2 ? 'bg-[#ffe2e8]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-sw-lightGray';
                 
                 return (
                     <div className={d.wrapper}>
                         <Label />
                         <div className={\`border \${isType2 ? 'border-gray-300' : 'border-sw-teal/30'} rounded-lg overflow-hidden bg-white shadow-sm\`}>
                             <div className={\`\${headerBg} border-b border-gray-200 grid gap-2 px-4 py-2\`} style={{ gridTemplateColumns: \`repeat(\${columns.length}, 1fr) 40px\` }}>
-                                {columns.map(c => <div key={c.id} className={\`text-xs font-bold uppercase \${isType2 ? 'text-[#e61126]' : 'text-gray-500'}\`}>{c.label}</div>)}
+                                {columns.map(c => <div key={c.id} className={\`text-xs font-bold uppercase \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-500'}\`}>{c.label}</div>)}
                                 <div></div>
                             </div>
                             <div className="divide-y divide-gray-100">
@@ -307,7 +310,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                         <textarea disabled={disabled} className={\`\${baseClasses} \${errorClasses} h-auto min-h-[120px]\`} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
                     ) : (
                         <div className="relative w-full">
-                            {element.type === 'currency' && <span className={\`absolute left-2 top-0 bottom-0 flex items-center font-bold \${isType2 ? 'text-[#e61126]' : 'text-sw-teal'}\`}>£</span>}
+                            {element.type === 'currency' && <span className={\`absolute left-2 top-0 bottom-0 flex items-center font-bold \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}\`}>£</span>}
                             <input 
                                 type={element.type === 'number' || element.type === 'currency' ? 'number' : element.type === 'date' ? 'date' : 'text'} 
                                 disabled={disabled} 
@@ -330,6 +333,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             const [isCompleted, setIsCompleted] = useState(false);
             
             const isType2 = THEME.mode === 'type2';
+            const isType3 = THEME.mode === 'type3';
 
             const currentStage = PROCESS_DEF.stages[currentStageIdx];
             const visibleSections = currentStage.sections.filter(sec => isSectionVisible(sec, formData));
@@ -365,17 +369,17 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             };
             
             // Dynamic Classes
-            const stageHeaderClass = isType2 ? 'bg-[#e61126] text-white' : 'bg-sw-teal text-white';
-            const btnPrimaryClass = isType2 ? 'bg-[#0b3239] hover:bg-[#062126] text-white' : 'bg-sw-teal text-white hover:bg-sw-tealHover';
+            const stageHeaderClass = isType2 ? 'bg-[#e61126] text-white' : isType3 ? 'bg-[#006a4d] text-white' : 'bg-sw-teal text-white';
+            const btnPrimaryClass = isType2 ? 'bg-[#0b3239] hover:bg-[#062126] text-white' : isType3 ? 'bg-[#006a4d] hover:bg-[#00482f] text-white' : 'bg-sw-teal text-white hover:bg-sw-tealHover';
 
             if (isCompleted) {
                 return (
-                    <div className={\`min-h-screen \${isType2 ? 'bg-[#e0e0e0]' : 'bg-[#fafafa]'}\`}>
+                    <div className={\`min-h-screen \${isType2 ? 'bg-[#e0e0e0]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-[#fafafa]'}\`}>
                          <header className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-50 shadow-sm flex items-center justify-between">
                              <div className="flex items-center gap-6">
                                 <img src="https://www.lloydsbankinggroup.com/assets/images/our-brands/scottish-widows/sw-logo-1000x5501.png" alt="Scottish Widows" className="h-12" />
                                 <div className="h-8 w-px bg-gray-200"></div>
-                                <h1 className={\`text-lg font-serif font-bold \${isType2 ? 'text-[#0b3239]' : 'text-sw-teal'}\`}>{PROCESS_DEF.name}</h1>
+                                <h1 className={\`text-lg font-serif font-bold \${isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}\`}>{PROCESS_DEF.name}</h1>
                              </div>
                          </header>
                          <div className="max-w-4xl mx-auto py-12 px-6 flex items-center justify-center min-h-[60vh]">
@@ -393,12 +397,12 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             }
 
             return (
-                <div className={\`min-h-screen \${isType2 ? 'bg-[#e0e0e0]' : 'bg-[#fafafa]'}\`}>
+                <div className={\`min-h-screen \${isType2 ? 'bg-[#e0e0e0]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-[#fafafa]'}\`}>
                     <header className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-50 shadow-sm flex items-center justify-between">
                          <div className="flex items-center gap-6">
                             <img src="https://www.lloydsbankinggroup.com/assets/images/our-brands/scottish-widows/sw-logo-1000x5501.png" alt="Scottish Widows" className="h-12" />
                             <div className="h-8 w-px bg-gray-200"></div>
-                            <h1 className={\`text-lg font-serif font-bold \${isType2 ? 'text-[#0b3239]' : 'text-sw-teal'}\`}>{PROCESS_DEF.name}</h1>
+                            <h1 className={\`text-lg font-serif font-bold \${isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}\`}>{PROCESS_DEF.name}</h1>
                          </div>
                          <div className="text-xs font-mono text-gray-400">PROTOTYPE MODE</div>
                     </header>
@@ -411,10 +415,10 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                                 const isCurrent = i === currentStageIdx;
                                 return (
                                     <React.Fragment key={s.id}>
-                                        <div className={\`flex items-center gap-2 whitespace-nowrap \${isCurrent ? (isType2 ? 'text-[#e61126] font-bold' : 'text-sw-teal font-bold') : isPast ? 'text-gray-500' : 'text-gray-400'}\`}>
+                                        <div className={\`flex items-center gap-2 whitespace-nowrap \${isCurrent ? (isType2 ? 'text-[#e61126] font-bold' : isType3 ? 'text-[#006a4d] font-bold' : 'text-sw-teal font-bold') : isPast ? 'text-gray-500' : 'text-gray-400'}\`}>
                                             <div className={\`w-6 h-6 rounded-full flex items-center justify-center text-xs border transition-colors \${
-                                                isPast ? (isType2 ? 'bg-[#e61126] text-white border-[#e61126]' : 'bg-sw-teal text-white border-sw-teal') :
-                                                isCurrent ? (isType2 ? 'bg-white text-[#e61126] border-[#e61126] ring-4 ring-[#e61126]/10' : 'bg-white text-sw-teal border-sw-teal ring-4 ring-sw-teal/10') :
+                                                isPast ? (isType2 ? 'bg-[#e61126] text-white border-[#e61126]' : isType3 ? 'bg-[#006a4d] text-white border-[#006a4d]' : 'bg-sw-teal text-white border-sw-teal') :
+                                                isCurrent ? (isType2 ? 'bg-white text-[#e61126] border-[#e61126] ring-4 ring-[#e61126]/10' : isType3 ? 'bg-white text-[#006a4d] border-[#006a4d] ring-4 ring-[#006a4d]/10' : 'bg-white text-sw-teal border-sw-teal ring-4 ring-sw-teal/10') :
                                                 'bg-white text-gray-400 border-gray-300'
                                             }\`}>
                                                 {isPast ? <Icons.Check width={12} height={12} strokeWidth={3} /> : i + 1}
@@ -429,7 +433,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                             })}
                         </nav>
 
-                        <div className={\`bg-white shadow-card rounded-2xl border overflow-hidden min-h-[600px] relative \${isType2 ? 'border-[#e0e0e0]' : 'border-gray-100'}\`}>
+                        <div className={\`bg-white shadow-card rounded-2xl border overflow-hidden min-h-[600px] relative \${isType2 ? 'border-[#e0e0e0]' : isType3 ? 'border-gray-200' : 'border-gray-100'}\`}>
                             <div className={\`p-6 \${stageHeaderClass}\`}>
                                 <h3 className="text-xl font-bold">{currentStage.title}</h3>
                             </div>
@@ -437,7 +441,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                             <div className="p-8 space-y-8">
                                 {visibleSections.map(section => (
                                     <div key={section.id}>
-                                        <h4 className={\`font-bold border-b border-gray-100 pb-2 mb-6 uppercase text-sm tracking-wide \${isType2 ? 'text-[#e61126]' : 'text-gray-800'}\`}>{section.title}</h4>
+                                        <h4 className={\`font-bold border-b border-gray-100 pb-2 mb-6 uppercase text-sm tracking-wide \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-800'}\`}>{section.title}</h4>
                                         <div className={\`grid gap-x-8 gap-y-2 \${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}\`}>
                                             {section.elements.filter(el => isElementVisible(el, formData)).map(el => (
                                                 <RenderElement
@@ -481,8 +485,8 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                         
                         <div className="mt-8 space-y-4">
                             {PROCESS_DEF.stages.flatMap(s => s.sections).filter(s => s.variant === 'summary' && isSectionVisible(s, formData)).map(summarySec => (
-                                <div key={summarySec.id} className={\`\${isType2 ? 'bg-white border-[#e0e0e0]' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6\`}>
-                                    <h4 className={\`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 \${isType2 ? 'text-[#e61126]' : 'text-sw-teal'}\`}>
+                                <div key={summarySec.id} className={\`\${isType2 ? 'bg-white border-[#e0e0e0]' : isType3 ? 'bg-white border-gray-200' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6\`}>
+                                    <h4 className={\`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}\`}>
                                         <Icons.PanelBottom /> {summarySec.title}
                                     </h4>
                                     <div className={\`grid gap-4 \${summarySec.layout === '2col' ? 'grid-cols-2' : summarySec.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}\`}>
@@ -503,4 +507,4 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
     </script>
 </body>
 </html>`;
-};
+}

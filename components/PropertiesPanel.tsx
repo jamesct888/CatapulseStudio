@@ -329,12 +329,21 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                          </button>
                          <button 
                             onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type2' })}
-                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type2' ? 'border-[#e61126] bg-[#ffe2e8] text-[#e61126] ring-1 ring-[#e61126]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type2' ? 'border-[#e61126] bg-[#e0e0e0] text-[#e61126] ring-1 ring-[#e61126]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
                          >
                              <div className="w-12 h-8 bg-[#e61126] border border-[#e61126] rounded flex items-center justify-center shadow-sm">
                                  <Palette size={16} className="text-white" />
                              </div>
-                             <span className="text-xs font-bold">Type 2 (Red/Pink)</span>
+                             <span className="text-xs font-bold">Type 2 (Red)</span>
+                         </button>
+                         <button 
+                            onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type3' })}
+                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all col-span-2 ${visualTheme.mode === 'type3' ? 'border-[#006a4d] bg-[#f1f1f1] text-[#006a4d] ring-1 ring-[#006a4d]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
+                         >
+                             <div className="w-12 h-8 bg-[#006a4d] border border-[#006a4d] rounded flex items-center justify-center shadow-sm">
+                                 <Palette size={16} className="text-white" />
+                             </div>
+                             <span className="text-xs font-bold">Type 3 (Green)</span>
                          </button>
                      </div>
                  </div>
