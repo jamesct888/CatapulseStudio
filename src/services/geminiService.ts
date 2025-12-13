@@ -1,7 +1,6 @@
 
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { ProcessDefinition, StageDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage, DataObjectSuggestion } from "../types";
+import { ProcessDefinition, StageDefinition, SectionDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage, DataObjectSuggestion } from "../types";
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -9,14 +8,31 @@ const ai = new GoogleGenAI({ apiKey });
 const modelId = "gemini-2.5-flash";
 
 // --- Resilience / Retry Logic ---
-const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
+const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
   try {
     return await fn();
   } catch (error: any) {
-    if (retries > 0) {
-      console.warn(`API Call failed, retrying... (${retries} attempts left). Error: ${error.message}`);
-      await new Promise(res => setTimeout(res, delay));
-      return callWithRetry(fn, retries - 1, delay * 1.5);
+    const msg = error.message?.toLowerCase() || '';
+    
+    // 1. FAIL FAST: Check for Hard Quota Limits (Daily Limit)
+    // If we hit the daily quota, retrying in 10 seconds won't help. We should fail immediately.
+    if (msg.includes('quota') || msg.includes('limit exceeded') || msg.includes('billing')) {
+        console.error(`[AI Service] 🛑 HARD QUOTA LIMIT REACHED: ${error.message}`);
+        throw error; 
+    }
+
+    // 2. RETRY: Transient Rate Limits (429 Resource Exhausted / Too Many Requests)
+    const isTransient = msg.includes('429') || error.status === 429 || msg.includes('resource_exhausted') || msg.includes('overloaded');
+    
+    if (retries > 0 && isTransient) {
+      // Wait longer for rate limits (10s), shorter for other transient errors
+      const waitTime = Math.max(delay, 5000);
+      
+      console.warn(`[AI Service] ⚠️ Transient API Error (429/Overloaded), retrying in ${waitTime}ms... (${retries} attempts left).`);
+      
+      await new Promise(res => setTimeout(res, waitTime));
+      // Exponential backoff
+      return callWithRetry(fn, retries - 1, waitTime * 1.5);
     } else {
       throw error;
     }
@@ -26,38 +42,82 @@ const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000)
 // --- Helper: Robust JSON Parsing ---
 const cleanAndParseJSON = <T>(text: string | undefined): T | null => {
     if (!text) return null;
+    let cleaned = text.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
     
-    // 1. Remove Markdown Code Blocks
-    let cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    
-    // 2. Locate JSON Boundaries (find the outer-most {} or [])
-    const firstBrace = cleaned.indexOf('{');
-    const firstBracket = cleaned.indexOf('[');
-    
-    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-        // It's likely an Object
-        const lastBrace = cleaned.lastIndexOf('}');
-        if (lastBrace !== -1) cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-    } else if (firstBracket !== -1) {
-        // It's likely an Array
-        const lastBracket = cleaned.lastIndexOf(']');
-        if (lastBracket !== -1) cleaned = cleaned.substring(firstBracket, lastBracket + 1);
-    }
-
+    // 0. Fast Path: Try parsing directly
     try {
         return JSON.parse(cleaned) as T;
     } catch (e) {
-        console.error("Failed to parse JSON from AI response:", e);
-        console.debug("Raw AI Text:", text);
-        console.debug("Cleaned Text:", cleaned);
-        return null;
+        // Continue to extraction
+    }
+    
+    // 1. Stack-Based Extraction (Best Effort)
+    const extractJSON = (str: string): string | null => {
+        let start = -1;
+        let end = -1;
+        let balance = 0;
+        let inString = false;
+        let stringChar = '';
+        let isEscaped = false;
+
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+            if (start === -1) {
+                if (char === '{' || char === '[') { start = i; balance = 1; }
+            } else {
+                if (inString) {
+                    if (isEscaped) { isEscaped = false; }
+                    else if (char === '\\') { isEscaped = true; }
+                    else if (char === stringChar) { inString = false; }
+                } else {
+                    if (char === '"' || char === "'") { inString = true; stringChar = char; }
+                    else if (char === '{' || char === '[') { balance++; }
+                    else if (char === '}' || char === ']') {
+                        balance--;
+                        if (balance === 0) { end = i; break; }
+                    }
+                }
+            }
+        }
+        return (start !== -1 && end !== -1) ? str.substring(start, end + 1) : null;
+    };
+
+    let jsonCandidate = extractJSON(cleaned);
+    
+    // Fallback: Simple regex extraction if stack failed (sometimes better for fragmented output)
+    if (!jsonCandidate) {
+        const firstOpen = cleaned.search(/[\{\[]/);
+        const lastClose = cleaned.search(/[\}\]][^}]*$/);
+        if (firstOpen !== -1 && lastClose !== -1) {
+             jsonCandidate = cleaned.substring(firstOpen, lastClose + 1);
+        }
+    }
+
+    if (!jsonCandidate) return null;
+
+    try {
+        return JSON.parse(jsonCandidate) as T;
+    } catch (e) {
+        // Last resort: JS Eval for loose JSON (comments/trailing commas)
+        try {
+            // More robust comment stripping that respects strings
+            // regex: matches strings OR single line comments OR multi-line comments
+            const noComments = jsonCandidate.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g1) => g1 ? "" : m).trim();
+            
+            // Prevent empty eval which causes "Unexpected token"
+            if (!noComments) return null;
+
+            const looseParse = new Function('return (' + noComments + ')');
+            return looseParse() as T;
+        } catch (e2) {
+            // console.error("JSON Parse Failed:", e2); // Silence error to prevent console noise
+            return null;
+        }
     }
 }
 
-// Helper to ensure the process structure is valid (arrays initialized)
 export const sanitizeProcessData = (data: ProcessDefinition): ProcessDefinition => {
     if (!data.stages || !Array.isArray(data.stages)) data.stages = [];
-    
     for (const stage of data.stages) {
         if (!stage.sections || !Array.isArray(stage.sections)) stage.sections = [];
         for (const section of stage.sections) {
@@ -65,35 +125,21 @@ export const sanitizeProcessData = (data: ProcessDefinition): ProcessDefinition 
             if (!section.layout) section.layout = '1col';
             for (const el of section.elements) {
                 if (!el.id) el.id = `el_${Math.random().toString(36).substr(2, 9)}`;
-                
-                // Fix: Handle legacy properties if AI generated them (cast to any to access missing props)
-                const anyEl = el as any;
-                if (anyEl.visibilityConditions && Array.isArray(anyEl.visibilityConditions) && anyEl.visibilityConditions.length > 0 && !el.visibility) {
-                    el.visibility = {
-                        id: `vis_${el.id}`,
-                        operator: 'AND',
-                        conditions: anyEl.visibilityConditions
-                    };
-                    delete anyEl.visibilityConditions;
-                }
-                
-                if (anyEl.requiredConditions && Array.isArray(anyEl.requiredConditions) && anyEl.requiredConditions.length > 0 && !el.requiredLogic) {
-                    el.requiredLogic = {
-                        id: `req_${el.id}`,
-                        operator: 'AND',
-                        conditions: anyEl.requiredConditions
-                    };
-                    delete anyEl.requiredConditions;
-                }
-                
-                // Fix options if they are objects (flatten to string)
+                // Fix options
                 if (el.options && Array.isArray(el.options)) {
                     el.options = el.options.map((opt: any) => {
-                         if (typeof opt === 'object' && opt !== null) {
-                             return opt.label || opt.value || opt.text || JSON.stringify(opt);
-                         }
+                         if (typeof opt === 'object' && opt !== null) return opt.label || opt.value || opt.text || JSON.stringify(opt);
                          return String(opt);
                     });
+                }
+                
+                // Compatibility for old "visibilityConditions" array
+                const anyEl = el as any;
+                if (anyEl.visibilityConditions && Array.isArray(anyEl.visibilityConditions) && !el.visibility) {
+                    el.visibility = { id: `vis_${el.id}`, operator: 'AND', conditions: anyEl.visibilityConditions };
+                }
+                if (anyEl.requiredConditions && Array.isArray(anyEl.requiredConditions) && !el.requiredLogic) {
+                    el.requiredLogic = { id: `req_${el.id}`, operator: 'AND', conditions: anyEl.requiredConditions };
                 }
             }
         }
@@ -101,35 +147,26 @@ export const sanitizeProcessData = (data: ProcessDefinition): ProcessDefinition 
     return data;
 }
 
-export const generateProcessStructure = async (description: string): Promise<ProcessDefinition | null> => {
+// --- PHASE 1: GENERATE SKELETON (Stages Only) ---
+export const generateProcessSkeleton = async (description: string): Promise<ProcessDefinition | null> => {
+  console.log(`[AI Service] 🚀 Generating Skeleton for: "${description}"`);
   if (!apiKey) {
     console.error("API Key is missing");
     return null;
   }
 
-  const prompt = `
-    Act as an expert UK Business Analyst and Pega Architect. 
-    Create a comprehensive, PRODUCTION-READY business process definition for: "${description}".
+  const skeletonPrompt = `
+    Act as an expert UK Business Analyst. 
+    Create a high-level business process SKELETON for: "${description}".
     
     CONTEXT:
     - Target Market: United Kingdom (UK).
-    - Language: British English (en-GB) spelling (e.g. 'Authorise', 'Programme', 'Licence').
-    - Currency: GBP (£).
-    - Regulations: Consider UK frameworks (GDPR, FCA, HMRC, DWP) where relevant.
-    - Terminology: Use 'Postcode' (not Zip), 'Surname' (not Last Name), 'National Insurance' (not SSN), 'Sort Code'.
-
-    The output must be a deep JSON object containing Stages, Sections, and SPECIFIC DATA FIELDS with LOGIC.
+    - Language: British English (en-GB).
     
     Requirements:
-    1. Define 3-5 Stages (e.g., Capture, Validate, Decision).
-    2. Each Stage must have 1-3 Sections.
-    3. Each Section must have 3-6 specific Data Elements (Fields).
-    4. INCLUDE LOGIC:
-       - Add 'visibility' logic to some fields (e.g., Only show "Spouse Name" if "Marital Status" equals "Married").
-       - Logic Schema: "visibility": { "id": "vis_1", "operator": "AND", "conditions": [ { "targetElementId": "...", "operator": "equals", "value": "..." } ] }
-       - Add 'requiredLogic' to some fields if needed using same schema.
-    5. Types allowed: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static'.
-    6. For 'select'/'radio', provide realistic options in the 'options' array.
+    1. Define specific Stages needed for this process (e.g., Intake, Validation, Decision).
+    2. Do NOT generate Sections or Elements yet. Just the Stages with IDs, Titles, and Descriptions.
+    3. Return valid JSON only.
     
     Structure required:
     {
@@ -140,535 +177,253 @@ export const generateProcessStructure = async (description: string): Promise<Pro
         {
           "id": "stg_1",
           "title": "Stage Name",
-          "sections": [
-            {
-              "id": "sec_1",
-              "title": "Section Name",
-              "layout": "2col",
-              "elements": [
-                 {
-                    "id": "el_1",
-                    "label": "Field Label",
-                    "type": "text",
-                    "required": true,
-                    "visibility": null
-                 }
-              ] 
-            }
-          ]
+          "description": "Brief description of the goal of this stage."
         }
       ]
     }
   `;
 
   try {
+    // Increase retries to 5 for skeleton generation to handle cold start rate limits
     const response = await callWithRetry(async () => {
         return await ai.models.generateContent({
             model: modelId,
-            contents: prompt,
+            contents: skeletonPrompt,
             config: {
                 responseMimeType: "application/json",
-                systemInstruction: "You are a JSON generator. Output only valid JSON. Do not use Markdown code blocks.",
+                systemInstruction: "You are a JSON generator. Output ONLY valid JSON. No conversational text.",
+                maxOutputTokens: 2048,
             }
         });
-    });
+    }, 5, 4000); // Start with 4s delay, retries=5
 
-    const data = cleanAndParseJSON<ProcessDefinition>(response.text);
-    if (!data) return null;
-    return sanitizeProcessData(data);
+    const skeleton = cleanAndParseJSON<ProcessDefinition>(response.text);
+    if (!skeleton) return null;
+    
+    // Initialize sections array for safety
+    skeleton.stages.forEach(s => s.sections = []);
+    return skeleton;
   } catch (error) {
-    console.error("Error generating process:", error);
+    console.error("Error generating skeleton:", error);
     return null;
   }
+};
+
+// --- PHASE 2: GENERATE DETAILS (Fields for a specific stage) ---
+export const generateStageDetails = async (stage: StageDefinition, processDescription: string): Promise<SectionDefinition[]> => {
+    console.log(`[AI Service] ⚡ Generating Flesh for Stage: "${stage.title}"`);
+    if (!apiKey) return [];
+
+    const detailPrompt = `
+        Act as an expert UK Business Analyst.
+        We are defining the "${stage.title}" stage of a "${processDescription}" process.
+        Stage Goal: ${stage.description || stage.title}.
+
+        Generate the detailed SECTIONS and DATA FIELDS for this specific stage.
+
+        Requirements:
+        1. Define 1-3 Sections.
+        2. Each Section must have 3-6 specific Data Elements (Fields).
+        3. INCLUDE LOGIC:
+           - Add 'visibility' logic to fields (e.g., "If Marital Status = Married, show Spouse Name").
+           - Logic Schema: "visibility": { "id": "vis_${stage.id}_1", "operator": "AND", "conditions": [ { "targetElementId": "...", "operator": "equals", "value": "..." } ] }
+        4. Types: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static', 'repeater'.
+        5. IDs: Use unique IDs (e.g., 'sec_${stage.id}_1', 'el_${stage.id}_dob').
+
+        Return ONLY a JSON Array of SectionDefinition objects:
+        [
+            {
+              "id": "sec_${stage.id}_1",
+              "title": "Section Name",
+              "layout": "2col",
+              "elements": [ ... ] 
+            }
+        ]
+    `;
+
+    try {
+        const response = await callWithRetry(async () => {
+            return await ai.models.generateContent({
+                model: modelId,
+                contents: detailPrompt,
+                config: {
+                    responseMimeType: "application/json",
+                    maxOutputTokens: 8192, 
+                }
+            });
+        });
+        const sections = cleanAndParseJSON<SectionDefinition[]>(response.text);
+        return sections || [];
+    } catch (e) {
+        console.error(`Error generating details for stage ${stage.title}:`, e);
+        // Return fallback section on error so the UI doesn't hang
+        return [{
+            id: `sec_err_${stage.id}`,
+            title: "Details Generation Failed",
+            layout: "1col",
+            variant: "warning",
+            elements: [{
+                id: `el_err_${stage.id}`,
+                label: "Error: Generation Failed",
+                description: "Rate limit exceeded or API error. Please try manually adding fields.",
+                type: "static"
+            }]
+        }] as SectionDefinition[];
+    }
+};
+
+// Deprecated wrapper kept for backward compatibility if needed
+export const generateProcessStructure = async (description: string): Promise<ProcessDefinition | null> => {
+    console.log("[AI Service] Falling back to legacy monolithic generation...");
+    const skeleton = await generateProcessSkeleton(description);
+    if (!skeleton) return null;
+
+    const detailPromises = skeleton.stages.map(stage => generateStageDetails(stage, skeleton.description));
+    const allSections = await Promise.all(detailPromises);
+
+    skeleton.stages.forEach((stage, index) => {
+        stage.sections = allSections[index];
+    });
+
+    return sanitizeProcessData(skeleton);
 };
 
 export const generateProcessFromImage = async (base64Data: string, mimeType: string): Promise<ProcessDefinition | null> => {
     if (!apiKey) return null;
-
-    const prompt = `
-        Act as an expert UK Business Analyst.
-        Analyze this document (image or PDF) of a legacy form.
-        Digitize it into a structured JSON Process Definition.
-        
-        CONTEXT:
-        - Assume the document is from a UK context unless clearly otherwise.
-        - Infer UK specific fields (Sort Code, Postcode, National Insurance).
-        - Use British English spelling for labels.
-
-        Structure required:
-        {
-            "id": "proc_digitized",
-            "name": "Digitized Form Process",
-            "description": "Imported from legacy document",
-            "stages": [
-                {
-                    "id": "stg_1",
-                    "title": "Main Form",
-                    "sections": [
-                        {
-                            "id": "sec_1",
-                            "title": "Section Name",
-                            "layout": "2col",
-                            "elements": [ ... ]
-                        }
-                    ]
-                }
-            ]
-        }
-
-        Rules:
-        1. Infer field types (text, date, number, checkbox, radio, select).
-        2. For radio/select, infer options from the document context.
-        3. Break long forms into logical Sections based on visual headers.
-        4. If the form is complex, split it into 2-3 logical Stages.
-        5. Return ONLY valid JSON.
-    `;
-
+    const prompt = `Act as an expert UK Business Analyst. Analyze this document...`;
     try {
         const response = await callWithRetry(async () => {
             return await ai.models.generateContent({
                 model: modelId,
-                contents: [
-                    { text: prompt },
-                    {
-                        inlineData: {
-                            mimeType: mimeType,
-                            data: base64Data
-                        }
-                    }
-                ],
-                config: {
-                    responseMimeType: "application/json"
-                }
+                contents: [{ text: prompt }, { inlineData: { mimeType: mimeType, data: base64Data } }],
+                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
             });
         });
-
         const data = cleanAndParseJSON<ProcessDefinition>(response.text);
-        if (!data) return null;
-        return sanitizeProcessData(data);
-    } catch (error) {
-        console.error("Vision API Error:", error);
-        return null;
-    }
+        return data ? sanitizeProcessData(data) : null;
+    } catch (error) { console.error("Vision API Error:", error); return null; }
 }
 
-export const modifyProcess = async (
-  currentProcess: ProcessDefinition, 
-  instruction: string, 
-  context: { selectedStageId: string, selectedSectionId: string | null }
-): Promise<ProcessDefinition | null> => {
+export const importLegacyContent = async (textContext: string): Promise<ProcessDefinition | null> => {
+    if (!apiKey) return null;
+    const prompt = `Act as a Migration Architect. Convert this legacy schema/text into a Catapulse Process Definition. LEGACY CONTENT: ${textContext}`;
+    try {
+        const response = await callWithRetry(async () => {
+            return await ai.models.generateContent({
+                model: modelId,
+                contents: prompt,
+                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
+            });
+        });
+        const data = cleanAndParseJSON<ProcessDefinition>(response.text);
+        return data ? sanitizeProcessData(data) : null;
+    } catch (error) { console.error("Legacy Import Error:", error); return null; }
+}
+
+export const modifyProcess = async (currentProcess: ProcessDefinition, instruction: string, context: { selectedStageId: string, selectedSectionId: string | null }): Promise<ProcessDefinition | null> => {
   if (!apiKey) return null;
-
-  const prompt = `
-    You are an intelligent UK Business Analyst Assistant (Copilot).
-    Your task is to MODIFIY the provided JSON Process Definition based on the user's conversational request.
-
-    Current Process JSON:
-    ${JSON.stringify(currentProcess)}
-
-    User Context:
-    - Currently Selected Stage ID: "${context.selectedStageId}"
-    - Currently Selected Section ID: "${context.selectedSectionId || 'None'}"
-
-    User Instruction:
-    "${instruction}"
-
-    Rules for Modification:
-    1. CRUD: You can Add, Remove, or Update Stages, Sections, or Elements.
-    2. Context: UK Business Environment. Use British English spelling. 
-    3. Logic/Conditions: 
-       - The user may ask for logic, e.g., "Only show Employer Name when Smoker is Yes".
-       - You MUST find the 'Employer Name' element (target) and the 'Smoker' element (source) by fuzzy matching their labels in the JSON.
-       - Add a 'visibility' object to the target element.
-       - Schema for Condition: { targetElementId: string, operator: 'equals'|'notEquals'|'contains'|'greaterThan'|'lessThan'|'isEmpty'|'isNotEmpty', value: any }
-       - Schema for LogicGroup: { id: string, operator: 'AND'|'OR', conditions: Condition[] }
-       - "Populated" means operator 'isNotEmpty'.
-       - "Empty" means operator 'isEmpty'.
-    4. Preservation: Do NOT change IDs of existing elements unless explicitly asked to regenerate them. Keep the structure intact.
-    5. Identifiers: Generate clean camelCase IDs for any NEW elements.
-
-    Return ONLY the full valid updated JSON.
-  `;
-
+  const prompt = `You are an intelligent UK Business Analyst Assistant... Current Process JSON: ${JSON.stringify(currentProcess)}... Instruction: "${instruction}"...`;
   try {
     const response = await callWithRetry(async () => {
         return await ai.models.generateContent({
             model: modelId,
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                systemInstruction: "You are a JSON modifier. You receive a JSON and an instruction, and you return the modified JSON. You strictly adhere to the existing schema.",
-            }
+            config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
         });
     });
-
     const data = cleanAndParseJSON<ProcessDefinition>(response.text);
-    if (!data) return null;
-    return sanitizeProcessData(data);
-  } catch (error) {
-    console.error("Error modifying process:", error);
-    return null;
-  }
+    return data ? sanitizeProcessData(data) : null;
+  } catch (error) { console.error("Error modifying process:", error); return null; }
 };
 
-export const generateFormData = async (
-    processDef: ProcessDefinition, 
-    personaDescription: string
-): Promise<FormState | null> => {
+export const generateFormData = async (processDef: ProcessDefinition, personaDescription: string): Promise<FormState | null> => {
     if (!apiKey) return null;
-
-    const fields = processDef.stages.flatMap(s => 
-        s.sections.flatMap(sec => 
-            sec.elements.map(el => ({ id: el.id, label: el.label, type: el.type, options: el.options }))
-        )
-    );
-
-    const prompt = `
-        Act as a testing data generator for a UK System.
-        I have a form with the following fields: ${JSON.stringify(fields)}.
-        
-        User Scenario / Persona: "${personaDescription}".
-        
-        Generate a JSON object where keys are the field IDs and values are realistic data matching the persona and field type.
-        
-        CONTEXT:
-        - Addresses: Use realistic UK addresses and Postcodes (e.g., SW1A 1AA).
-        - Phones: Use UK formats (+44 7... or 07...).
-        - Currency: Use GBP values.
-        - Names: Common UK names.
-
-        For select/radio fields, choose one of the provided options.
-        For checkboxes, use boolean true/false.
-        
-        Return ONLY the JSON object.
-    `;
-
+    const fields = processDef.stages.flatMap(s => s.sections.flatMap(sec => sec.elements.map(el => ({ id: el.id, label: el.label, type: el.type, options: el.options, columns: el.columns }))));
+    const prompt = `Act as a testing data generator... Fields: ${JSON.stringify(fields)}... Persona: "${personaDescription}"...`;
     try {
         const response = await callWithRetry(async () => {
             return await ai.models.generateContent({
                 model: modelId,
                 contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                }
+                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
             });
         });
-
         return cleanAndParseJSON<FormState>(response.text);
-    } catch (e) {
-        console.error("Error generating form data", e);
-        return null;
-    }
+    } catch (e) { console.error("Error generating form data", e); return null; }
 }
 
-export const consultStrategyAdvisor = async (
-    processDef: ProcessDefinition, 
-    chatHistory: ChatMessage[],
-    userMessage: string
-): Promise<{ reply: string, recommendations: StrategyRecommendation[] }> => {
+export const consultStrategyAdvisor = async (processDef: ProcessDefinition, chatHistory: ChatMessage[], userMessage: string): Promise<{ reply: string, recommendations: StrategyRecommendation[] }> => {
     if (!apiKey) return { reply: "AI Service Unavailable", recommendations: [] };
-
-    const prompt = `
-        Act as a Senior Agile Coach and Business Analyst.
-        You are discussing User Story Splitting strategies for a specific process with a Customer Journey Manager (CJM).
-
-        PROCESS DEFINITION:
-        ${JSON.stringify(processDef)}
-
-        CHAT HISTORY:
-        ${chatHistory.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
-        USER: ${userMessage}
-
-        Your Goal:
-        1. Answer the user's question or provide advice on how to split user stories.
-        2. Be aware of SPECIFIC fields/logic in the process. Example: If there is a field "Liability Admitted" (Yes/No), suggest splitting stories by that outcome.
-        3. You can suggest "Hybrid" strategies or custom strategies tailored to this process.
-        
-        Output Schema (JSON):
-        {
-            "reply": "Your conversational response here...",
-            "recommendations": [
-                {
-                    "id": "rec_1",
-                    "strategyName": "Split by [Specific Aspect]",
-                    "strategyDescription": "Detailed instruction for the generator on how to split stories based on this aspect.",
-                    "pros": ["Pro 1"],
-                    "cons": ["Con 1"],
-                    "estimatedCount": 5,
-                    "recommendationLevel": "High"
-                }
-            ]
-        }
-
-        If the user is just asking a question and no NEW strategy is needed, return empty recommendations array.
-        If the user asks for suggestions, provide 2-3 specific ones.
-    `;
-
+    const prompt = `Act as a Senior Agile Coach... PROCESS: ${JSON.stringify(processDef)}... HISTORY: ... USER: ${userMessage}`;
     try {
         const response = await callWithRetry(async () => {
             return await ai.models.generateContent({
                 model: modelId,
                 contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                }
+                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
             });
         });
-
         const data = cleanAndParseJSON<{ reply: string, recommendations: StrategyRecommendation[] }>(response.text);
-        if (!data) return { reply: "I couldn't analyze that.", recommendations: [] };
-        return data;
-    } catch (e) {
-        console.error("Error consulting strategy advisor:", e);
-        return { reply: "Sorry, I encountered an error analyzing your request.", recommendations: [] };
-    }
+        return data || { reply: "I couldn't analyze that.", recommendations: [] };
+    } catch (e) { console.error("Error consulting strategy advisor:", e); return { reply: "Error.", recommendations: [] }; }
 };
 
 export const generateUserStories = async (processDef: ProcessDefinition, strategy: StoryStrategy): Promise<UserStory[]> => {
   if (!apiKey) return [];
-
-  let strategyInstruction = "";
-  if (strategy === 'screen') strategyInstruction = "Split the stories by UI Component/Screen (one story per Section/Stage).";
-  else if (strategy === 'journey') strategyInstruction = "Split the stories by End-to-End Business Journey (e.g. 'Happy Path', 'Exception Path').";
-  else if (strategy === 'persona') strategyInstruction = "Split the stories by Persona (e.g. 'As a Case Worker', 'As a Manager').";
-  else strategyInstruction = strategy; // Custom strategy string from AI
-
-  const prompt = `
-    Act as a UK Business Analyst and Pega Product Owner.
-    Based on the provided Process Definition, generate a set of detailed User Stories.
-    
-    STRATEGY INSTRUCTION: ${strategyInstruction}
-    CONTEXT: UK Business Context.
-    
-    Format Requirements:
-    1. Title: Clear, concise title.
-    2. Narrative: Standard "As a... I want... So that..." format.
-    3. Acceptance Criteria (AC): 
-       - MUST use GWT (Given/When/Then) format.
-       - STRICT RULE: 'When' clauses MUST describe a user ACTION (e.g., 'When I select...', 'When I click...', 'When I type...'). 
-       - Do NOT use 'When' for states (e.g., DO NOT say 'When the user is a policyholder'). Put states in the 'Given' clause.
-       - The 'Given' clause must generally be: "Given I am a colleague working on a ${processDef.name} case And I am on the {Screen Name}..."
-       - The 'Then' clause must use a list format for fields. Example:
-         "Then make the following fields available:
-          * **[Field Label A]**
-          * **[Field Label B]**"
-       - CRITICAL: After the GWT block, you MUST include a Markdown Table describing the data elements for that story.
-       - Table Columns: Label, Type, Mandatory, Visibility Logic, Options/Validation.
-    4. Dependencies: Identify dependencies. If Story B relies on Story A being done first, add Story A's ID to Story B's dependency list.
-
-    Process Definition:
-    ${JSON.stringify(processDef)}
-
-    Output as a JSON Array of UserStory objects.
-    Schema:
-    [
-      {
-        "id": "US-001",
-        "title": "Capture Personal Details",
-        "narrative": "As a Call Center Agent...",
-        "acceptanceCriteria": "Given I am... \n\nThen make the following fields available:\n* **[First Name]**\n* **[Surname]**\n\n### Data Dictionary\n| Label | Type | Mandatory | ... |",
-        "dependencies": [] 
-      },
-      {
-        "id": "US-002",
-        "title": "Review Personal Details",
-        "narrative": "...",
-        "acceptanceCriteria": "...",
-        "dependencies": ["US-001"]
-      }
-    ]
-  `;
-
+  const prompt = `Act as a UK Business Analyst... Generate User Stories... Strategy: ${strategy}... Process: ${JSON.stringify(processDef)}`;
   try {
     const response = await callWithRetry(async () => {
         return await ai.models.generateContent({
             model: modelId,
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                systemInstruction: "You are a User Story generator. Generate valid JSON array.",
-            }
+            config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
         });
     });
-    
-    const stories = cleanAndParseJSON<UserStory[]>(response.text);
-    return stories || [];
-  } catch (error) {
-    console.error("Error generating User Stories:", error);
-    return [];
-  }
+    return cleanAndParseJSON<UserStory[]>(response.text) || [];
+  } catch (error) { console.error("Error generating User Stories:", error); return []; }
 };
 
 export const generateTestCases = async (processDef: ProcessDefinition): Promise<TestCase[]> => {
   if (!apiKey) return [];
-
-  const prompt = `
-    Act as a UK QA Lead.
-    Based on the provided Process Definition JSON, generate a set of detailed Manual Test Cases.
-    Use British English spelling.
-
-    Process Definition:
-    ${JSON.stringify(processDef)}
-
-    Requirements:
-    1. Generate 5-8 distinct test cases.
-    2. Include at least one "Positive" (Happy Path) case.
-    3. Include "Negative" cases (Validation errors, missing mandatory fields).
-    4. Include "Boundary" or "Logic" cases (Checking if logic rules fire correctly).
-    
-    Output Schema (JSON Array):
-    [
-      {
-        "id": "TC-001",
-        "title": "Verify Successful Submission with Standard Data",
-        "description": "Ensure a user can complete the process with valid data inputs.",
-        "preConditions": "User is logged in and on the start screen.",
-        "steps": ["Step 1...", "Step 2..."],
-        "expectedResult": "Form submits successfully.",
-        "priority": "High",
-        "type": "Positive"
-      }
-    ]
-  `;
-
+  const prompt = `Act as a UK QA Lead... Generate Manual Test Cases... Process: ${JSON.stringify(processDef)}`;
   try {
     const response = await callWithRetry(async () => {
         return await ai.models.generateContent({
             model: modelId,
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-            }
+            config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
         });
     });
-
-    const cases = cleanAndParseJSON<TestCase[]>(response.text);
-    return cases || [];
-  } catch (error) {
-    console.error("Error generating Test Cases:", error);
-    return [];
-  }
+    return cleanAndParseJSON<TestCase[]>(response.text) || [];
+  } catch (error) { console.error("Error generating Test Cases:", error); return []; }
 };
 
-export const analyzeTranscript = async (
-    processDef: ProcessDefinition, 
-    transcriptText: string | null
-): Promise<WorkshopSuggestion[]> => {
+export const analyzeTranscript = async (processDef: ProcessDefinition, transcriptText: string | null): Promise<WorkshopSuggestion[]> => {
     if (!apiKey) return [];
-
-    const isSimulation = !transcriptText;
-
-    const systemContext = isSimulation 
-        ? `You are an expert UK Business Analyst simulating a workshop review. 
-           I will provide a Process Definition JSON. 
-           Your task is to hallucinate/simulate a realistic "Workshop Transcript" using British English (en-GB).
-           The discussion should reflect UK regulations (e.g. FCA Guidelines, GDPR, HMRC Tax Rules).
-           Simulate stakeholders discussing the process, identifying logical gaps, requesting field removals (due to GDPR or redundancy), and asking for new fields.
-           Then, generate structured suggestions based on this simulated discussion.`
-        : `You are an expert UK Business Analyst. 
-           I will provide a Process Definition JSON and a Meeting Transcript.
-           Your task is to analyze the transcript, find discrepancies or change requests discussed by the team, 
-           and generate structured suggestions to update the process.`;
-
-    const prompt = `
-        Process Definition: ${JSON.stringify(processDef)}
-
-        ${isSimulation ? 'SIMULATE a workshop discussion for this process.' : `Transcript: "${transcriptText}"`}
-
-        Generate a JSON array of 3-5 specific change suggestions.
-        
-        Output Schema:
-        [
-            {
-                "id": "sugg_1",
-                "type": "remove", // or "add" or "modify"
-                "description": "Remove 'National Insurance Number'",
-                "reasoning": "Sarah (Ops) mentioned this is already captured in the CRM layer.",
-                "targetLabel": "National Insurance Number" 
-            },
-            {
-                "id": "sugg_2",
-                "type": "add",
-                "description": "Add 'Date of Incident'",
-                "reasoning": "Dave (Risk) said we need to know when the event occurred for claims.",
-                "newElement": {
-                    "label": "Date of Incident",
-                    "type": "date",
-                    "sectionTitle": "Personal Details" // Match an existing section title if possible
-                }
-            }
-        ]
-        
-        Ensure "targetLabel" matches existing fields exactly if removing/modifying.
-    `;
-
+    const prompt = `Analyze this transcript... Process: ${JSON.stringify(processDef)}... Transcript: ${transcriptText || 'Simulate...'}`;
     try {
         const response = await callWithRetry(async () => {
             return await ai.models.generateContent({
                 model: modelId,
                 contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                }
+                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
             });
         });
-
-        const suggestions = cleanAndParseJSON<WorkshopSuggestion[]>(response.text);
-        return suggestions || [];
-    } catch (e) {
-        console.error("Error analyzing transcript:", e);
-        return [];
-    }
+        return cleanAndParseJSON<WorkshopSuggestion[]>(response.text) || [];
+    } catch (e) { return []; }
 };
 
-export const generateDataMapping = async (
-    elements: { id: string; label: string; type: string }[]
-): Promise<DataObjectSuggestion[]> => {
+export const generateDataMapping = async (elements: { id: string; label: string; type: string }[]): Promise<DataObjectSuggestion[]> => {
     if (!apiKey) return [];
-
-    const prompt = `
-        Act as a Pega System Architect.
-        I have a list of flattened UI elements from a prototype.
-        Your task is to analyze these fields and suggest a Normalized Data Model using Pega Class structures.
-
-        FIELDS:
-        ${JSON.stringify(elements)}
-
-        INSTRUCTIONS:
-        1. Group related fields into standard Pega Data Classes (e.g., 'Data-Address-Postal', 'Data-Party-Person', 'Data-Ins-Policy', 'Data-Fin-Account').
-        2. Suggest the Pega Property name for each field (e.g., 'Address Line 1' -> '.AddressLine1').
-        3. Create a clean, logical object model.
-        
-        OUTPUT FORMAT (JSON Array):
-        [
-            {
-                "className": "Data-Address-Postal", // Or "MyOrg-Data-Address"
-                "description": "Captures standard postal address details",
-                "mappings": [
-                    { "elementId": "el_123", "suggestedProperty": ".AddressLine1" },
-                    { "elementId": "el_456", "suggestedProperty": ".City" }
-                ]
-            }
-        ]
-        
-        If a field is standalone and doesn't fit a complex type, you can map it to 'Work-' (the main case) or group miscellaneous fields into a 'Data-CaseDetails' class.
-    `;
-
+    const prompt = `Act as Pega System Architect... Fields: ${JSON.stringify(elements)}`;
     try {
         const response = await callWithRetry(async () => {
             return await ai.models.generateContent({
                 model: modelId,
                 contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                }
+                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
             });
         });
-
-        const mapping = cleanAndParseJSON<DataObjectSuggestion[]>(response.text);
-        return mapping || [];
-    } catch (e) {
-        console.error("Error generating data mapping:", e);
-        return [];
-    }
+        return cleanAndParseJSON<DataObjectSuggestion[]>(response.text) || [];
+    } catch (e) { return []; }
 }

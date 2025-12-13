@@ -102,10 +102,10 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     <div 
                         key={stage.id} 
                         className={`relative group ${draggedStageIdx === idx ? 'opacity-40' : ''}`}
-                        draggable={!isLoading}
-                        onDragStart={(e) => !isLoading && handleDragStart(e, idx)}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
                         onDragOver={handleDragOver}
-                        onDrop={(e) => !isLoading && handleDrop(e, idx)}
+                        onDrop={(e) => handleDrop(e, idx)}
                     >
                     {/* Connection Line (Hide for last item) */}
                     {idx < processDef.stages.length - 1 && (
@@ -113,28 +113,26 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                     )}
 
                     <div 
-                        className={`flex items-center gap-3 p-2 rounded-lg transition-colors pr-8 relative 
-                            ${selectedStageId === stage.id && !selectedSectionId ? 'bg-sw-teal text-white shadow-md' : 'hover:bg-sw-lightGray text-sw-teal'}
-                            ${isLoading ? 'opacity-70 cursor-wait' : 'cursor-pointer'}
-                        `}
+                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors pr-8 relative ${selectedStageId === stage.id && !selectedSectionId ? 'bg-sw-teal text-white shadow-md' : 'hover:bg-sw-lightGray text-sw-teal'}`}
                         onClick={() => {
-                            if (isLoading) return;
                             setSelectedStageId(stage.id);
                             setSelectedSectionId(null);
                             setSelectedElementId(null);
                         }}
                     >
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${selectedStageId === stage.id ? 'bg-white text-sw-teal' : 'bg-sw-teal text-white'}`}>
-                            {isLoading ? <Loader2 size={12} className="animate-spin"/> : idx + 1}
+                            {isLoading ? (
+                                <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                                idx + 1
+                            )}
                         </div>
                         <span className="font-bold text-sm truncate flex-1">{stage.title}</span>
                         
                         {/* Drag Handle */}
-                        {!isLoading && (
-                            <div className={`absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing ${selectedStageId === stage.id ? 'text-white/50 hover:text-white' : 'text-gray-400 hover:text-sw-teal'}`}>
-                                <GripVertical size={16} />
-                            </div>
-                        )}
+                        <div className={`absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing ${selectedStageId === stage.id ? 'text-white/50 hover:text-white' : 'text-gray-400 hover:text-sw-teal'}`}>
+                            <GripVertical size={16} />
+                        </div>
                     </div>
                     
                     {selectedStageId === stage.id && (

@@ -1,8 +1,8 @@
 
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ElementDefinition, VisualTheme } from '../types';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, X, ChevronDown, Check } from 'lucide-react';
 
 interface FormElementProps {
   element: ElementDefinition;
@@ -19,7 +19,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
   const densityConfig = {
     dense: {
       wrapper: "mb-2",
-      inputHeight: "h-[30px]",
+      inputHeight: "min-h-[30px]",
       padding: "px-2 py-0.5",
       fontSize: "text-xs",
       labelMb: "mb-0.5",
@@ -29,11 +29,14 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       radioDot: "w-1.5 h-1.5",
       checkboxWrapper: "p-1.5",
       checkboxSize: "w-3 h-3",
-      iconSize: "w-2.5 h-2.5"
+      iconSize: "w-2.5 h-2.5",
+      chipGap: "gap-1",
+      chipText: "text-[10px]",
+      chipPad: "px-1.5 py-0.5"
     },
     compact: {
       wrapper: "mb-4",
-      inputHeight: "h-[36px]",
+      inputHeight: "min-h-[36px]",
       padding: "px-3 py-1.5",
       fontSize: "text-sm",
       labelMb: "mb-1",
@@ -43,11 +46,14 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       radioDot: "w-2 h-2",
       checkboxWrapper: "p-2",
       checkboxSize: "w-4 h-4",
-      iconSize: "w-3 h-3"
+      iconSize: "w-3 h-3",
+      chipGap: "gap-1.5",
+      chipText: "text-xs",
+      chipPad: "px-2 py-0.5"
     },
     default: {
       wrapper: "mb-6",
-      inputHeight: "h-[50px]",
+      inputHeight: "min-h-[50px]",
       padding: "px-4 py-3",
       fontSize: "text-lg",
       labelMb: "mb-3",
@@ -57,11 +63,14 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       radioDot: "w-3 h-3",
       checkboxWrapper: "p-3",
       checkboxSize: "w-6 h-6",
-      iconSize: "w-4 h-4"
+      iconSize: "w-4 h-4",
+      chipGap: "gap-2",
+      chipText: "text-sm",
+      chipPad: "px-3 py-1"
     },
     spacious: {
       wrapper: "mb-10",
-      inputHeight: "h-[64px]",
+      inputHeight: "min-h-[64px]",
       padding: "px-6 py-4",
       fontSize: "text-xl",
       labelMb: "mb-4",
@@ -71,7 +80,10 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       radioDot: "w-4 h-4",
       checkboxWrapper: "p-5",
       checkboxSize: "w-8 h-8",
-      iconSize: "w-5 h-5"
+      iconSize: "w-5 h-5",
+      chipGap: "gap-3",
+      chipText: "text-base",
+      chipPad: "px-4 py-2"
     }
   };
 
@@ -129,7 +141,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
 
   // Base input class construction
   const baseClasses = `w-full ${d.inputHeight} ${d.padding} ${d.fontSize} border ${inputBorderClass} ${r} focus:outline-none focus:shadow-input-focus focus:ring-1 transition-all ${inputBgClass} ${inputTextClass} font-sans`;
-  // Assuming Error Red is somewhat universal, Type 3 specifies #c04318, we can stick with sw-error (#db0f30) or override. Let's override for Type 3.
+  
   const errorColorText = isType3 ? 'text-[#c04318]' : 'text-sw-red';
   const errorBorderBg = isType3 ? 'border-[#c04318] bg-[#fff6f5] focus:border-[#c04318] focus:ring-[#c04318]' : 'border-sw-error bg-[#fff6f5] focus:border-sw-error focus:ring-sw-error';
 
@@ -140,6 +152,20 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     onChange(e.target.value);
   };
+
+  // --- Sub-Component for Label ---
+  const Label = () => (
+    <label className={`block font-bold ${labelTextClass} ${d.labelSize} ${d.labelMb}`}>
+      {element.label}
+      {element.required && <span className={`${errorColorText} ml-1`} title="Required">*</span>}
+    </label>
+  );
+
+  // --- Sub-Component for Error ---
+  const ErrorMsg = () => error ? <p className={`text-sm ${errorColorText} mt-2 font-medium flex items-center gap-2 before:content-[''] before:bg-[url('https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/alert-circle.svg')] before:w-4 before:h-4`}>{error}</p> : null;
+
+
+  // --- Specific Render Logic ---
 
   if (element.type === 'static') {
     const isReflection = element.staticDataSource === 'field';
@@ -157,13 +183,11 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
 
     return (
       <div className={`prose max-w-none ${d.wrapper}`}>
-        {/* Show label if it exists and isn't the default 'New Field' which might be distracting for pure text */}
         {element.label && element.label !== 'New Field' && (
              <label className={`block font-bold ${labelTextClass} ${d.labelSize} ${d.labelMb}`}>
                 {element.label}
              </label>
         )}
-        
         {isReflection ? (
              <div className={`w-full px-0 ${d.fontSize} ${staticTextClass} ${r} min-h-[${theme.density === 'dense' ? '30px' : '50px'}] flex items-center`}>
                 {displayContent ? (
@@ -179,15 +203,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
     );
   }
 
-  const Label = () => (
-    <label className={`block font-bold ${labelTextClass} ${d.labelSize} ${d.labelMb}`}>
-      {element.label}
-      {element.required && <span className={`${errorColorText} ml-1`} title="Required">*</span>}
-    </label>
-  );
-
-  const ErrorMsg = () => error ? <p className={`text-sm ${errorColorText} mt-2 font-medium flex items-center gap-2 before:content-[''] before:bg-[url('https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/alert-circle.svg')] before:w-4 before:h-4`}>{error}</p> : null;
-
+  // --- Standard Inputs ---
   switch (element.type) {
     case 'text':
     case 'email':
@@ -258,6 +274,21 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
           <ErrorMsg />
         </div>
       );
+    case 'datetime':
+      return (
+        <div className={`${d.wrapper} group`}>
+          <Label />
+          <input
+            type="datetime-local"
+            disabled={disabled}
+            className={`${baseClasses} ${errorClasses}`}
+            value={value || ''}
+            onChange={handleChange}
+            onBlur={onBlur}
+          />
+          <ErrorMsg />
+        </div>
+      );
     case 'select':
       const options = element.options ? (Array.isArray(element.options) ? element.options : String(element.options).split(',')) : [];
       return (
@@ -281,6 +312,93 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
           <ErrorMsg />
         </div>
       );
+    case 'multiselect':
+        const msOptions = element.options ? (Array.isArray(element.options) ? element.options : String(element.options).split(',')) : [];
+        const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
+        // Custom MultiSelect Hook State
+        const [isOpen, setIsOpen] = useState(false);
+        const wrapperRef = useRef<HTMLDivElement>(null);
+
+        const toggleOption = (opt: string) => {
+            const newValues = selectedValues.includes(opt) 
+                ? selectedValues.filter((v: string) => v !== opt)
+                : [...selectedValues, opt];
+            onChange(newValues);
+        };
+
+        const removeValue = (e: React.MouseEvent, opt: string) => {
+            e.stopPropagation();
+            const newValues = selectedValues.filter((v: string) => v !== opt);
+            onChange(newValues);
+        };
+
+        // Click outside to close
+        useEffect(() => {
+            function handleClickOutside(event: MouseEvent) {
+                if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                    setIsOpen(false);
+                }
+            }
+            if (isOpen) {
+                document.addEventListener("mousedown", handleClickOutside);
+            }
+            return () => {
+                document.removeEventListener("mousedown", handleClickOutside);
+            };
+        }, [isOpen]);
+
+        const chipBg = isType2 ? 'bg-[#e61126]' : isType3 ? 'bg-[#006a4d]' : 'bg-sw-teal';
+        const activeItemBg = isType2 ? 'bg-[#ffe2e8] text-[#e61126]' : isType3 ? 'bg-[#f1f1f1] text-[#006a4d]' : 'bg-sw-teal/10 text-sw-teal';
+
+        return (
+            <div className={`${d.wrapper} group relative ${isOpen ? 'z-30' : ''}`} ref={wrapperRef}>
+                <Label />
+                <div 
+                    className={`${baseClasses} ${errorClasses} h-auto flex flex-wrap items-center ${d.chipGap} cursor-pointer relative pr-8`}
+                    onClick={() => !disabled && setIsOpen(!isOpen)}
+                >
+                    {selectedValues.length === 0 && (
+                        <span className="text-gray-400 pointer-events-none select-none">Select options...</span>
+                    )}
+                    {selectedValues.map((val: string) => (
+                        <span key={val} className={`${chipBg} text-white rounded-md ${d.chipPad} ${d.chipText} font-bold flex items-center gap-1 shadow-sm`}>
+                            {val}
+                            {!disabled && (
+                                <span onClick={(e) => removeValue(e, val)} className="cursor-pointer hover:text-gray-200">
+                                    <X size={12} />
+                                </span>
+                            )}
+                        </span>
+                    ))}
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
+                        <ChevronDown size={16} />
+                    </div>
+                </div>
+
+                {/* Dropdown Menu */}
+                {isOpen && !disabled && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                        {msOptions.map((opt, idx) => {
+                            const label = String(opt).trim();
+                            const isSelected = selectedValues.includes(label);
+                            return (
+                                <div 
+                                    key={idx} 
+                                    onClick={() => toggleOption(label)}
+                                    className={`px-4 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors ${isSelected ? activeItemBg : 'hover:bg-gray-50 text-gray-700'}`}
+                                >
+                                    <span>{label}</span>
+                                    {isSelected && <Check size={14} />}
+                                </div>
+                            );
+                        })}
+                        {msOptions.length === 0 && <div className="p-3 text-center text-gray-400 text-sm">No options defined</div>}
+                    </div>
+                )}
+                <ErrorMsg />
+            </div>
+        );
+
     case 'radio':
       const radioOpts = element.options ? (Array.isArray(element.options) ? element.options : String(element.options).split(',')) : [];
       const radioContainerClass = isType2 || isType3 ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200';
@@ -425,7 +543,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                                                 value={row[col.id] || ''}
                                                 onChange={(e) => handleRowChange(rowIdx, col.id, e.target.value)}
                                             >
-                                                <option value="" className="text-gray-500">Select...</option>
+                                                <option value="">Select...</option>
                                                 {col.options?.map((opt, i) => (
                                                     <option key={i} value={opt} className="text-gray-900">{opt}</option>
                                                 ))}

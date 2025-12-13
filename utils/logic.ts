@@ -1,4 +1,8 @@
 
+
+
+
+
 import { Condition, ElementDefinition, SectionDefinition, FormState, LogicGroup } from "../types";
 
 export const generateId = (label: string): string => {
@@ -9,26 +13,54 @@ export const generateId = (label: string): string => {
 };
 
 export const evaluateCondition = (condition: Condition, formData: FormState): boolean => {
-  const value = formData[condition.targetElementId];
+  let value = formData[condition.targetElementId];
   const targetValue = condition.value;
+
+  // Normalize boolean values (from checkboxes) to strings for comparison with config values
+  if (typeof value === 'boolean') {
+      value = String(value);
+  }
+
+  // Handle Array Values (MultiSelect)
+  if (Array.isArray(value)) {
+      const targetStr = String(targetValue).trim();
+      
+      // Contains: Check if the array includes the target value
+      if (condition.operator === 'contains') return value.map(String).includes(targetStr);
+      
+      // Is Empty / Is Not Empty checks
+      if (condition.operator === 'isEmpty') return value.length === 0;
+      if (condition.operator === 'isNotEmpty') return value.length > 0;
+      
+      // Equals: Strict check (array has exactly 1 element and it matches target)
+      if (condition.operator === 'equals') return value.length === 1 && String(value[0]) === targetStr;
+      
+      // Not Equals: Check if the array does NOT include the target value
+      if (condition.operator === 'notEquals') return !value.map(String).includes(targetStr);
+      
+      // Fallback for others
+      return false;
+  }
+
+  // Robust string conversion for comparison (Handle numbers, booleans, and trimming)
+  const valStr = String(value !== undefined && value !== null ? value : '').trim();
+  const targetStr = String(targetValue !== undefined && targetValue !== null ? targetValue : '').trim();
 
   switch (condition.operator) {
     case 'equals':
-      // eslint-disable-next-line eqeqeq
-      return value == targetValue;
+      return valStr === targetStr;
     case 'notEquals':
-      // eslint-disable-next-line eqeqeq
-      return value != targetValue;
+      return valStr !== targetStr;
     case 'contains':
-      return String(value || '').includes(String(targetValue));
+      return valStr.includes(targetStr);
     case 'greaterThan':
       return Number(value) > Number(targetValue);
     case 'lessThan':
       return Number(value) < Number(targetValue);
     case 'isEmpty':
-      return value === undefined || value === '' || value === null;
+      return value === undefined || value === '' || value === null || (Array.isArray(value) && value.length === 0);
     case 'isNotEmpty':
-      return value !== undefined && value !== '' && value !== null;
+      return value !== undefined && value !== '' && value !== null && (!Array.isArray(value) || value.length > 0);
     default:
       return false;
   }

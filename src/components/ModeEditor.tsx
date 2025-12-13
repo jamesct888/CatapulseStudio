@@ -62,7 +62,6 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                 visualTheme={visualTheme}
                 isSettingsOpen={isSettingsOpen}
                 selectedStage={selectedStage}
-                loadingStageIds={loadingStageIds}
             />
         </>
     );

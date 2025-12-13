@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from 'react';
 import { ElementDefinition, SectionDefinition, StageDefinition, SkillRule, LogicGroup, RepeaterColumn, VisualTheme } from '../types';
 import { Trash2, Info, Layout, Briefcase, ShieldCheck, GitMerge, Eye, X, Edit2, Plus, ArrowLeft, Palette } from 'lucide-react';
@@ -319,6 +318,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                      <label className={labelClass}>Color Theme</label>
                      <div className="grid grid-cols-2 gap-3">
                          <button 
+                            id="btn-theme-type1"
                             onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type1' })}
                             className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type1' ? 'border-sw-teal bg-sw-lightGray text-sw-teal ring-1 ring-sw-teal' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
                          >
@@ -328,15 +328,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                              <span className="text-xs font-bold">Type 1 (Teal)</span>
                          </button>
                          <button 
+                            id="btn-theme-type2"
                             onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type2' })}
                             className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type2' ? 'border-[#e61126] bg-[#e0e0e0] text-[#e61126] ring-1 ring-[#e61126]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
                          >
                              <div className="w-12 h-8 bg-[#e61126] border border-[#e61126] rounded flex items-center justify-center shadow-sm">
                                  <Palette size={16} className="text-white" />
                              </div>
-                             <span className="text-xs font-bold">Type 2 (Red)</span>
+                             <span className="text-xs font-bold">Type 2 (Red/Pink)</span>
                          </button>
                          <button 
+                            id="btn-theme-type3"
                             onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type3' })}
                             className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all col-span-2 ${visualTheme.mode === 'type3' ? 'border-[#006a4d] bg-[#f1f1f1] text-[#006a4d] ring-1 ring-[#006a4d]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
                          >
@@ -355,6 +357,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                         {['dense', 'compact', 'default', 'spacious'].map((d) => (
                             <button
                                 key={d}
+                                id={`btn-density-${d}`}
                                 onClick={() => onUpdateTheme({ ...visualTheme, density: d as any })}
                                 className={`px-3 py-2 text-xs font-bold rounded-lg border capitalize transition-all ${visualTheme.density === d ? 'bg-sw-teal text-white border-sw-teal' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
                             >
@@ -482,10 +485,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 shrink-0">
-        <button className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'general' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`} onClick={() => onTabChange('general')}>
+        <button 
+            id="tab-general"
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'general' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`} 
+            onClick={() => onTabChange('general')}
+        >
           General
         </button>
-        <button className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'logic' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`} onClick={() => onTabChange('logic')}>
+        <button 
+            id="tab-logic"
+            className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'logic' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`} 
+            onClick={() => onTabChange('logic')}
+        >
           {isEditingStage ? 'Operations' : 'Logic'}
         </button>
       </div>
@@ -507,7 +518,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <label className={labelClass}>Layout Grid</label>
                     <div className="grid grid-cols-3 gap-2">
                         {['1col', '2col', '3col'].map(l => (
-                            <button key={l} onClick={() => handleChange('layout', l)} className={`p-3 border rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${(data as SectionDefinition).layout === l ? 'border-sw-teal bg-sw-teal/5 text-sw-teal font-bold' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}><Layout size={20} /><span className="text-xs uppercase">{l.replace('col', ' Col')}</span></button>
+                            <button 
+                                key={l} 
+                                id={`btn-layout-${l}`}
+                                onClick={() => handleChange('layout', l)} 
+                                className={`p-3 border rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${(data as SectionDefinition).layout === l ? 'border-sw-teal bg-sw-teal/5 text-sw-teal font-bold' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                            >
+                                <Layout size={20} /><span className="text-xs uppercase">{l.replace('col', ' Col')}</span>
+                            </button>
                         ))}
                     </div>
                  </div>
@@ -518,7 +536,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <div><label className={labelClass}>Field Label</label><input type="text" value={(data as ElementDefinition).label} onChange={(e) => handleChange('label', e.target.value)} className={inputClass} /></div>
                     <div><label className={labelClass}>Field Type</label>
                         <select value={(data as ElementDefinition).type} onChange={(e) => handleChange('type', e.target.value)} className={inputClass}>
-                            <option value="text">Single Line Text</option><option value="email">Email Address</option><option value="textarea">Multi-line Text</option><option value="number">Number</option><option value="date">Date</option><option value="currency">Currency</option><option value="select">Dropdown</option><option value="radio">Radio Buttons</option><option value="checkbox">Checkbox</option><option value="repeater">Repeater List</option><option value="static">Static Text</option>
+                            <option value="text">Single Line Text</option><option value="email">Email Address</option><option value="textarea">Multi-line Text</option><option value="number">Number</option><option value="date">Date</option><option value="currency">Currency</option><option value="select">Dropdown</option><option value="multiselect">Multi-Select Dropdown</option><option value="radio">Radio Buttons</option><option value="checkbox">Checkbox</option><option value="repeater">Repeater List</option><option value="static">Static Text</option>
                         </select>
                     </div>
 
@@ -599,7 +617,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                         </div>
                     )}
 
-                    {['select', 'radio'].includes((data as ElementDefinition).type) && (
+                    {['select', 'radio', 'multiselect'].includes((data as ElementDefinition).type) && (
                         <div><label className={labelClass}>Options (comma separated)</label><textarea value={Array.isArray((data as ElementDefinition).options) ? ((data as ElementDefinition).options as string[]).join(',') : (data as ElementDefinition).options} onChange={(e) => handleChange('options', e.target.value.split(','))} className={inputClass} rows={3} /></div>
                     )}
                     {(data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (
@@ -629,13 +647,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                     <p className="text-xs text-gray-500">{(data as StageDefinition).skillLogic?.length || 0} Rules Configured</p>
                                 </div>
                             </div>
-                            <button onClick={() => {
+                            <div className="flex gap-1">
+                                {/* ... existing buttons ... */}
+                            </div>
+                        </div>
+                        <div className="mb-4">
+                             <button onClick={() => {
                                 const newRule: SkillRule = { logic: { id: Date.now().toString(), operator: 'AND', conditions: [] }, requiredSkill: '' };
                                 const newIndex = (selectedStage.skillLogic?.length || 0);
                                 onUpdateStage({ ...selectedStage!, skillLogic: [...(selectedStage?.skillLogic || []), newRule] });
                                 setActiveRuleIndex(newIndex);
                                 setSkillModalOpen(true);
-                            }} className="text-xs bg-sw-teal text-white px-3 py-2 rounded-lg font-bold hover:bg-sw-tealHover">+ Add Routing Condition</button>
+                            }} className="w-full text-xs bg-white border border-sw-teal text-sw-teal px-3 py-2 rounded-lg font-bold hover:bg-sw-teal hover:text-white transition-colors">+ Add Routing Condition</button>
                         </div>
                         <div className="space-y-2">
                             {(data as StageDefinition).skillLogic?.map((rule, idx) => {
@@ -684,7 +707,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
             {/* VALIDATION CARD */}
             {isEditingElement && (data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (
-                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => setValidationModalOpen(true)}>
+                <div id="card-validation" className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => setValidationModalOpen(true)}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-red-50 rounded-lg text-sw-red group-hover:bg-sw-red group-hover:text-white transition-colors">
                             <ShieldCheck size={24} />

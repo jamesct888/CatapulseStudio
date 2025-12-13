@@ -33,10 +33,19 @@ export const LoadingOverlay: React.FC = () => {
       <div className="fixed inset-0 z-[100] bg-sw-teal/95 backdrop-blur-xl flex flex-col items-center justify-center text-white p-8 animate-in fade-in duration-500 overflow-hidden">
           
           {/* Dynamic Rotating Background Rings */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
-              <div className="absolute w-[40rem] h-[40rem] border border-white/50 rounded-full animate-[spin_20s_linear_infinite]"></div>
-              <div className="absolute w-[30rem] h-[30rem] border border-dashed border-white/50 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
-              <div className="absolute w-[50rem] h-[50rem] border border-dotted border-white/30 rounded-full animate-[spin_30s_linear_infinite]"></div>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+              {/* Outer Circle - Slower */}
+              <div className="absolute w-[50rem] h-[50rem] border border-dotted border-white/20 rounded-full animate-[spin_20s_linear_infinite]">
+                  <div className="absolute top-1/2 -right-1.5 w-3 h-3 bg-sw-red rounded-full shadow-[0_0_40px_15px_rgba(230,17,38,0.6)]"></div>
+              </div>
+              
+              {/* Middle Circle - Medium (No Dot) */}
+              <div className="absolute w-[40rem] h-[40rem] border border-white/10 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
+              
+              {/* Inner Circle - Faster */}
+              <div className="absolute w-[30rem] h-[30rem] border border-dashed border-white/30 rounded-full animate-[spin_8s_linear_infinite]">
+                   <div className="absolute -top-1.5 left-1/2 w-3 h-3 bg-sw-red rounded-full shadow-[0_0_40px_15px_rgba(230,17,38,0.6)]"></div>
+              </div>
           </div>
 
           {/* Impact Pulse Container */}
@@ -49,15 +58,15 @@ export const LoadingOverlay: React.FC = () => {
               <div className="w-96 h-24 relative flex items-center justify-center overflow-hidden">
                 {/* The Line */}
                 <div className="absolute inset-0 flex items-center">
-                    <div className="w-full h-0.5 bg-white/20"></div>
+                    <div className="w-full h-0.5 bg-white/10"></div>
                 </div>
                 
                 {/* The Pulse - Smooth Sine Wave */}
-                <svg viewBox="0 0 500 150" className="w-full h-full drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">
+                <svg viewBox="0 0 500 150" className="w-full h-full drop-shadow-[0_0_15px_rgba(230,17,38,0.8)]">
                       <path 
                         d="M0 75 L150 75 C 180 10, 200 140, 230 75 L500 75"
                         fill="none"
-                        stroke="white"
+                        stroke="#e61126"
                         strokeWidth="4"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -79,9 +88,9 @@ export const LoadingOverlay: React.FC = () => {
                         animation: ecgDraw 4.5s ease-in-out infinite;
                     }
                     @keyframes impactPulse {
-                        0%, 20% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
-                        30% { transform: scale(1.02); filter: drop-shadow(0 0 15px rgba(255,255,255,0.4)); }
-                        40% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+                        0%, 20% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(230,17,38,0)); }
+                        30% { transform: scale(1.02); filter: drop-shadow(0 0 30px rgba(230,17,38,0.5)); }
+                        40% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(230,17,38,0)); }
                         100% { transform: scale(1); }
                     }
                     .animate-heartbeat-impact {

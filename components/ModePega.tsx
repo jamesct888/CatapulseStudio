@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { ProcessDefinition, ElementDefinition, DataObjectSuggestion, StageDefinition, LogicGroup, Condition } from '../types';
-import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList } from 'lucide-react';
+import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode } from 'lucide-react';
 import { CatapulseLogo } from './Shared';
 import { generateDataMapping } from '../services/geminiService';
+import { formatLogicSummary } from '../utils/logic';
 
 interface ModePegaProps {
     processDef: ProcessDefinition;
@@ -11,20 +12,41 @@ interface ModePegaProps {
     setPegaTab: (val: 'blueprint' | 'manual' | 'data' | 'logic') => void;
 }
 
+type PegaRuleType = 'Rule-Obj-When' | 'Rule-Obj-Validate' | 'Rule-HTML-Section' | 'Rule-Declare-Decision';
+
+interface PegaRuleItem {
+    id: string;
+    label: string;
+    type: PegaRuleType;
+    context: string;
+    logicDescription: string;
+    technicalName: string;
+}
+
 export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPegaTab }) => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [dataSuggestions, setDataSuggestions] = useState<DataObjectSuggestion[]>([]);
     const [editingClassIndex, setEditingClassIndex] = useState<number | null>(null);
     const [tempClassName, setTempClassName] = useState('');
-    const [selectedDecisionStage, setSelectedDecisionStage] = useState<string>(processDef.stages[0]?.id || '');
+    const [activeRuleFilter, setActiveRuleFilter] = useState<PegaRuleType | 'ALL'>('ALL');
 
     const handleAnalyzeData = async () => {
         setIsAnalyzing(true);
-        // Gather all elements
-        const allElements = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements).map(e => ({ id: e.id, label: e.label, type: e.type }));
-        const suggestions = await generateDataMapping(allElements);
-        setDataSuggestions(suggestions);
-        setIsAnalyzing(false);
+        try {
+            // Gather all elements
+            const allElements = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements).map(e => ({ id: e.id, label: e.label, type: e.type }));
+            const suggestions = await generateDataMapping(allElements);
+            if (suggestions) {
+                setDataSuggestions(suggestions);
+            } else {
+                alert("Could not generate data mapping.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Analysis failed.");
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     const handleSaveClassName = (index: number) => {
@@ -45,105 +67,127 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
         return null;
     };
 
-    // --- Decision Table Logic ---
-    const getFlattenedLogic = (stage: StageDefinition) => {
-        if (!stage.skillLogic || stage.skillLogic.length === 0) return null;
+    // --- Rule Extraction Engine ---
+    const getRuleInventory = (): PegaRuleItem[] => {
+        const rules: PegaRuleItem[] = [];
+        const allElements = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements).map(e => ({ id: e.id, label: e.label }));
 
-        const allElements = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements);
-
-        // 1. Identify all unique columns (Input Conditions)
-        const uniqueConditionFieldIds = new Set<string>();
-        stage.skillLogic.forEach(rule => {
-            const traverse = (g: LogicGroup) => {
-                g.conditions.forEach(c => uniqueConditionFieldIds.add(c.targetElementId));
-                g.groups?.forEach(traverse);
+        processDef.stages.forEach(stage => {
+            // 1. Decision Rules (Routing)
+            if (stage.skillLogic && stage.skillLogic.length > 0) {
+                rules.push({
+                    id: `dec_${stage.id}`,
+                    label: `${stage.title} Routing`,
+                    type: 'Rule-Declare-Decision',
+                    context: `Stage: ${stage.title}`,
+                    logicDescription: `Routes based on ${stage.skillLogic.length} logic conditions (Decision Table)`,
+                    technicalName: `Determine${stage.title.replace(/\s+/g,'')}Routing`
+                });
             }
-            traverse(rule.logic);
-        });
-        const columns = Array.from(uniqueConditionFieldIds).map(id => {
-            const el = allElements.find(e => e.id === id);
-            return { id, label: el ? el.label : 'Unknown Field' };
-        });
 
-        // 2. Build Rows
-        const rows = stage.skillLogic.map(rule => {
-            const rowData: {[key: string]: string} = {};
-            
-            const traverse = (g: LogicGroup) => {
-                g.conditions.forEach(c => {
-                    const opMap: Record<string, string> = {
-                        'equals': '=',
-                        'notEquals': '!=',
-                        'greaterThan': '>',
-                        'lessThan': '<',
-                        'contains': 'contains',
-                        'isEmpty': 'is empty',
-                        'isNotEmpty': 'is populated'
-                    };
-                    const opSymbol = opMap[c.operator] || c.operator;
-                    
-                    const valStr = (c.operator === 'isEmpty' || c.operator === 'isNotEmpty') 
-                        ? opSymbol 
-                        : `${opSymbol} "${c.value}"`;
+            stage.sections.forEach(section => {
+                // 2. Section Rules
+                rules.push({
+                    id: `sec_${section.id}`,
+                    label: section.title,
+                    type: 'Rule-HTML-Section',
+                    context: `Stage: ${stage.title}`,
+                    logicDescription: `Layout: ${section.layout || '1col'}, Variant: ${section.variant || 'Standard'}`,
+                    technicalName: section.title.replace(/[^a-zA-Z0-9]/g, '')
+                });
 
-                    // Aggregate conditions if multiple exist for the same field (e.g. > 5 AND < 10)
-                    if (rowData[c.targetElementId]) {
-                        rowData[c.targetElementId] += ` AND ${valStr}`;
-                    } else {
-                        rowData[c.targetElementId] = valStr;
+                // 3. When Rules (Section Visibility)
+                if (section.visibility && (section.visibility.conditions.length > 0 || (section.visibility.groups && section.visibility.groups.length > 0))) {
+                    rules.push({
+                        id: `when_sec_${section.id}`,
+                        label: `${section.title} Visibility`,
+                        type: 'Rule-Obj-When',
+                        context: `Section: ${section.title}`,
+                        logicDescription: formatLogicSummary(section.visibility, allElements),
+                        technicalName: `When${section.title.replace(/[^a-zA-Z0-9]/g, '')}Visible`
+                    });
+                }
+
+                section.elements.forEach(element => {
+                    // 4. When Rules (Field Visibility)
+                    if (element.visibility && (element.visibility.conditions.length > 0 || (element.visibility.groups && element.visibility.groups.length > 0))) {
+                        rules.push({
+                            id: `when_el_${element.id}`,
+                            label: `${element.label} Visibility`,
+                            type: 'Rule-Obj-When',
+                            context: `Field: ${element.label}`,
+                            logicDescription: formatLogicSummary(element.visibility, allElements),
+                            technicalName: `When${element.label.replace(/[^a-zA-Z0-9]/g, '')}Visible`
+                        });
+                    }
+
+                    // 5. When Rules (Required Logic)
+                    if (element.requiredLogic && (element.requiredLogic.conditions.length > 0 || (element.requiredLogic.groups && element.requiredLogic.groups.length > 0))) {
+                        rules.push({
+                            id: `req_el_${element.id}`,
+                            label: `${element.label} Required`,
+                            type: 'Rule-Obj-When',
+                            context: `Field: ${element.label}`,
+                            logicDescription: formatLogicSummary(element.requiredLogic, allElements),
+                            technicalName: `When${element.label.replace(/[^a-zA-Z0-9]/g, '')}Required`
+                        });
+                    }
+
+                    // 6. Validate Rules
+                    if (element.validation && element.validation.type !== 'none') {
+                        rules.push({
+                            id: `val_${element.id}`,
+                            label: `${element.label} Validation`,
+                            type: 'Rule-Obj-Validate',
+                            context: `Field: ${element.label}`,
+                            logicDescription: element.validation.type === 'custom' 
+                                ? (element.validation.customDescription || 'Custom Logic') 
+                                : `Format check: ${element.validation.type}`,
+                            technicalName: `Val${element.label.replace(/[^a-zA-Z0-9]/g, '')}`
+                        });
                     }
                 });
-                g.groups?.forEach(traverse);
-            }
-            traverse(rule.logic);
-            
-            return {
-                inputs: rowData,
-                result: rule.requiredSkill
-            };
+            });
         });
 
-        return { columns, rows };
+        return rules;
     };
-    
-    const handleCopyTable = (tableData: any) => {
-        if (!tableData) return;
-        const headers = [...tableData.columns.map((c:any) => c.label), "Return"];
-        const rows = tableData.rows.map((r:any) => {
-            return [...tableData.columns.map((c:any) => r.inputs[c.id] || ""), r.result];
-        });
-        
-        const csv = [headers.join("\t"), ...rows.map((r:any) => r.join("\t"))].join("\n");
-        navigator.clipboard.writeText(csv);
-        alert("Table copied to clipboard (Tab Separated). You can paste this directly into Excel or Pega.");
+
+    const handleCopy = (text: string) => {
+        navigator.clipboard.writeText(text);
+        // Could add toast here
     };
 
     return (
         <div className="max-w-6xl mx-auto py-12 px-6">
             <div className="flex justify-center mb-8 bg-gray-100 p-1 rounded-lg inline-flex mx-auto sticky top-4 z-20 shadow-sm border border-gray-200">
                  <button 
+                    id="tab-pega-blueprint"
                     onClick={() => setPegaTab('blueprint')}
                     className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${pegaTab === 'blueprint' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     Blueprint Generator
                  </button>
                  <button 
+                    id="tab-pega-manual"
                     onClick={() => setPegaTab('manual')}
                     className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${pegaTab === 'manual' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     Implementation Guide
                  </button>
                  <button 
+                    id="tab-pega-data"
                     onClick={() => setPegaTab('data')}
                     className={`px-6 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'data' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     <Database size={14}/> Data Dictionary
                  </button>
                  <button 
+                    id="tab-pega-logic"
                     onClick={() => setPegaTab('logic')}
                     className={`px-6 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'logic' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
-                    <TableIcon size={14}/> Logic & Decisions
+                    <TableIcon size={14}/> Rule Inventory
                  </button>
             </div>
   
@@ -296,110 +340,79 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
             {pegaTab === 'logic' && (
                 <div className="space-y-6 animate-in fade-in">
                     {/* Header */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex justify-between items-center">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-800">Logic & Decisions</h2>
-                            <p className="text-sm text-gray-500">Convert logic to Decision Tables for easy Pega implementation.</p>
+                            <h2 className="text-xl font-bold text-gray-800">Technical Rule Inventory</h2>
+                            <p className="text-sm text-gray-500">Automatically extracted rule candidates for implementation.</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Context:</label>
-                            <select 
-                                value={selectedDecisionStage}
-                                onChange={(e) => setSelectedDecisionStage(e.target.value)}
-                                className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-sw-teal"
-                            >
-                                {processDef.stages.map(s => <option key={s.id} value={s.id}>Stage: {s.title}</option>)}
-                            </select>
+                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                            {(['ALL', 'Rule-Obj-When', 'Rule-Obj-Validate', 'Rule-HTML-Section', 'Rule-Declare-Decision'] as const).map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setActiveRuleFilter(f)}
+                                    className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${activeRuleFilter === f ? 'bg-white shadow-sm text-sw-teal' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    {f === 'ALL' ? 'All Rules' : f.replace('Rule-', '')}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Table Render */}
-                    {(() => {
-                        const stage = processDef.stages.find(s => s.id === selectedDecisionStage);
-                        const tableData = stage ? getFlattenedLogic(stage) : null;
-
-                        if (!stage || !tableData) {
-                            return (
-                                <div className="text-center py-16 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl">
-                                    <p className="text-gray-400 font-medium mb-2">No routing logic defined for this stage.</p>
-                                    <p className="text-xs text-gray-400">Add Skill Routing in the Editor -> Properties Panel to see a decision table here.</p>
-                                </div>
-                            );
-                        }
-
-                        return (
-                            <div className="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
-                                <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                        <TableIcon size={16} className="text-sw-teal" />
-                                        <span className="font-bold text-sm text-gray-700">Decision Table: {stage.title} Routing</span>
-                                    </div>
-                                    <button 
-                                        onClick={() => handleCopyTable(tableData)}
-                                        className="text-xs font-bold bg-white border border-gray-300 px-3 py-1.5 rounded hover:bg-sw-teal hover:text-white hover:border-sw-teal transition-colors flex items-center gap-2"
-                                    >
-                                        <ClipboardList size={14} /> Copy for Pega/Excel
-                                    </button>
-                                </div>
-                                
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm border-collapse">
-                                        <thead>
-                                            <tr>
-                                                <th className="p-1 w-12 text-center bg-gray-100 border border-gray-200 text-xs font-mono text-gray-400">#</th>
-                                                {/* Conditions Header */}
-                                                {tableData.columns.map(col => (
-                                                    <th key={col.id} className="p-0 border border-gray-200 min-w-[150px]">
-                                                        <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase text-center">
-                                                            Condition
-                                                        </div>
-                                                        <div className="px-3 py-2 bg-gray-50 text-sw-teal font-bold text-center">
-                                                            {col.label}
-                                                        </div>
-                                                    </th>
-                                                ))}
-                                                {/* Actions Header */}
-                                                <th className="p-0 border border-gray-200 min-w-[150px] bg-sw-teal/5">
-                                                     <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase text-center">
-                                                            Return
-                                                    </div>
-                                                    <div className="px-3 py-2 bg-sw-teal/10 text-sw-teal font-bold text-center">
-                                                        Route To
-                                                    </div>
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {tableData.rows.map((row, idx) => (
-                                                <tr key={idx} className="hover:bg-blue-50/50 transition-colors">
-                                                    <td className="p-2 text-center border border-gray-200 font-mono text-xs text-gray-400 bg-gray-50">{idx + 1}</td>
-                                                    {tableData.columns.map(col => (
-                                                        <td key={col.id} className="p-2 border border-gray-200 text-center font-mono text-gray-600">
-                                                            {row.inputs[col.id] || <span className="text-gray-300">-</span>}
-                                                        </td>
-                                                    ))}
-                                                    <td className="p-2 border border-gray-200 text-center font-bold text-sw-teal bg-sw-teal/5">
-                                                        {row.result}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            <tr className="bg-gray-50">
-                                                <td className="p-2 text-center border border-gray-200 font-mono text-xs text-gray-400">Else</td>
-                                                {tableData.columns.map(col => (
-                                                     <td key={col.id} className="p-2 border border-gray-200 text-center text-gray-400 italic">
-                                                        Otherwise
-                                                     </td>
-                                                ))}
-                                                 <td className="p-2 border border-gray-200 text-center text-gray-400 italic bg-sw-teal/5">
-                                                    {stage.defaultSkill || 'Stop'}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        );
-                    })()}
+                    {/* Rules Table */}
+                    <div className="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase whitespace-nowrap w-48">Type</th>
+                                    <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Rule Name / ID</th>
+                                    <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Context</th>
+                                    <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase w-1/3">Logic / Configuration</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {getRuleInventory()
+                                    .filter(r => activeRuleFilter === 'ALL' || r.type === activeRuleFilter)
+                                    .map(rule => (
+                                    <tr key={rule.id} className="hover:bg-gray-50 group">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`inline-block text-xs font-medium px-3 py-1.5 rounded-md border shadow-sm ${
+                                                rule.type === 'Rule-Obj-When' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                                rule.type === 'Rule-Obj-Validate' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                rule.type === 'Rule-HTML-Section' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                'bg-orange-50 text-orange-700 border-orange-200'
+                                            }`}>
+                                                {rule.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-mono text-xs font-bold text-sw-teal flex items-center gap-2">
+                                                {rule.technicalName}
+                                                <button onClick={() => handleCopy(rule.technicalName)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-sw-teal transition-opacity">
+                                                    <ClipboardList size={12} />
+                                                </button>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-0.5">{rule.label}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-xs text-gray-600">
+                                            {rule.context}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-xs text-gray-700 font-mono bg-gray-50 p-2 rounded border border-gray-100 break-words">
+                                                {rule.logicDescription}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {getRuleInventory().filter(r => activeRuleFilter === 'ALL' || r.type === activeRuleFilter).length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-12 text-center text-gray-400 italic">
+                                            No rules found for this category.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
             

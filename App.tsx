@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
@@ -7,6 +8,7 @@ import { ModeQA } from './components/ModeQA';
 import { ModePega } from './components/ModePega';
 import { ModeFlow } from './components/ModeFlow';
 import { PropertiesPanel } from './components/PropertiesPanel';
+import { GlobalSettingsPanel } from './components/GlobalSettingsPanel';
 import { AppHeader } from './components/AppHeader';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { DemoManager } from './components/DemoManager';
@@ -17,7 +19,8 @@ import {
   ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy 
 } from './types';
 import { 
-  generateProcessStructure, generateProcessFromImage, modifyProcess
+  generateProcessStructure, generateProcessFromImage, modifyProcess,
+  generateProcessSkeleton, generateStageDetails 
 } from './services/geminiService';
 import { 
   demoDigitizedProcess 
@@ -35,7 +38,10 @@ const App: React.FC = () => {
   const [startPrompt, setStartPrompt] = useState('');
   const [showDemoDrop, setShowDemoDrop] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [loadingStageIds, setLoadingStageIds] = useState<Set<string>>(new Set()); // Track individual loading stages
+  const [activeSidePanel, setActiveSidePanel] = useState<'none' | 'properties' | 'settings'>('properties');
+  const [panelWidth, setPanelWidth] = useState(480);
+  const [isResizingPanel, setIsResizingPanel] = useState(false);
   
   // Selection State
   const [selectedStageId, setSelectedStageId] = useState<string>('');
@@ -71,7 +77,6 @@ const App: React.FC = () => {
     }
 
     if (!startPrompt.trim()) {
-        // Default blank start
         const defaultProcess: ProcessDefinition = {
             id: `proc_${Date.now()}`,
             name: "New Process",
@@ -91,13 +96,77 @@ const App: React.FC = () => {
     }
     
     setIsGenerating(true);
-    const result = await generateProcessStructure(startPrompt);
-    if (result) {
-        setProcessDef(result);
-        setSelectedStageId(result.stages[0]?.id || '');
-        setViewMode('editor');
+    try {
+        console.log(`[App] 🟢 STARTING GENERATION for: "${startPrompt}"`);
+        
+        // Step 1: Generate Skeleton (Fast)
+        const skeleton = await generateProcessSkeleton(startPrompt);
+        
+        if (skeleton) {
+            console.log(`[App] ✅ SKELETON RECEIVED with ${skeleton.stages.length} stages.`);
+            
+            // Mark all stages as loading initially
+            const newLoadingSet = new Set<string>();
+            skeleton.stages.forEach(s => newLoadingSet.add(s.id));
+            setLoadingStageIds(newLoadingSet);
+
+            // Render Skeleton Immediately
+            setProcessDef(skeleton);
+            setSelectedStageId(skeleton.stages[0]?.id || '');
+            setViewMode('editor');
+            setIsGenerating(false); // Stop main loading overlay
+
+            // Step 2: Generate Flesh (Serialized with 4s delay to respect 15 RPM limit)
+            console.log(`[App] 🚀 QUEUING ${skeleton.stages.length} REQUESTS for details...`);
+            
+            for (let i = 0; i < skeleton.stages.length; i++) {
+                const stage = skeleton.stages[i];
+                
+                // Add a deliberate 4-second delay before firing next request (except the first one)
+                // This keeps us safely under ~15 RPM.
+                if (i > 0) {
+                    console.log(`[App] 🛑 Pacing request... waiting 4s`);
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                }
+
+                console.log(`[App] ⏳ Fetching details for Stage ${i + 1}: ${stage.title}`);
+                
+                // Fire request and handle response
+                generateStageDetails(stage, skeleton.description).then((details) => {
+                    console.log(`[App] 📥 Received details for Stage ${i + 1}: ${stage.title} (${details.length} sections)`);
+                    
+                    setProcessDef(prev => {
+                        if (!prev) return prev;
+                        if (prev.id !== skeleton.id) return prev; // Avoid race condition if reset
+
+                        const newStages = [...prev.stages];
+                        // Merge details into the specific stage
+                        const stageIndex = newStages.findIndex(s => s.id === stage.id);
+                        if (stageIndex !== -1) {
+                            newStages[stageIndex] = { ...newStages[stageIndex], sections: details };
+                        }
+                        return { ...prev, stages: newStages };
+                    });
+
+                    // Remove from loading set
+                    setLoadingStageIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(stage.id);
+                        return next;
+                    });
+                });
+            }
+
+        } else {
+            setIsGenerating(false);
+            console.error("[App] ❌ Skeleton generation failed (returned null).");
+            alert("Could not generate process. Rate limit may be exceeded. Please wait 1 minute and try again.");
+        }
+    } catch (e) {
+        setIsGenerating(false);
+        console.error("[App] ❌ CRITICAL ERROR during generation:", e);
+        alert("An error occurred during generation. Please check your network or try again later.");
     }
-    setIsGenerating(false);
   };
 
   const handleLegacyFormUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,21 +178,28 @@ const App: React.FC = () => {
 
       const reader = new FileReader();
       reader.onloadend = async () => {
-          const base64 = reader.result as string;
-          const data = base64.split(',')[1];
-          const result = await generateProcessFromImage(data, file.type);
-          
-          if (result) {
-              setProcessDef(result);
-              setSelectedStageId(result.stages[0]?.id || '');
-              setViewMode('editor');
-          } else {
-             setProcessDef(demoDigitizedProcess);
-             setSelectedStageId(demoDigitizedProcess.stages[0].id);
-             setViewMode('editor');
+          try {
+              const base64 = reader.result as string;
+              const data = base64.split(',')[1];
+              const result = await generateProcessFromImage(data, file.type);
+              
+              if (result) {
+                  setProcessDef(result);
+                  setSelectedStageId(result.stages[0]?.id || '');
+                  setViewMode('editor');
+              } else {
+                 setProcessDef(demoDigitizedProcess);
+                 setSelectedStageId(demoDigitizedProcess.stages[0].id);
+                 setViewMode('editor');
+                 alert("AI extraction failed or incomplete. Loaded backup for demo continuity.");
+              }
+          } catch (e) {
+              console.error(e);
+              alert("Error analyzing image.");
+          } finally {
+              setShowDemoDrop(false);
+              setIsGenerating(false);
           }
-          setShowDemoDrop(false);
-          setIsGenerating(false);
       };
       reader.readAsDataURL(file);
   };
@@ -131,13 +207,21 @@ const App: React.FC = () => {
   const handleAiModification = async () => {
       if (!processDef || !aiPrompt) return;
       setIsGenerating(true);
-      const context = { selectedStageId, selectedSectionId };
-      const updated = await modifyProcess(processDef, aiPrompt, context);
-      if (updated) {
-          setProcessDef(updated);
-          setAiPrompt('');
+      try {
+          const context = { selectedStageId, selectedSectionId };
+          const updated = await modifyProcess(processDef, aiPrompt, context);
+          if (updated) {
+              setProcessDef(updated);
+              setAiPrompt('');
+          } else {
+              alert("The AI could not perform this modification. Please try rephrasing your request.");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("Modification failed due to an error.");
+      } finally {
+          setIsGenerating(false);
       }
-      setIsGenerating(false);
   };
 
   // Helper to resolve selection objects
@@ -181,21 +265,26 @@ const App: React.FC = () => {
                     setShowDemoDrop={setShowDemoDrop}
                     setFormData={setFormData}
                     setUserStories={setUserStories}
+                    setTestCases={setTestCases}
                     setPersonaPrompt={setPersonaPrompt}
                     setAiPrompt={setAiPrompt}
                     setSelectedStageId={setSelectedStageId}
                     setSelectedSectionId={setSelectedSectionId}
                     setSelectedElementId={setSelectedElementId}
-                    setIsSettingsOpen={setIsSettingsOpen}
+                    setActiveSidePanel={() => {}} 
                     setActivePropTab={setActivePropTab}
                     onStop={() => { setIsDemoMode(false); setViewMode('onboarding'); setProcessDef(null); }}
                     processDef={processDef}
+                    setVisualTheme={setVisualTheme}
+                    setQaTab={setQaTab}
+                    setPegaTab={setPegaTab}
                 />
             )}
           </>
       );
   }
 
+  // Only show global loading if we have NO process definition yet
   if (isGenerating && !processDef) return <LoadingOverlay />;
   if (!processDef) return null;
 
@@ -206,20 +295,13 @@ const App: React.FC = () => {
             setProcessDef={setProcessDef}
             viewMode={viewMode} 
             setViewMode={setViewMode} 
-            isSettingsOpen={isSettingsOpen} 
-            setIsSettingsOpen={setIsSettingsOpen}
+            isSettingsOpen={activeSidePanel === 'settings'} 
+            setIsSettingsOpen={(val) => setActiveSidePanel(val ? 'settings' : 'properties')}
             visualTheme={visualTheme}
         />
 
         <div className="flex-1 flex overflow-hidden relative">
             <main className="flex-1 overflow-hidden relative flex flex-col">
-                {isGenerating && (
-                    <div className="absolute top-0 left-0 right-0 z-50">
-                        <div className="h-1 w-full bg-sw-lightGray overflow-hidden">
-                             <div className="h-full bg-sw-teal w-1/3 animate-loading-bar"></div>
-                        </div>
-                    </div>
-                )}
                 
                 {viewMode === 'editor' && (
                     <div className="flex-1 flex overflow-hidden">
@@ -231,13 +313,17 @@ const App: React.FC = () => {
                             selectedSectionId={selectedSectionId}
                             setSelectedSectionId={setSelectedSectionId}
                             selectedElementId={selectedElementId}
-                            setSelectedElementId={setSelectedElementId}
+                            setSelectedElementId={(id) => {
+                                setSelectedElementId(id);
+                                if (id) setActiveSidePanel('properties');
+                            }}
                             aiPrompt={aiPrompt}
                             setAiPrompt={setAiPrompt}
                             handleAiModification={handleAiModification}
                             isGenerating={isGenerating}
                             visualTheme={visualTheme}
-                            isSettingsOpen={isSettingsOpen}
+                            isSettingsOpen={activeSidePanel !== 'none'}
+                            loadingStageIds={loadingStageIds} 
                         />
                     </div>
                 )}
@@ -280,43 +366,52 @@ const App: React.FC = () => {
             </main>
 
             {viewMode === 'editor' && (
-                <div className={`fixed right-0 top-16 bottom-0 z-40 transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                    <PropertiesPanel 
-                        selectedElement={selectedElement}
-                        selectedSection={selectedSection}
-                        selectedStage={selectedStage}
-                        allElements={processDef.stages.flatMap(s=>s.sections).flatMap(sec=>sec.elements)}
-                        activeTab={activePropTab}
-                        onTabChange={setActivePropTab}
-                        onUpdateElement={updateElement}
-                        onUpdateSection={updateSection}
-                        onUpdateStage={updateStage}
-                        onDeleteElement={deleteElement}
-                        onDeleteSection={deleteSection}
-                        onDeleteStage={(id) => {
-                            if (!processDef) return;
-                            if (processDef.stages.length <= 1) {
-                                alert("Cannot delete the only stage in the process.");
-                                return;
-                            }
-                            deleteStage(id);
-                            // Update selection if needed
-                            if (selectedStageId === id) {
-                                const remaining = processDef.stages.filter(s => s.id !== id);
-                                if (remaining.length > 0) {
-                                    setSelectedStageId(remaining[0].id);
-                                    setSelectedSectionId(remaining[0].sections[0]?.id || null);
-                                } else {
-                                    setSelectedStageId('');
-                                    setSelectedSectionId(null);
+                <div className={`fixed right-0 top-16 bottom-0 z-40 transition-transform duration-300 ease-in-out ${activeSidePanel !== 'none' ? 'translate-x-0' : 'translate-x-full'}`}>
+                    {activeSidePanel === 'properties' && (
+                        <PropertiesPanel 
+                            selectedElement={selectedElement}
+                            selectedSection={selectedSection}
+                            selectedStage={selectedStage}
+                            allElements={processDef.stages.flatMap(s=>s.sections).flatMap(sec=>sec.elements)}
+                            activeTab={activePropTab}
+                            onTabChange={setActivePropTab}
+                            onUpdateElement={updateElement}
+                            onUpdateSection={updateSection}
+                            onUpdateStage={updateStage}
+                            onDeleteElement={deleteElement}
+                            onDeleteSection={deleteSection}
+                            onDeleteStage={(id) => {
+                                if (!processDef) return;
+                                if (processDef.stages.length <= 1) {
+                                    alert("Cannot delete the only stage in the process.");
+                                    return;
                                 }
-                                setSelectedElementId(null);
-                            }
-                        }}
-                        visualTheme={visualTheme}
-                        onUpdateTheme={setVisualTheme}
-                        onClose={() => setIsSettingsOpen(false)}
-                    />
+                                deleteStage(id);
+                                if (selectedStageId === id) {
+                                    const remaining = processDef.stages.filter(s => s.id !== id);
+                                    if (remaining.length > 0) {
+                                        setSelectedStageId(remaining[0].id);
+                                        setSelectedSectionId(remaining[0].sections[0]?.id || null);
+                                    } else {
+                                        setSelectedStageId('');
+                                        setSelectedSectionId(null);
+                                    }
+                                    setSelectedElementId(null);
+                                }
+                            }}
+                            visualTheme={visualTheme}
+                            onClose={() => setActiveSidePanel('none')}
+                        />
+                    )}
+                    {activeSidePanel === 'settings' && (
+                        <GlobalSettingsPanel 
+                            visualTheme={visualTheme}
+                            onUpdateTheme={setVisualTheme}
+                            onClose={() => setActiveSidePanel('properties')}
+                            panelWidth={panelWidth}
+                            onResizeStart={() => setIsResizingPanel(true)}
+                        />
+                    )}
                 </div>
             )}
         </div>
@@ -330,15 +425,19 @@ const App: React.FC = () => {
                 setShowDemoDrop={setShowDemoDrop}
                 setFormData={setFormData}
                 setUserStories={setUserStories}
+                setTestCases={setTestCases}
                 setPersonaPrompt={setPersonaPrompt}
                 setAiPrompt={setAiPrompt}
                 setSelectedStageId={setSelectedStageId}
                 setSelectedSectionId={setSelectedSectionId}
                 setSelectedElementId={setSelectedElementId}
-                setIsSettingsOpen={setIsSettingsOpen}
+                setActiveSidePanel={setActiveSidePanel}
                 setActivePropTab={setActivePropTab}
                 onStop={() => { setIsDemoMode(false); setViewMode('onboarding'); setProcessDef(null); }}
                 processDef={processDef}
+                setVisualTheme={setVisualTheme}
+                setQaTab={setQaTab}
+                setPegaTab={setPegaTab}
             />
         )}
         <DemoFocusOverlay area="none" highlightId={null} />

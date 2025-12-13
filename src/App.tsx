@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
@@ -9,21 +8,18 @@ import { ModeQA } from './components/ModeQA';
 import { ModePega } from './components/ModePega';
 import { ModeFlow } from './components/ModeFlow';
 import { PropertiesPanel } from './components/PropertiesPanel';
+import { GlobalSettingsPanel } from './components/GlobalSettingsPanel';
 import { AppHeader } from './components/AppHeader';
+import { AppFooter } from './components/AppFooter';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { DemoManager } from './components/DemoManager';
 import { DemoFocusOverlay } from './components/DemoFocusOverlay';
 import { useProcessState } from './hooks/useProcessState'; 
+import { useAiOperations } from './hooks/useAiOperations';
 import { 
-  ProcessDefinition, FormState, VisualTheme, UserStory, TestCase, 
+  FormState, VisualTheme, UserStory, TestCase, 
   ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy 
 } from './types';
-import { 
-  generateProcessStructure, generateProcessFromImage, modifyProcess
-} from './services/geminiService';
-import { 
-  demoDigitizedProcess 
-} from './services/demoData';
 
 // --- Main App Component ---
 const App: React.FC = () => {
@@ -35,9 +31,10 @@ const App: React.FC = () => {
   // UI State
   const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');
   const [startPrompt, setStartPrompt] = useState('');
-  const [showDemoDrop, setShowDemoDrop] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [loadingStageIds, setLoadingStageIds] = useState<Set<string>>(new Set());
+  const [activeSidePanel, setActiveSidePanel] = useState<'none' | 'properties' | 'settings'>('properties');
+  const [panelWidth, setPanelWidth] = useState(480);
+  const [isResizingPanel, setIsResizingPanel] = useState(false);
   
   // Selection State
   const [selectedStageId, setSelectedStageId] = useState<string>('');
@@ -61,85 +58,37 @@ const App: React.FC = () => {
   // Demo State
   const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // --- Handlers ---
-
-  const handleStart = async (useDemo = false) => {
-    if (useDemo) {
-        setIsDemoMode(true);
-        setStartPrompt('');
-        setProcessDef(null); 
-        setViewMode('onboarding');
-        return;
-    }
-
-    if (!startPrompt.trim()) {
-        // Default blank start
-        const defaultProcess: ProcessDefinition = {
-            id: `proc_${Date.now()}`,
-            name: "New Process",
-            description: "Started from scratch",
-            stages: [
-                {
-                    id: 'stg_1',
-                    title: 'Stage 1',
-                    sections: [{ id: 'sec_1', title: 'Section 1', layout: '1col', elements: [] }]
-                }
-            ]
-        };
-        setProcessDef(defaultProcess);
-        setSelectedStageId(defaultProcess.stages[0].id);
-        setViewMode('editor');
-        return;
-    }
-    
-    setIsGenerating(true);
-    const result = await generateProcessStructure(startPrompt);
-    if (result) {
-        setProcessDef(result);
-        setSelectedStageId(result.stages[0]?.id || '');
-        setViewMode('editor');
-    }
-    setIsGenerating(false);
+  // --- Helpers for Demo ---
+  const handleStartDemo = (useDemo = false) => {
+      setIsDemoMode(true);
+      setStartPrompt('');
+      setProcessDef(null); 
+      setViewMode('onboarding');
   };
 
-  const handleLegacyFormUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  // --- AI Logic Hook ---
+  const {
+      isGenerating,
+      setIsGenerating,
+      showDemoDrop,
+      setShowDemoDrop,
+      handleStartGeneration,
+      handleLegacyFormUpload,
+      handleAiModification
+  } = useAiOperations({
+      processDef,
+      setProcessDef,
+      setViewMode,
+      setStartPrompt,
+      setSelectedStageId,
+      setLoadingStageIds,
+      handleStartDemo
+  });
 
-      setShowDemoDrop(true);
-      setIsGenerating(true);
+  const handleStart = () => handleStartGeneration(startPrompt);
 
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-          const base64 = reader.result as string;
-          const data = base64.split(',')[1];
-          const result = await generateProcessFromImage(data, file.type);
-          
-          if (result) {
-              setProcessDef(result);
-              setSelectedStageId(result.stages[0]?.id || '');
-              setViewMode('editor');
-          } else {
-             setProcessDef(demoDigitizedProcess);
-             setSelectedStageId(demoDigitizedProcess.stages[0].id);
-             setViewMode('editor');
-          }
-          setShowDemoDrop(false);
-          setIsGenerating(false);
-      };
-      reader.readAsDataURL(file);
-  };
-
-  const handleAiModification = async () => {
-      if (!processDef || !aiPrompt) return;
-      setIsGenerating(true);
-      const context = { selectedStageId, selectedSectionId };
-      const updated = await modifyProcess(processDef, aiPrompt, context);
-      if (updated) {
-          setProcessDef(updated);
-          setAiPrompt('');
-      }
-      setIsGenerating(false);
+  const onAiModification = () => {
+      handleAiModification(aiPrompt, { selectedStageId, selectedSectionId }, () => setAiPrompt(''));
   };
 
   // Helper to resolve selection objects
@@ -169,7 +118,7 @@ const App: React.FC = () => {
             <Onboarding 
                 startPrompt={startPrompt}
                 setStartPrompt={setStartPrompt}
-                handleStart={handleStart}
+                handleStart={(demo) => demo ? handleStartDemo(true) : handleStart()}
                 handleLegacyFormUpload={handleLegacyFormUpload}
                 showDemoDrop={showDemoDrop}
             />
@@ -183,21 +132,26 @@ const App: React.FC = () => {
                     setShowDemoDrop={setShowDemoDrop}
                     setFormData={setFormData}
                     setUserStories={setUserStories}
+                    setTestCases={setTestCases}
                     setPersonaPrompt={setPersonaPrompt}
                     setAiPrompt={setAiPrompt}
                     setSelectedStageId={setSelectedStageId}
                     setSelectedSectionId={setSelectedSectionId}
                     setSelectedElementId={setSelectedElementId}
-                    setIsSettingsOpen={setIsSettingsOpen}
+                    setActiveSidePanel={() => {}} 
                     setActivePropTab={setActivePropTab}
                     onStop={() => { setIsDemoMode(false); setViewMode('onboarding'); setProcessDef(null); }}
                     processDef={processDef}
+                    setVisualTheme={setVisualTheme}
+                    setQaTab={setQaTab}
+                    setPegaTab={setPegaTab}
                 />
             )}
           </>
       );
   }
 
+  // Only show global loading if we have NO process definition yet
   if (isGenerating && !processDef) return <LoadingOverlay />;
   if (!processDef) return null;
 
@@ -208,20 +162,13 @@ const App: React.FC = () => {
             setProcessDef={setProcessDef}
             viewMode={viewMode} 
             setViewMode={setViewMode} 
-            isSettingsOpen={isSettingsOpen} 
-            setIsSettingsOpen={setIsSettingsOpen}
+            isSettingsOpen={activeSidePanel === 'settings'} 
+            setIsSettingsOpen={(val) => setActiveSidePanel(val ? 'settings' : 'properties')}
             visualTheme={visualTheme}
         />
 
         <div className="flex-1 flex overflow-hidden relative">
             <main className="flex-1 overflow-hidden relative flex flex-col">
-                {isGenerating && (
-                    <div className="absolute top-0 left-0 right-0 z-50">
-                        <div className="h-1 w-full bg-sw-lightGray overflow-hidden">
-                             <div className="h-full bg-sw-teal w-1/3 animate-loading-bar"></div>
-                        </div>
-                    </div>
-                )}
                 
                 {viewMode === 'editor' && (
                     <div className="flex-1 flex overflow-hidden">
@@ -233,13 +180,17 @@ const App: React.FC = () => {
                             selectedSectionId={selectedSectionId}
                             setSelectedSectionId={setSelectedSectionId}
                             selectedElementId={selectedElementId}
-                            setSelectedElementId={setSelectedElementId}
+                            setSelectedElementId={(id) => {
+                                setSelectedElementId(id);
+                                if (id) setActiveSidePanel('properties');
+                            }}
                             aiPrompt={aiPrompt}
                             setAiPrompt={setAiPrompt}
-                            handleAiModification={handleAiModification}
+                            handleAiModification={onAiModification}
                             isGenerating={isGenerating}
                             visualTheme={visualTheme}
-                            isSettingsOpen={isSettingsOpen}
+                            isSettingsOpen={activeSidePanel !== 'none'}
+                            loadingStageIds={loadingStageIds} 
                         />
                     </div>
                 )}
@@ -282,46 +233,58 @@ const App: React.FC = () => {
             </main>
 
             {viewMode === 'editor' && (
-                <div className={`fixed right-0 top-16 bottom-0 z-40 transition-transform duration-300 ease-in-out ${isSettingsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                    <PropertiesPanel 
-                        selectedElement={selectedElement}
-                        selectedSection={selectedSection}
-                        selectedStage={selectedStage}
-                        allElements={processDef.stages.flatMap(s=>s.sections).flatMap(sec=>sec.elements)}
-                        activeTab={activePropTab}
-                        onTabChange={setActivePropTab}
-                        onUpdateElement={updateElement}
-                        onUpdateSection={updateSection}
-                        onUpdateStage={updateStage}
-                        onDeleteElement={deleteElement}
-                        onDeleteSection={deleteSection}
-                        onDeleteStage={(id) => {
-                            if (!processDef) return;
-                            if (processDef.stages.length <= 1) {
-                                alert("Cannot delete the only stage in the process.");
-                                return;
-                            }
-                            deleteStage(id);
-                            // Update selection if needed
-                            if (selectedStageId === id) {
-                                const remaining = processDef.stages.filter(s => s.id !== id);
-                                if (remaining.length > 0) {
-                                    setSelectedStageId(remaining[0].id);
-                                    setSelectedSectionId(remaining[0].sections[0]?.id || null);
-                                } else {
-                                    setSelectedStageId('');
-                                    setSelectedSectionId(null);
+                <div className={`fixed right-0 top-16 bottom-0 z-40 transition-transform duration-300 ease-in-out ${activeSidePanel !== 'none' ? 'translate-x-0' : 'translate-x-full'}`}>
+                    {activeSidePanel === 'properties' && (
+                        <PropertiesPanel 
+                            selectedElement={selectedElement}
+                            selectedSection={selectedSection}
+                            selectedStage={selectedStage}
+                            allElements={processDef.stages.flatMap(s=>s.sections).flatMap(sec=>sec.elements)}
+                            activeTab={activePropTab}
+                            onTabChange={setActivePropTab}
+                            onUpdateElement={updateElement}
+                            onUpdateSection={updateSection}
+                            onUpdateStage={updateStage}
+                            onDeleteElement={deleteElement}
+                            onDeleteSection={deleteSection}
+                            onDeleteStage={(id) => {
+                                if (!processDef) return;
+                                if (processDef.stages.length <= 1) {
+                                    alert("Cannot delete the only stage in the process.");
+                                    return;
                                 }
-                                setSelectedElementId(null);
-                            }
-                        }}
-                        visualTheme={visualTheme}
-                        onUpdateTheme={setVisualTheme}
-                        onClose={() => setIsSettingsOpen(false)}
-                    />
+                                deleteStage(id);
+                                if (selectedStageId === id) {
+                                    const remaining = processDef.stages.filter(s => s.id !== id);
+                                    if (remaining.length > 0) {
+                                        setSelectedStageId(remaining[0].id);
+                                        setSelectedSectionId(remaining[0].sections[0]?.id || null);
+                                    } else {
+                                        setSelectedStageId('');
+                                        setSelectedSectionId(null);
+                                    }
+                                    setSelectedElementId(null);
+                                }
+                            }}
+                            visualTheme={visualTheme}
+                            onOpenSettings={() => setActiveSidePanel('settings')}
+                            onClose={() => setActiveSidePanel('none')}
+                        />
+                    )}
+                    {activeSidePanel === 'settings' && (
+                        <GlobalSettingsPanel 
+                            visualTheme={visualTheme}
+                            onUpdateTheme={setVisualTheme}
+                            onClose={() => setActiveSidePanel('properties')}
+                            panelWidth={panelWidth}
+                            onResizeStart={() => setIsResizingPanel(true)}
+                        />
+                    )}
                 </div>
             )}
         </div>
+
+        <AppFooter />
 
         {isDemoMode && (
             <DemoManager 
@@ -332,15 +295,19 @@ const App: React.FC = () => {
                 setShowDemoDrop={setShowDemoDrop}
                 setFormData={setFormData}
                 setUserStories={setUserStories}
+                setTestCases={setTestCases}
                 setPersonaPrompt={setPersonaPrompt}
                 setAiPrompt={setAiPrompt}
                 setSelectedStageId={setSelectedStageId}
                 setSelectedSectionId={setSelectedSectionId}
                 setSelectedElementId={setSelectedElementId}
-                setIsSettingsOpen={setIsSettingsOpen}
+                setActiveSidePanel={setActiveSidePanel}
                 setActivePropTab={setActivePropTab}
                 onStop={() => { setIsDemoMode(false); setViewMode('onboarding'); setProcessDef(null); }}
                 processDef={processDef}
+                setVisualTheme={setVisualTheme}
+                setQaTab={setQaTab}
+                setPegaTab={setPegaTab}
             />
         )}
         <DemoFocusOverlay area="none" highlightId={null} />

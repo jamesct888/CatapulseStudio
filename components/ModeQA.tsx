@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ProcessDefinition, TestCase, UserStory, StoryStrategy, ChatMessage } from '../types';
 import { BookOpen, ClipboardList, RefreshCw, Sparkles, Split, BrainCircuit, ThumbsUp, ThumbsDown, Send, FileText, Bot, User, LayoutGrid, Network } from 'lucide-react';
@@ -17,6 +18,84 @@ interface ModeQAProps {
     isGenerating: boolean;
     setIsGenerating: (val: boolean) => void;
 }
+
+// Simple Markdown Renderer specifically for GWT stories and Tables
+const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+    const lines = content.split('\n');
+    const elements: React.ReactNode[] = [];
+    let tableBuffer: string[] = [];
+
+    const flushTable = () => {
+        if (tableBuffer.length === 0) return;
+        
+        // Basic Markdown Table Parser
+        const headers = tableBuffer[0].split('|').map(c => c.trim()).filter(c => c);
+        // Row 1 is usually separator |---|---| so we skip it if present, or handle it
+        const dataRows = tableBuffer.slice(2).map(line => 
+            line.split('|').map(c => c.trim()).filter(c => c)
+        );
+
+        elements.push(
+            <div key={`tbl-${elements.length}`} className="my-4 overflow-x-auto border border-gray-200 rounded-lg shadow-sm bg-white">
+                <table className="min-w-full text-xs">
+                    <thead className="bg-gray-100 text-gray-700 font-bold uppercase tracking-wider">
+                        <tr>
+                            {headers.map((h, i) => <th key={i} className="px-4 py-2 border-b border-gray-200 text-left">{h}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {dataRows.map((row, rI) => (
+                            <tr key={rI} className="hover:bg-gray-50/50">
+                                {row.map((cell, cI) => <td key={cI} className="px-4 py-2 text-gray-600 align-top">{cell}</td>)}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+        tableBuffer = [];
+    };
+
+    lines.forEach((line, idx) => {
+        const trimmed = line.trim();
+        // Detect Table Row
+        if (trimmed.startsWith('|')) {
+            tableBuffer.push(trimmed);
+        } else {
+            flushTable();
+            // Detect Headers
+            if (trimmed.startsWith('###')) {
+                 elements.push(<h4 key={idx} className="font-bold text-gray-800 mt-4 mb-2 border-b border-gray-100 pb-1">{trimmed.replace(/#/g,'').trim()}</h4>);
+            } else if (trimmed === '') {
+                 elements.push(<div key={idx} className="h-2"></div>);
+            } else {
+                // Parse Bold **text**
+                const parts = line.split(/(\*\*.*?\*\*)/g);
+                const renderedLine = parts.map((part, pIdx) => {
+                    if (part.startsWith('**') && part.endsWith('**')) {
+                        return <strong key={pIdx} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>;
+                    }
+                    return part;
+                });
+                
+                // Check if it's a list item
+                if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+                     elements.push(
+                        <div key={idx} className="flex gap-2 ml-4">
+                            <span className="text-sw-teal">•</span>
+                            <span>{renderedLine.slice(1)}</span> {/* Hacky way to remove the asterisk char from array, better to substring */}
+                        </div>
+                     );
+                } else {
+                    elements.push(<div key={idx} className="min-h-[1.4em]">{renderedLine}</div>);
+                }
+            }
+        }
+    });
+    flushTable();
+
+    return <div className="text-sm font-sans text-gray-600 leading-relaxed space-y-1">{elements}</div>;
+};
 
 export const ModeQA: React.FC<ModeQAProps> = ({ 
     processDef, qaTab, setQaTab, 
@@ -40,17 +119,37 @@ export const ModeQA: React.FC<ModeQAProps> = ({
 
     const handleGenerateStories = async () => {
         setIsGenerating(true);
-        const stories = await generateUserStories(processDef, storyStrategy);
-        setUserStories(stories);
-        setIsGenerating(false);
-        setShowAdvisor(false);
+        try {
+            const stories = await generateUserStories(processDef, storyStrategy);
+            if (stories && stories.length > 0) {
+                setUserStories(stories);
+                setShowAdvisor(false);
+            } else {
+                alert("No stories generated. Please try a different strategy.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error generating user stories.");
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const handleGenerateTests = async () => {
         setIsGenerating(true);
-        const cases = await generateTestCases(processDef);
-        setTestCases(cases);
-        setIsGenerating(false);
+        try {
+            const cases = await generateTestCases(processDef);
+            if (cases && cases.length > 0) {
+                setTestCases(cases);
+            } else {
+                alert("No test cases generated.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error generating test cases.");
+        } finally {
+            setIsGenerating(false);
+        }
     }
 
     const handleInitialAdvisor = async () => {
@@ -60,13 +159,18 @@ export const ModeQA: React.FC<ModeQAProps> = ({
         }
         setShowAdvisor(true);
         setIsThinking(true);
-        const initialPrompt = "Review this process and suggest 3 effective user story splitting strategies. Include specific pros and cons based on the data fields and logic used.";
-        const response = await consultStrategyAdvisor(processDef, [], initialPrompt);
-        
-        setChatHistory([
-            { id: '1', role: 'model', text: response.reply, recommendations: response.recommendations }
-        ]);
-        setIsThinking(false);
+        try {
+            const initialPrompt = "Review this process and suggest 3 effective user story splitting strategies. Include specific pros and cons based on the data fields and logic used.";
+            const response = await consultStrategyAdvisor(processDef, [], initialPrompt);
+            
+            setChatHistory([
+                { id: '1', role: 'model', text: response.reply, recommendations: response.recommendations }
+            ]);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsThinking(false);
+        }
     };
 
     const handleSendMessage = async () => {
@@ -76,29 +180,36 @@ export const ModeQA: React.FC<ModeQAProps> = ({
         setInputMessage("");
         setIsThinking(true);
 
-        const response = await consultStrategyAdvisor(processDef, [...chatHistory, newUserMsg], inputMessage);
-        
-        setChatHistory(prev => [...prev, {
-            id: (Date.now() + 1).toString(),
-            role: 'model',
-            text: response.reply,
-            recommendations: response.recommendations
-        }]);
-        setIsThinking(false);
+        try {
+            const response = await consultStrategyAdvisor(processDef, [...chatHistory, newUserMsg], inputMessage);
+            
+            setChatHistory(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'model',
+                text: response.reply,
+                recommendations: response.recommendations
+            }]);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsThinking(false);
+        }
     };
 
     return (
-        <div className="max-w-6xl mx-auto py-12 px-8">
+        <div className="w-full px-8 py-12">
             <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-serif text-sw-teal">Quality Assurance</h2>
+                <h2 className="text-3xl font-serif text-sw-teal">Stories & Test Cases</h2>
                 <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
                     <button 
+                        id="tab-qa-stories"
                         onClick={() => setQaTab('stories')}
                         className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${qaTab === 'stories' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
                         <BookOpen size={16} /> User Stories
                     </button>
                     <button 
+                        id="tab-qa-cases"
                         onClick={() => setQaTab('cases')}
                         className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${qaTab === 'cases' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
@@ -270,25 +381,24 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                     {storyViewMode === 'map' && userStories.length > 0 ? (
                         <StoryDependencyGraph stories={userStories} />
                     ) : (
-                        <div className="grid grid-cols-1 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {userStories.map(story => (
-                                <div key={story.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div key={story.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full">
                                     <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                                         <div className="flex items-center gap-3">
                                             <span className="bg-sw-teal text-white text-xs font-mono px-2 py-1 rounded">{story.id}</span>
-                                            <h3 className="font-bold text-gray-800">{story.title}</h3>
+                                            <h3 className="font-bold text-gray-800 text-sm truncate max-w-[200px]" title={story.title}>{story.title}</h3>
                                         </div>
-                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Ready for Dev</span>
                                     </div>
-                                    <div className="p-6 space-y-6">
+                                    <div className="p-6 space-y-4 flex-1 flex flex-col">
                                         <div>
                                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Narrative</h4>
-                                            <p className="text-gray-700 italic border-l-4 border-sw-teal pl-4 py-1">{story.narrative}</p>
+                                            <p className="text-gray-700 italic text-sm border-l-4 border-sw-teal pl-4 py-1">{story.narrative}</p>
                                         </div>
                                         {story.dependencies && story.dependencies.length > 0 && (
                                             <div>
                                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dependencies</h4>
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-wrap gap-2">
                                                     {story.dependencies.map(dep => (
                                                         <span key={dep} className="text-[10px] bg-sw-purpleLight text-sw-teal px-2 py-1 rounded font-mono font-bold">
                                                             Blocks {dep}
@@ -297,17 +407,17 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                                 </div>
                                             </div>
                                         )}
-                                        <div>
+                                        <div className="flex-1">
                                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Acceptance Criteria</h4>
-                                            <div className="prose prose-sm max-w-none text-gray-700 font-mono text-xs bg-gray-50 p-4 rounded-lg">
-                                                <pre className="whitespace-pre-wrap font-sans">{story.acceptanceCriteria}</pre>
+                                            <div className="bg-gray-50 p-4 rounded-lg h-48 overflow-y-auto border border-gray-100">
+                                                <MarkdownRenderer content={story.acceptanceCriteria} />
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             ))}
                             {userStories.length === 0 && !isGenerating && (
-                                <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                                <div className="col-span-full text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
                                     No stories generated yet. Select a strategy or ask the Advisor for help.
                                 </div>
                             )}

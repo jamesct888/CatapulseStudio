@@ -17,13 +17,15 @@ export const OperationsHUD: React.FC<OperationsHUDProps> = ({ requiredSkill, rea
       setShow(true);
       const timer = setTimeout(() => setShow(false), 6000); // Auto hide after 6s
       return () => clearTimeout(timer);
+    } else {
+      setShow(false);
     }
   }, [isVisible, requiredSkill]); // Re-trigger if skill changes
 
   if (!show) return null;
 
   return (
-    <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-[60] animate-in slide-in-from-top-4 fade-in duration-300">
+    <div key={requiredSkill} className="fixed top-24 left-1/2 transform -translate-x-1/2 z-[60] animate-in slide-in-from-top-4 fade-in duration-300">
       <div className="bg-sw-teal text-white rounded-xl shadow-2xl p-4 max-w-md border border-sw-teal/50 flex flex-col gap-2 relative">
         <button 
             onClick={() => { setShow(false); onDismiss(); }}

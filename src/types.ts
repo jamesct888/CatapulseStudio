@@ -1,17 +1,18 @@
 
-
 export type ElementType = 
   | 'text' 
   | 'email'
   | 'textarea' 
   | 'number' 
   | 'date' 
+  | 'datetime' 
   | 'currency' 
   | 'select' 
+  | 'multiselect'
   | 'radio' 
   | 'checkbox' 
   | 'static'
-  | 'repeater'; // Added repeater type
+  | 'repeater'; 
 
 export type Operator = 'equals' | 'notEquals' | 'contains' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 
@@ -23,7 +24,7 @@ export interface ValidationRule {
 }
 
 export interface Condition {
-  id?: string; // unique id for UI handling
+  id?: string; 
   targetElementId: string;
   operator: Operator;
   value: string | number | boolean;
@@ -35,12 +36,11 @@ export interface LogicGroup {
   id: string;
   operator: LogicOperator;
   conditions: Condition[];
-  groups?: LogicGroup[]; // Recursive grouping for complex logic
+  groups?: LogicGroup[]; 
 }
 
-// Operational Logic for Stages
 export interface SkillRule {
-  logic: LogicGroup; // Replaced simple condition with full logic group
+  logic: LogicGroup; 
   requiredSkill: string;
 }
 
@@ -48,39 +48,41 @@ export interface RepeaterColumn {
   id: string;
   label: string;
   type: 'text' | 'date' | 'number' | 'select' | 'checkbox';
-  options?: string[]; // For select types within the repeater
+  options?: string[]; 
 }
 
 export interface DataMapping {
-    dataObject: string; // The class name, e.g., "Data-Address" or "MyOrg-Data-Policy"
-    property: string;   // The property name, e.g., ".Postcode"
+    dataObject: string; 
+    property: string;   
+}
+
+export interface SelectOption {
+    label: string;
+    value: string;
 }
 
 export interface ElementDefinition {
   id: string;
   label: string;
   type: ElementType;
-  options?: string[]; 
+  // Strict typing for options to prevent [object Object] errors
+  options?: (string | SelectOption)[]; 
   defaultValue?: string;
   description?: string; 
   
-  // Repeater Configuration
   columns?: RepeaterColumn[];
 
   staticDataSource?: 'manual' | 'field';
   sourceFieldId?: string;
 
-  // Logic
   hidden?: boolean; 
-  visibility?: LogicGroup; // New structure (Root group)
+  visibility?: LogicGroup; 
   
   required?: boolean; 
-  requiredLogic?: LogicGroup; // New structure
+  requiredLogic?: LogicGroup; 
 
-  // Validation
   validation?: ValidationRule;
 
-  // Data Model
   dataMapping?: DataMapping;
 }
 
@@ -89,10 +91,9 @@ export interface SectionDefinition {
   title: string;
   description?: string;
   layout?: '1col' | '2col' | '3col';
-  variant?: 'standard' | 'summary'; 
+  variant?: 'standard' | 'summary' | 'warning' | 'info'; 
   elements: ElementDefinition[];
   
-  // Logic
   hidden?: boolean;
   visibility?: LogicGroup;
 }
@@ -100,9 +101,9 @@ export interface SectionDefinition {
 export interface StageDefinition {
   id: string;
   title: string;
+  description?: string;
   sections: SectionDefinition[];
   
-  // Operational Context
   defaultSkill?: string; 
   skillLogic?: SkillRule[]; 
 }

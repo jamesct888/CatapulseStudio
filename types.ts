@@ -1,13 +1,13 @@
-
-
 export type ElementType = 
   | 'text' 
   | 'email'
   | 'textarea' 
   | 'number' 
   | 'date' 
+  | 'datetime' 
   | 'currency' 
   | 'select' 
+  | 'multiselect'
   | 'radio' 
   | 'checkbox' 
   | 'static'
@@ -89,7 +89,7 @@ export interface SectionDefinition {
   title: string;
   description?: string;
   layout?: '1col' | '2col' | '3col';
-  variant?: 'standard' | 'summary'; 
+  variant?: 'standard' | 'summary' | 'warning' | 'info'; 
   elements: ElementDefinition[];
   
   // Logic
@@ -100,6 +100,7 @@ export interface SectionDefinition {
 export interface StageDefinition {
   id: string;
   title: string;
+  description?: string;
   sections: SectionDefinition[];
   
   // Operational Context

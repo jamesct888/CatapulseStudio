@@ -1,11 +1,10 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { ProcessDefinition, FormState, VisualTheme } from '../types';
 import { isElementVisible, isElementRequired, isSectionVisible, validateValue, evaluateLogicGroup } from '../utils/logic';
 import { RenderElement } from './FormElements';
 import { generateFormData } from '../services/geminiService';
-import { User, Sparkles, PanelBottom, ArrowRight } from 'lucide-react';
+import { User, Sparkles, PanelBottom, ArrowRight, AlertTriangle, Info, Shield } from 'lucide-react';
 import { OperationsHUD } from './OperationsHUD';
 
 interface ModePreviewProps {
@@ -23,6 +22,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   const [isGenerating, setIsGenerating] = useState(false);
   
   // HUD State
+  const [isHudEnabled, setIsHudEnabled] = useState(true);
   const [hudVisible, setHudVisible] = useState(false);
   const [activeSkill, setActiveSkill] = useState<string>('');
   const [skillReason, setSkillReason] = useState<string>('');
@@ -33,7 +33,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   const isType2 = visualTheme.mode === 'type2';
   const isType3 = visualTheme.mode === 'type3';
 
-  // Evaluate Skills on Stage Change
+  // 1. Calculate Active Skill (Runs on Data or Stage Change)
   useEffect(() => {
       if (!currentStage) return;
       
@@ -50,20 +50,33 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
           }
       }
 
-      if (foundSkill) {
-          setActiveSkill(foundSkill);
-          setSkillReason(foundReason);
+      // Default state if no match found
+      if (!foundSkill) {
+          foundSkill = "No routing defined";
+          foundReason = "Standard processing";
+      }
+
+      setActiveSkill(foundSkill);
+      setSkillReason(foundReason);
+  }, [currentStage, formData, processDef]);
+
+  // 2. Trigger HUD Visibility (Runs ONLY on Stage Change or Toggle)
+  useEffect(() => {
+      if (isHudEnabled) {
           setHudVisible(true);
       } else {
           setHudVisible(false);
       }
-  }, [currentStageIdx, currentStage, formData, processDef]);
+  }, [currentStageIdx, isHudEnabled]);
 
   const handleNext = () => {
     const errors: {[key: string]: string} = {};
     let isValid = true;
     
     visibleSections.forEach(sec => {
+        // Skip validation for read-only sections
+        if (sec.variant === 'warning' || sec.variant === 'info' || sec.variant === 'summary') return;
+
         sec.elements.forEach(el => {
             if (isElementVisible(el, formData)) {
                 if (isElementRequired(el, formData) && (formData[el.id] === undefined || formData[el.id] === '')) {
@@ -104,8 +117,6 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   }
 
   // --- Theme Classes ---
-  // Type 2: Red/Pink/White
-  // Type 3: Green (#006a4d)/Gray(#f1f1f1)/White
   
   const containerBg = isType2 
     ? 'bg-white border-[#e0e0e0]' 
@@ -135,7 +146,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   const headerTextColor = isType2 
     ? 'text-[#0b3239]' 
     : isType3
-        ? 'text-[#006a4d]'
+        ? 'text-[#006a4d]' 
         : 'text-sw-teal';
         
   const primaryButtonClass = isType2
@@ -152,8 +163,9 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
 
   return (
     <div className={`h-full overflow-y-auto ${pageBg}`}>
-    <div className="max-w-4xl mx-auto py-12 px-6 relative">
+    <div className="w-[80%] max-w-[2400px] mx-auto py-12 px-6 relative">
         <OperationsHUD 
+            key={`${currentStageIdx}-${isHudEnabled}`} // Only re-animate on stage change or toggle, not data change
             isVisible={hudVisible} 
             requiredSkill={activeSkill} 
             reason={skillReason}
@@ -171,7 +183,17 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
             </div>
             
             <div className={`flex gap-2 items-center p-2 rounded-xl border shadow-sm ${isType2 ? 'bg-white border-white' : 'bg-white border-gray-200'}`}>
-                <User size={16} className={'text-gray-400 ml-2'} />
+                {/* HUD Toggle */}
+                <button 
+                    onClick={() => setIsHudEnabled(!isHudEnabled)}
+                    className={`p-2 rounded-lg transition-all flex items-center justify-center ${isHudEnabled ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}`}
+                    title={isHudEnabled ? "Operations HUD: ON" : "Operations HUD: OFF"}
+                >
+                    <Shield size={16} />
+                </button>
+                <div className="w-px h-6 bg-gray-200 mx-1"></div>
+                
+                <User size={16} className={'text-gray-400 ml-1'} />
                 <input 
                     type="text" 
                     value={personaPrompt}
@@ -195,32 +217,84 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
             </div>
             
             <div className="p-8 space-y-8">
-                {visibleSections.map(section => (
-                    <div key={section.id}>
-                        <h4 className={`font-bold pb-2 mb-6 uppercase text-sm tracking-wide ${sectionTitleColor}`}>{section.title}</h4>
-                        <div className={`grid gap-x-8 gap-y-2 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                            {section.elements.filter(el => isElementVisible(el, formData)).map(el => (
-                                <RenderElement
-                                    key={el.id}
-                                    element={{...el, required: isElementRequired(el, formData)}} 
-                                    value={formData[el.id]}
-                                    onChange={(val) => {
-                                        setFormData(prev => ({...prev, [el.id]: val}));
-                                        if (formErrors[el.id]) {
-                                            setFormErrors(prev => { const n = {...prev}; delete n[el.id]; return n; });
+                {visibleSections.map(section => {
+                    // Filter out 'Summary' sections from main flow - they belong in footer
+                    if (section.variant === 'summary') return null;
+
+                    // Check if this is a 'Warning' or 'Info' section
+                    const isWarning = section.variant === 'warning';
+                    const isInfo = section.variant === 'info';
+                    const isSpecial = isWarning || isInfo;
+
+                    if (isSpecial) {
+                        return (
+                            <div key={section.id} className={`p-4 rounded-xl border ${
+                                isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+                            }`}>
+                                <div className="flex items-center gap-2 mb-3">
+                                    {isWarning ? <AlertTriangle size={18} className="text-amber-600"/> : <Info size={18} className="text-blue-600"/>}
+                                    <h4 className={`font-bold uppercase text-sm tracking-wide ${isWarning ? 'text-amber-700' : 'text-blue-700'}`}>{section.title}</h4>
+                                </div>
+                                <div className={`grid gap-x-8 gap-y-2 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                                    {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
+                                        // Handle Reflection Logic
+                                        let elementValue = formData[el.id];
+                                        if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                                            elementValue = formData[el.sourceFieldId];
                                         }
-                                    }}
-                                    onBlur={() => {
-                                        const msg = validateValue(el, formData[el.id]);
-                                        if (msg) setFormErrors(prev => ({...prev, [el.id]: msg}));
-                                    }}
-                                    error={formErrors[el.id]}
-                                    theme={visualTheme}
-                                />
-                            ))}
+                                        
+                                        return (
+                                            <RenderElement
+                                                key={el.id}
+                                                element={{...el, required: false}} // Force non-required as it's read-only
+                                                value={elementValue}
+                                                onChange={()=>{}} // Read only
+                                                disabled={true}
+                                                theme={{...visualTheme, density: 'compact'}}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    // Standard Rendering
+                    return (
+                        <div key={section.id}>
+                            <h4 className={`font-bold pb-2 mb-6 uppercase text-sm tracking-wide ${sectionTitleColor}`}>{section.title}</h4>
+                            <div className={`grid gap-x-8 gap-y-2 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                                {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
+                                    // Logic for handling "Reflection" fields
+                                    let elementValue = formData[el.id];
+                                    if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                                        elementValue = formData[el.sourceFieldId];
+                                    }
+
+                                    return (
+                                        <RenderElement
+                                            key={el.id}
+                                            element={{...el, required: isElementRequired(el, formData)}} 
+                                            value={elementValue}
+                                            onChange={(val) => {
+                                                setFormData(prev => ({...prev, [el.id]: val}));
+                                                if (formErrors[el.id]) {
+                                                    setFormErrors(prev => { const n = {...prev}; delete n[el.id]; return n; });
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                const msg = validateValue(el, formData[el.id]);
+                                                if (msg) setFormErrors(prev => ({...prev, [el.id]: msg}));
+                                            }}
+                                            error={formErrors[el.id]}
+                                            theme={visualTheme}
+                                        />
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             <div className={`p-6 border-t flex justify-between items-center ${isType2 ? 'bg-gray-50 border-gray-100' : 'bg-gray-50 border-gray-100'}`}>
@@ -242,15 +316,27 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
         </div>
         
         <div className="mt-8 space-y-4">
-             {processDef.stages.flatMap(s => s.sections).filter(s => s.variant === 'summary' && isSectionVisible(s, formData)).map(summarySec => (
+             {/* FOOTER: Only show Summary sections from current or previous stages to create a "running receipt" */}
+             {processDef.stages
+                .filter((_, idx) => idx <= currentStageIdx)
+                .flatMap(s => s.sections)
+                .filter(s => s.variant === 'summary' && isSectionVisible(s, formData))
+                .map(summarySec => (
                  <div key={summarySec.id} className={`${isType2 ? 'bg-white border-[#ffe2e8]' : isType3 ? 'bg-white border-gray-200' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6`}>
                      <h4 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}`}>
                         <PanelBottom size={14} /> {summarySec.title}
                      </h4>
                      <div className={`grid gap-4 ${summarySec.layout === '2col' ? 'grid-cols-2' : summarySec.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                        {summarySec.elements.filter(el => isElementVisible(el, formData)).map(el => (
-                            <RenderElement key={el.id} element={el} value={formData[el.id]} onChange={()=>{}} disabled theme={{...visualTheme, density: 'compact', radius: 'small'}} />
-                        ))}
+                        {summarySec.elements.filter(el => isElementVisible(el, formData)).map(el => {
+                            // Ensure data is pulled for reflection fields in summary
+                            let elementValue = formData[el.id];
+                            if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                                elementValue = formData[el.sourceFieldId];
+                            }
+                            return (
+                                <RenderElement key={el.id} element={el} value={elementValue} onChange={()=>{}} disabled theme={{...visualTheme, density: 'compact', radius: 'small'}} />
+                            );
+                        })}
                      </div>
                  </div>
              ))}

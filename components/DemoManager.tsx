@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { DemoFocusOverlay } from './DemoFocusOverlay';
 import { 
-  ProcessDefinition, SectionDefinition, ElementDefinition 
+  ProcessDefinition, SectionDefinition, ElementDefinition, VisualTheme 
 } from '../types';
 import { 
-  demoProcess, demoDigitizedProcess, demoFormData, demoUserStories 
+  demoProcess, demoDigitizedProcess, demoFormData, demoUserStories, demoTestCases
 } from '../services/demoData';
 
 interface DemoManagerProps {
@@ -17,22 +17,28 @@ interface DemoManagerProps {
   setShowDemoDrop: (val: boolean) => void;
   setFormData: (val: any) => void;
   setUserStories: (val: any) => void;
+  setTestCases: (val: any) => void;
   setPersonaPrompt: (val: string) => void;
   setAiPrompt: (val: string) => void;
   setSelectedStageId: (val: string) => void;
   setSelectedSectionId: (val: string | null) => void;
   setSelectedElementId: (val: string | null) => void;
-  setIsSettingsOpen: (val: boolean) => void;
+  setActiveSidePanel: (val: 'none' | 'properties' | 'settings') => void;
   setActivePropTab: (val: 'general' | 'logic') => void;
   onStop: () => void;
   processDef: ProcessDefinition | null;
+  // New Setters
+  setVisualTheme: (theme: VisualTheme) => void;
+  setQaTab: (tab: 'stories' | 'cases') => void;
+  setPegaTab: (tab: 'blueprint' | 'manual' | 'data' | 'logic') => void;
 }
 
 export const DemoManager: React.FC<DemoManagerProps> = ({
   setProcessDef, setViewMode, setIsGenerating, setStartPrompt, setShowDemoDrop,
-  setFormData, setUserStories, setPersonaPrompt, setAiPrompt,
+  setFormData, setUserStories, setTestCases, setPersonaPrompt, setAiPrompt,
   setSelectedStageId, setSelectedSectionId, setSelectedElementId,
-  setIsSettingsOpen, setActivePropTab, onStop, processDef
+  setActiveSidePanel, setActivePropTab, onStop, processDef,
+  setVisualTheme, setQaTab, setPegaTab
 }) => {
   const [isPaused, setIsPaused] = useState(false);
   const [step, setStep] = useState(0);
@@ -135,22 +141,42 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
             setHighlightId("btn-settings");
             setZoomArea('none'); 
             timeoutId = setTimeout(() => {
-                setIsSettingsOpen(true);
+                setActiveSidePanel('settings');
                 setHighlightId(null);
                 setStep(7);
             }, 4000);
         }
         else if (step === 7) {
-            setMessage("We can tighten the screen density for power users or increase spacing for accessibility.");
-            timeoutId = setTimeout(() => setStep(8), 4000);
+            setMessage("We can instantly rebrand the application. Switching to 'Type 2' Theme...");
+            setHighlightId("btn-theme-type2");
+            timeoutId = setTimeout(() => {
+                setVisualTheme({ mode: 'type2', density: 'default', radius: 'medium' });
+                setStep(8);
+            }, 3000);
         }
         else if (step === 8) {
-            setMessage("These settings apply globally to the entire prototype.");
-            setIsSettingsOpen(false);
-            setZoomArea('canvas');
-            timeoutId = setTimeout(() => setStep(9), 4000);
+            setMessage("And revert back to the standard 'Type 1'.");
+            setHighlightId("btn-theme-type1");
+            timeoutId = setTimeout(() => {
+                setVisualTheme({ mode: 'type1', density: 'default', radius: 'medium' });
+                setStep(9);
+            }, 3000);
         }
         else if (step === 9) {
+            setMessage("We can tighten the screen density for power users or increase spacing.");
+            setHighlightId("btn-density-compact");
+            timeoutId = setTimeout(() => {
+                setVisualTheme({ mode: 'type1', density: 'compact', radius: 'medium' });
+                setStep(10);
+            }, 3000);
+        }
+        else if (step === 10) {
+            setMessage("These settings apply globally. Let's return to the editor.");
+            setActiveSidePanel('properties');
+            setZoomArea('canvas');
+            timeoutId = setTimeout(() => setStep(11), 4000);
+        }
+        else if (step === 11) {
             setMessage("To extend the form, simply click a component from the toolbox.");
             setHighlightId('toolbox');
             setOverlayPosition('top'); 
@@ -170,19 +196,18 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
                 }
                  setHighlightId(null);
                  setOverlayPosition('bottom');
-                 setStep(10);
+                 setStep(12);
             }, 4000);
         }
-        else if (step === 10) {
-            setMessage("The new field appears instantly on the canvas.");
+        else if (step === 12) {
+            setMessage("The new field appears instantly. We rename it to 'Transfer Date'...");
             setHighlightId('transferDate_demo');
             setZoomArea('canvas');
-            timeoutId = setTimeout(() => setStep(11), 4000);
+            timeoutId = setTimeout(() => setStep(13), 3000);
         }
-        else if (step === 11) {
-            setMessage("Use the Properties Panel to rename it to 'Transfer Date'.");
-            setIsSettingsOpen(true); 
-            // FIX: Ensure selection is set
+        else if (step === 13) {
+            setMessage("...mark it as mandatory...");
+            setActiveSidePanel('properties'); // Ensure properties panel is visible
             setSelectedSectionId(demoProcess.stages[0].sections[0].id);
             setSelectedElementId('transferDate_demo');
             setZoomArea('panel');
@@ -192,92 +217,80 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
                     const newDef = JSON.parse(JSON.stringify(processDef));
                     const sec = newDef.stages[0].sections[0];
                     const el = sec.elements.find((e: any) => e.id === 'transferDate_demo');
-                    if (el) { el.label = 'Transfer Date'; }
+                    if (el) { el.label = 'Transfer Date'; el.required = true; }
                     setProcessDef(newDef);
                 }
-                setStep(12);
-            }, 4000);
-        }
-        else if (step === 12) {
-            setMessage("We also mark it as mandatory, adding the red asterisk indicator.");
-            setHighlightId('req');
-            if (processDef) {
-                const newDef = JSON.parse(JSON.stringify(processDef));
-                const sec = newDef.stages[0].sections[0];
-                const el = sec.elements.find((e: any) => e.id === 'transferDate_demo');
-                if (el) { el.required = true; }
-                setProcessDef(newDef);
-            }
-            timeoutId = setTimeout(() => {
-                setHighlightId(null);
-                setStep(13);
-            }, 4000);
-        }
-        else if (step === 13) {
-            setMessage("We can apply logic to entire sections. Let's make this whole section conditional.");
-            setSelectedElementId(null);
-            setSelectedSectionId(demoProcess.stages[0].sections[0].id);
-            setZoomArea('panel');
-            timeoutId = setTimeout(() => setStep(14), 4000);
+                setStep(14);
+            }, 3000);
         }
         else if (step === 14) {
-            setMessage("Switch to the 'Logic' tab to configure rules.");
-            setActivePropTab('logic');
-            setHighlightId("tab-logic");
-            timeoutId = setTimeout(() => setStep(15), 4000);
+            setMessage("...and configure specific Data Validation rules.");
+            setHighlightId('card-validation');
+            timeoutId = setTimeout(() => {
+                if (processDef) {
+                    const newDef = JSON.parse(JSON.stringify(processDef));
+                    const sec = newDef.stages[0].sections[0];
+                    const el = sec.elements.find((e: any) => e.id === 'transferDate_demo');
+                    if (el) { el.validation = { type: 'date_future' }; }
+                    setProcessDef(newDef);
+                }
+                setStep(15);
+            }, 3000);
         }
         else if (step === 15) {
-            setMessage("Here you would add rules like 'Only show if Stage 1 is Complete'. Let's move to field logic.");
+            setMessage("Let's look at logic. Select 'Spouse Name'.");
+            setSelectedElementId(null);
             setHighlightId(null);
-            timeoutId = setTimeout(() => setStep(16), 4000);
-        }
-        else if (step === 16) {
-            setMessage("Select 'Spouse Name'. We want this to appear only when 'Married' is selected.");
             setZoomArea('canvas');
             const spouseField = processDef?.stages[0].sections[0].elements.find(e => e.label === 'Spouse Name');
             if(spouseField) {
                 setSelectedElementId(spouseField.id);
                 setHighlightId(spouseField.id);
             }
+            setActiveSidePanel('properties'); // Explicitly force panel open
             setActivePropTab('general');
-            timeoutId = setTimeout(() => setStep(17), 5000);
+            timeoutId = setTimeout(() => setStep(16), 4000);
         }
-        else if (step === 17) {
-            setMessage("Back to the Logic tab for this field.");
+        else if (step === 16) {
+            setMessage("Switch to the 'Logic' tab to see visibility rules.");
             setZoomArea('panel');
+            setActiveSidePanel('properties'); // Ensure panel stays open
             setActivePropTab('logic');
             setHighlightId("tab-logic");
             timeoutId = setTimeout(() => {
                 setHighlightId(null);
-                setStep(18);
+                setStep(17);
             }, 3000);
         }
-        else if (step === 18) {
-            setMessage("We define the rule: IF 'Marital Status' EQUALS 'Married'.");
+        else if (step === 17) {
+            setMessage("We see the rule: Show only if 'Marital Status' EQUALS 'Married'.");
             if (processDef) {
                 const newDef = JSON.parse(JSON.stringify(processDef));
                 const sec = newDef.stages[0].sections[0];
                 const el = sec.elements.find((e: any) => e.label === 'Spouse Name');
                 const ms = sec.elements.find((e: any) => e.label === 'Marital Status');
                 if (el && ms) {
-                    el.visibilityConditions = [{
-                        targetElementId: ms.id,
-                        operator: 'equals',
-                        value: 'Married'
-                    }];
+                    el.visibility = {
+                        id: 'vis_spouse',
+                        operator: 'AND',
+                        conditions: [{
+                            targetElementId: ms.id,
+                            operator: 'equals',
+                            value: 'Married'
+                        }]
+                    };
                 }
                 setProcessDef(newDef);
             }
-             setTimeout(() => setHighlightId('condition-visibilityConditions-0'), 100);
-             timeoutId = setTimeout(() => setStep(19), 5000);
+             timeoutId = setTimeout(() => setStep(18), 5000);
         }
-        else if (step === 19) {
-             setMessage("We can also use the AI Copilot to make larger structural changes instantly.");
+        else if (step === 18) {
+             setMessage("We can also use the AI Copilot to make structural changes instantly.");
              setZoomArea('copilot');
              setHighlightId('sidebar-copilot');
-             timeoutId = setTimeout(() => setStep(20), 4000);
+             timeoutId = setTimeout(() => setStep(19), 4000);
         }
-        else if (step === 20) {
+        else if (step === 19) {
             setMessage("Just describe what you need in natural language.");
             const text = "add another stage named 'post settlement checks' and put in whatever fields you think would be appropriate";
             let i = 0;
@@ -286,16 +299,16 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
                 i++;
                 if (i === text.length) {
                     clearInterval(intervalId);
-                    timeoutId = setTimeout(() => setStep(21), 2000);
+                    timeoutId = setTimeout(() => setStep(20), 2000);
                 }
             }, 40);
         }
-        else if (step === 21) {
+        else if (step === 20) {
             setIsGenerating(true);
             setMessage("The AI interprets the request and generates the new stage and fields.");
-            timeoutId = setTimeout(() => setStep(22), 3000);
+            timeoutId = setTimeout(() => setStep(21), 3000);
         }
-        else if (step === 22) {
+        else if (step === 21) {
              if (processDef) {
                 const newDef = JSON.parse(JSON.stringify(processDef));
                 newDef.stages.push({
@@ -321,20 +334,23 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
              setAiPrompt('');
              setIsGenerating(false);
              setMessage("The new stage is added to the process definition.");
-             timeoutId = setTimeout(() => setStep(23), 4000);
+             timeoutId = setTimeout(() => setStep(22), 4000);
+        }
+        else if (step === 22) {
+            setMessage("Let's visualize the entire process flow.");
+            setZoomArea('none');
+            setHighlightId('nav-flow');
+            timeoutId = setTimeout(() => setStep(23), 2500);
         }
         else if (step === 23) {
-            setMessage("Let's view the generated fields.");
-            setSelectedStageId("stg_post_settlement");
-            setSelectedSectionId("sec_checks");
+            setViewMode('flow');
             setHighlightId(null);
-            setZoomArea('canvas');
+            setMessage("The Flow View visualizes stages, steps, and logic connections automatically.");
             timeoutId = setTimeout(() => setStep(33), 5000);
         }
         
         else if (step === 33) {
-            setMessage("Requirements are now synced. Let's see how we handle legacy assets.");
-            setZoomArea('none');
+            setMessage("Design is complete. Now let's handle legacy assets.");
             setViewMode('onboarding');
             timeoutId = setTimeout(() => setStep(34), 4000);
         }
@@ -373,9 +389,13 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
         }
         else if (step === 39) {
             setMessage("Time to validate the experience with the interactive Preview.");
-            setViewMode('preview');
-            setZoomArea('full');
-            timeoutId = setTimeout(() => setStep(40), 4000);
+            setHighlightId('nav-preview');
+            timeoutId = setTimeout(() => {
+                setViewMode('preview');
+                setHighlightId(null);
+                setZoomArea('full');
+                setStep(40);
+            }, 3000);
         }
         else if (step === 40) {
             setMessage("We use the 'Persona Simulator' to test complex logic paths automatically.");
@@ -393,28 +413,47 @@ export const DemoManager: React.FC<DemoManagerProps> = ({
             timeoutId = setTimeout(() => setStep(42), 6000);
         }
         else if (step === 42) {
-            setMessage("With the prototype validated, we generate the Functional Specification.");
-            setViewMode('spec');
-            timeoutId = setTimeout(() => setStep(43), 5000);
+            setMessage("Prototype validated. Let's switch to the Pega Developer view.");
+            setHighlightId('nav-pega');
+            setZoomArea('none');
+            timeoutId = setTimeout(() => {
+                setViewMode('pega');
+                setHighlightId(null);
+                setStep(43);
+            }, 3000);
         }
         else if (step === 43) {
-            setMessage("The 'Blueprint Accelerator' creates the specific prompt for Pega GenAI.");
-            setViewMode('pega');
-            timeoutId = setTimeout(() => setStep(44), 5000);
+            setMessage("We can generate the Blueprint prompt, or analyze the Data Model.");
+            setHighlightId('tab-pega-data');
+            setPegaTab('blueprint');
+            timeoutId = setTimeout(() => {
+                setPegaTab('data');
+                setStep(44);
+            }, 3000);
         }
         else if (step === 44) {
-            setMessage("And the 'Implementation Guide' gives developers the property definitions and rules.");
-            // setPegaTab('manual');
-            timeoutId = setTimeout(() => setStep(45), 5000);
+            setMessage("The Rule Inventory lists every specific rule needed for implementation.");
+            setHighlightId('tab-pega-logic');
+            timeoutId = setTimeout(() => {
+                setPegaTab('logic');
+                setStep(45);
+            }, 3000);
         }
         else if (step === 45) {
-            setMessage("Finally, we generate User Stories in GWT format with Data Tables for QA.");
+            setMessage("Finally, we generate User Stories and Manual Test Cases for QA.");
+            setHighlightId('nav-qa');
             setViewMode('qa');
             setUserStories(demoUserStories);
-            timeoutId = setTimeout(() => setStep(46), 5000);
+            setTestCases(demoTestCases);
+            timeoutId = setTimeout(() => {
+                setHighlightId('tab-qa-cases');
+                setQaTab('cases');
+                setStep(46);
+            }, 4000);
         }
         else if (step === 46) {
             setMessage("Complete Discovery to Delivery. Demo Finished.");
+            setHighlightId(null);
             timeoutId = setTimeout(() => {
                 onStop();
             }, 8000);

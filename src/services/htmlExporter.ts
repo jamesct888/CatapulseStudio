@@ -1,5 +1,4 @@
 
-
 import { ProcessDefinition, VisualTheme } from '../types';
 
 export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: VisualTheme): string => {
@@ -79,22 +78,35 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             Trash: (props) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
             Plus: (props) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
             Alert: (props) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
-            PanelBottom: (props) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="15" y2="15"/></svg>
+            PanelBottom: (props) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="15" y2="15"/></svg>,
+            Shield: (props) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+            X: (props) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Info: (props) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
+            Warning: (props) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
         };
 
         // --- LOGIC ENGINE ---
         const evaluateCondition = (condition, formData) => {
-            const value = formData[condition.targetElementId];
+            let value = formData[condition.targetElementId];
             const targetValue = condition.value;
             
+            // Normalize boolean
+            if (typeof value === 'boolean') {
+                value = String(value);
+            }
+
+            // Robust comparison
+            const valStr = String(value !== undefined && value !== null ? value : '').trim();
+            const targetStr = String(targetValue !== undefined && targetValue !== null ? targetValue : '').trim();
+
             switch (condition.operator) {
-                case 'equals': return value == targetValue;
-                case 'notEquals': return value != targetValue;
-                case 'contains': return String(value || '').includes(String(targetValue));
+                case 'equals': return valStr == targetStr;
+                case 'notEquals': return valStr != targetStr;
+                case 'contains': return valStr.includes(targetStr);
                 case 'greaterThan': return Number(value) > Number(targetValue);
                 case 'lessThan': return Number(value) < Number(targetValue);
-                case 'isEmpty': return value === undefined || value === '' || value === null;
-                case 'isNotEmpty': return value !== undefined && value !== '' && value !== null;
+                case 'isEmpty': return value === undefined || value === '' || value === null || (Array.isArray(value) && value.length === 0);
+                case 'isNotEmpty': return value !== undefined && value !== '' && value !== null && (!Array.isArray(value) || value.length > 0);
                 default: return false;
             }
         };
@@ -149,6 +161,42 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
 
         // --- COMPONENTS ---
         
+        const OperationsHUD = ({ requiredSkill, reason, isVisible, onDismiss }) => {
+            const [show, setShow] = useState(false);
+
+            useEffect(() => {
+                if (isVisible) {
+                    setShow(true);
+                    const timer = setTimeout(() => setShow(false), 6000);
+                    return () => clearTimeout(timer);
+                } else {
+                    setShow(false);
+                }
+            }, [isVisible, requiredSkill]);
+
+            if (!show) return null;
+
+            return (
+                <div key={requiredSkill} className="fixed top-24 left-1/2 transform -translate-x-1/2 z-[60] animate-[slideIn_0.3s_ease-out]">
+                    <div className="bg-sw-teal text-white rounded-xl shadow-2xl p-4 max-w-md border border-sw-teal/50 flex flex-col gap-2 relative">
+                        <button onClick={() => { setShow(false); onDismiss(); }} className="absolute top-2 right-2 p-1 hover:bg-white/10 rounded-full transition-colors"><Icons.X size={14}/></button>
+                        <div className="flex items-center gap-2">
+                            <div className="bg-white/20 p-1.5 rounded-lg"><Icons.Shield size={16} className="text-white"/></div>
+                            <span className="text-xs font-bold uppercase tracking-widest text-sw-purpleLight">Operational Context</span>
+                        </div>
+                        <div>
+                            <p className="text-sm font-light opacity-90">This stage requires specific authority. In production, this work would route to:</p>
+                            <div className="mt-2 flex items-center gap-3 bg-black/20 p-2 rounded-lg">
+                                <div className="text-sm font-bold text-white">{requiredSkill}</div>
+                                {reason && <><Icons.ArrowRight size={14} className="opacity-50"/><div className="text-xs italic opacity-80">{reason}</div></>}
+                            </div>
+                        </div>
+                    </div>
+                    <style>{\`@keyframes slideIn { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }\`}</style>
+                </div>
+            );
+        };
+
         const RenderElement = ({ element, value, onChange, onBlur, error, disabled }) => {
             const theme = THEME;
             const isType2 = theme.mode === 'type2';
@@ -173,6 +221,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             const inputTextClass = isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#323233]' : 'text-sw-teal';
             const labelTextClass = isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal';
             const errorHover = isType2 ? 'hover:border-[#e61126]' : isType3 ? 'hover:border-[#006a4d]' : 'hover:border-sw-teal';
+            const staticTextClass = isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#323233]' : 'text-sw-teal';
 
             const baseClasses = \`w-full \${d.inputHeight} \${d.padding} \${d.fontSize} border \${inputBorderClass} \${r} focus:outline-none focus:shadow-input-focus focus:ring-1 transition-all bg-white \${inputTextClass} placeholder-gray-400 font-sans\`;
             const errorClasses = error ? "border-sw-error bg-[#fff6f5] focus:border-sw-error focus:ring-1 focus:ring-sw-error" : errorHover;
@@ -192,6 +241,34 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                  if (isReflection) {
                     if (value === true || value === 'true') displayContent = 'Yes';
                     else if (value === false || value === 'false') displayContent = 'No';
+                    else if (Array.isArray(value)) {
+                        // Render Table for List/Repeater Reflection
+                        if (value.length === 0) {
+                            displayContent = <span className="italic opacity-60 text-gray-400">Empty list</span>;
+                        } else {
+                            const firstItem = value[0];
+                            const isObjectList = typeof firstItem === 'object' && firstItem !== null;
+                            if (isObjectList) {
+                                const headers = Object.keys(firstItem);
+                                displayContent = (
+                                    <div className="border border-gray-200 rounded-lg overflow-hidden text-sm bg-gray-50/50">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-gray-100 border-b border-gray-200">
+                                                <tr>{headers.map(h => <th key={h} className="px-3 py-2 font-bold text-gray-500 uppercase text-xs">{h}</th>)}</tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200">
+                                                {value.map((row, i) => (
+                                                    <tr key={i}>{headers.map(h => <td key={h} className="px-3 py-2 text-gray-700">{String(row[h] || '')}</td>)}</tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                );
+                            } else {
+                                displayContent = <ul className="list-disc ml-5 text-gray-700">{value.map((item, i) => <li key={i}>{String(item)}</li>)}</ul>;
+                            }
+                        }
+                    }
                  } else {
                     displayContent = element.description || element.label;
                  }
@@ -199,7 +276,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                  return (
                     <div className={\`prose max-w-none \${d.wrapper}\`}>
                         {element.label && element.label !== 'New Field' && <label className={\`block font-bold \${labelTextClass} \${d.labelSize} \${d.labelMb}\`}>{element.label}</label>}
-                        <div className={\`font-sans whitespace-pre-wrap \${labelTextClass}\`}>{displayContent}</div>
+                        <div className={\`font-sans whitespace-pre-wrap \${staticTextClass}\`}>{displayContent}</div>
                     </div>
                  );
             }
@@ -229,8 +306,8 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                                 const label = String(opt).trim();
                                 const isSelected = value === label;
                                 return (
-                                    <label key={i} className={\`cursor-pointer transition-all rounded-md flex-1 flex items-center justify-center text-center select-none py-2 text-sm \${isSelected ? \`\${radioSelectedClass} font-bold shadow-md\` : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'}\`}>
-                                        <input type="radio" name={element.id} value={label} checked={isSelected} onChange={(e) => onChange(e.target.value)} className="hidden"/>
+                                    <label key={i} className={\`cursor-pointer transition-all rounded-md flex-1 flex items-center justify-center text-center select-none py-2 text-sm \${isSelected ? \`\${radioSelectedClass} font-bold shadow-md\` : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'} \${disabled ? 'opacity-50 cursor-not-allowed' : ''}\`}>
+                                        <input type="radio" name={element.id} value={label} checked={isSelected} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="hidden"/>
                                         {label}
                                     </label>
                                 );
@@ -246,11 +323,11 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                  const checkInactive = isType2 ? 'border-[#e61126] bg-white' : isType3 ? 'border-[#006a4d] bg-white' : 'border-sw-teal bg-white';
                  return (
                     <div className={d.wrapper}>
-                        <label className={\`flex items-center gap-3 cursor-pointer p-3 border \${inputBorderClass} \${r} hover:bg-opacity-5 transition-colors bg-white\`}>
+                        <label className={\`flex items-center gap-3 cursor-pointer p-3 border \${inputBorderClass} \${r} hover:bg-opacity-5 transition-colors bg-white \${disabled ? 'opacity-50 cursor-not-allowed' : ''}\`}>
                             <div className={\`w-6 h-6 border rounded flex items-center justify-center \${value === true || value === 'true' ? checkActive : checkInactive}\`}>
                                 {(value === true || value === 'true') && <span className="text-white"><Icons.Check/></span>}
                             </div>
-                            <input type="checkbox" checked={value === 'true' || value === true} onChange={(e) => onChange(e.target.checked)} className="hidden" />
+                            <input type="checkbox" checked={value === 'true' || value === true} onChange={(e) => onChange(e.target.checked)} disabled={disabled} className="hidden" />
                             <span className={\`font-bold \${labelTextClass}\`}>{element.label}</span>
                         </label>
                         <ErrorMsg />
@@ -266,13 +343,14 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                 const handleRowChange = (idx, field, val) => { const n = [...rows]; n[idx] = { ...n[idx], [field]: val }; onChange(n); };
                 
                 const headerBg = isType2 ? 'bg-[#ffe2e8]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-sw-lightGray';
+                const headerLabel = isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-500';
                 
                 return (
                     <div className={d.wrapper}>
                         <Label />
                         <div className={\`border \${isType2 ? 'border-gray-300' : 'border-sw-teal/30'} rounded-lg overflow-hidden bg-white shadow-sm\`}>
                             <div className={\`\${headerBg} border-b border-gray-200 grid gap-2 px-4 py-2\`} style={{ gridTemplateColumns: \`repeat(\${columns.length}, 1fr) 40px\` }}>
-                                {columns.map(c => <div key={c.id} className={\`text-xs font-bold uppercase \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-500'}\`}>{c.label}</div>)}
+                                {columns.map(c => <div key={c.id} className={\`text-xs font-bold uppercase \${headerLabel}\`}>{c.label}</div>)}
                                 <div></div>
                             </div>
                             <div className="divide-y divide-gray-100">
@@ -281,22 +359,22 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                                         {columns.map(c => (
                                             <div key={c.id}>
                                                 {c.type === 'select' ? (
-                                                    <select className="w-full text-xs p-2 border border-gray-200 rounded" value={row[c.id] || ''} onChange={(e) => handleRowChange(rIdx, c.id, e.target.value)}>
+                                                    <select disabled={disabled} className="w-full text-xs p-2 border border-gray-200 rounded" value={row[c.id] || ''} onChange={(e) => handleRowChange(rIdx, c.id, e.target.value)}>
                                                         <option value="">Select...</option>
                                                         {(c.options || []).map((o, i) => <option key={i} value={o}>{o}</option>)}
                                                     </select>
                                                 ) : (
-                                                    <input type={c.type} className="w-full text-xs p-2 border border-gray-200 rounded" value={row[c.id] || ''} onChange={(e) => handleRowChange(rIdx, c.id, e.target.value)} />
+                                                    <input disabled={disabled} type={c.type} className="w-full text-xs p-2 border border-gray-200 rounded" value={row[c.id] || ''} onChange={(e) => handleRowChange(rIdx, c.id, e.target.value)} />
                                                 )}
                                             </div>
                                         ))}
-                                        <button onClick={() => handleRemove(rIdx)} className="text-gray-400 hover:text-sw-red p-2"><Icons.Trash/></button>
+                                        <button onClick={() => handleRemove(rIdx)} disabled={disabled} className="text-gray-400 hover:text-sw-red p-2"><Icons.Trash/></button>
                                     </div>
                                 ))}
                                 {rows.length === 0 && <div className="p-4 text-center text-sm text-gray-400 italic">No items.</div>}
                             </div>
                             <div className="bg-gray-50 border-t border-gray-200 p-2">
-                                <button onClick={handleAdd} className="w-full py-2 border border-dashed border-gray-300 rounded text-xs font-bold text-gray-500 hover:text-sw-teal hover:border-sw-teal flex items-center justify-center gap-2"><Icons.Plus/> Add Item</button>
+                                <button onClick={handleAdd} disabled={disabled} className="w-full py-2 border border-dashed border-gray-300 rounded text-xs font-bold text-gray-500 hover:text-sw-teal hover:border-sw-teal flex items-center justify-center gap-2"><Icons.Plus/> Add Item</button>
                             </div>
                         </div>
                     </div>
@@ -332,16 +410,60 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             const [formErrors, setFormErrors] = useState({});
             const [isCompleted, setIsCompleted] = useState(false);
             
+            // HUD State
+            const [isHudEnabled, setIsHudEnabled] = useState(true);
+            const [hudVisible, setHudVisible] = useState(false);
+            const [activeSkill, setActiveSkill] = useState('');
+            const [skillReason, setSkillReason] = useState('');
+            
             const isType2 = THEME.mode === 'type2';
             const isType3 = THEME.mode === 'type3';
 
             const currentStage = PROCESS_DEF.stages[currentStageIdx];
             const visibleSections = currentStage.sections.filter(sec => isSectionVisible(sec, formData));
 
+            // 1. Calculate Skill (Responsive)
+            useEffect(() => {
+                if (!currentStage) return;
+                let foundSkill = currentStage.defaultSkill || '';
+                let foundReason = '';
+
+                if (currentStage.skillLogic && currentStage.skillLogic.length > 0) {
+                    for (const rule of currentStage.skillLogic) {
+                        if (evaluateLogicGroup(rule.logic, formData)) {
+                            foundSkill = rule.requiredSkill;
+                            foundReason = "Logic match found";
+                            break;
+                        }
+                    }
+                }
+
+                // Default fallback if no routing defined
+                if (!foundSkill) {
+                    foundSkill = "No routing defined";
+                    foundReason = "Standard processing";
+                }
+
+                setActiveSkill(foundSkill);
+                setSkillReason(foundReason);
+            }, [currentStage, formData]); // Runs whenever data changes
+
+            // 2. Trigger Visibility (Stage Change Only)
+            useEffect(() => {
+                if (isHudEnabled) {
+                    setHudVisible(true);
+                } else {
+                    setHudVisible(false);
+                }
+            }, [currentStageIdx, isHudEnabled]); // Only trigger notification on stage move
+
             const handleNext = () => {
                 const errors = {};
                 let isValid = true;
                 visibleSections.forEach(sec => {
+                    // Skip validation for read-only variant sections
+                    if (sec.variant === 'warning' || sec.variant === 'info' || sec.variant === 'summary') return;
+
                     sec.elements.forEach(el => {
                         if (isElementVisible(el, formData)) {
                             if (isElementRequired(el, formData) && (formData[el.id] === undefined || formData[el.id] === '')) {
@@ -398,16 +520,32 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
 
             return (
                 <div className={\`min-h-screen \${isType2 ? 'bg-[#e0e0e0]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-[#fafafa]'}\`}>
+                    <OperationsHUD 
+                        key={\`\${currentStageIdx}-\${isHudEnabled}\`}
+                        isVisible={hudVisible} 
+                        requiredSkill={activeSkill} 
+                        reason={skillReason}
+                        onDismiss={() => setHudVisible(false)}
+                    />
                     <header className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-50 shadow-sm flex items-center justify-between">
                          <div className="flex items-center gap-6">
                             <img src="https://www.lloydsbankinggroup.com/assets/images/our-brands/scottish-widows/sw-logo-1000x5501.png" alt="Scottish Widows" className="h-12" />
                             <div className="h-8 w-px bg-gray-200"></div>
                             <h1 className={\`text-lg font-serif font-bold \${isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}\`}>{PROCESS_DEF.name}</h1>
                          </div>
-                         <div className="text-xs font-mono text-gray-400">PROTOTYPE MODE</div>
+                         <div className="flex items-center gap-4">
+                             <button 
+                                onClick={() => setIsHudEnabled(!isHudEnabled)}
+                                className={\`p-2 rounded-lg transition-all flex items-center justify-center \${isHudEnabled ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}\`}
+                                title={isHudEnabled ? "Operations HUD: ON" : "Operations HUD: OFF"}
+                            >
+                                <Icons.Shield size={16} />
+                            </button>
+                            <div className="text-xs font-mono text-gray-400">PROTOTYPE MODE</div>
+                         </div>
                     </header>
 
-                    <div className="max-w-5xl mx-auto py-12 px-6">
+                    <div className="w-[80%] max-w-[2400px] mx-auto py-12 px-6">
                         {/* Breadcrumbs */}
                         <nav className="flex items-center space-x-2 mb-12 text-sm overflow-x-auto pb-2 scrollbar-thin">
                             {PROCESS_DEF.stages.map((s, i) => {
@@ -439,29 +577,66 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                             </div>
                             
                             <div className="p-8 space-y-8">
-                                {visibleSections.map(section => (
-                                    <div key={section.id}>
-                                        <h4 className={\`font-bold border-b border-gray-100 pb-2 mb-6 uppercase text-sm tracking-wide \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-800'}\`}>{section.title}</h4>
-                                        <div className={\`grid gap-x-8 gap-y-2 \${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}\`}>
-                                            {section.elements.filter(el => isElementVisible(el, formData)).map(el => (
-                                                <RenderElement
-                                                    key={el.id}
-                                                    element={{...el, required: isElementRequired(el, formData)}} 
-                                                    value={formData[el.id]}
-                                                    onChange={(val) => {
-                                                        setFormData(prev => ({...prev, [el.id]: val}));
-                                                        if (formErrors[el.id]) setFormErrors(prev => { const n = {...prev}; delete n[el.id]; return n; });
-                                                    }}
-                                                    onBlur={() => {
-                                                        const msg = validateValue(el, formData[el.id]);
-                                                        if (msg) setFormErrors(prev => ({...prev, [el.id]: msg}));
-                                                    }}
-                                                    error={formErrors[el.id]}
-                                                />
-                                            ))}
+                                {visibleSections.map(section => {
+                                    // Skip Summary from main flow
+                                    if (section.variant === 'summary') return null;
+                                    
+                                    const isWarning = section.variant === 'warning';
+                                    const isInfo = section.variant === 'info';
+                                    const isSpecial = isWarning || isInfo;
+
+                                    if (isSpecial) {
+                                        return (
+                                            <div key={section.id} className={\`p-4 rounded-xl border \${isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}\`}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    {isWarning ? <span className="text-amber-600"><Icons.Warning/></span> : <span className="text-blue-600"><Icons.Info/></span>}
+                                                    <h4 className={\`font-bold uppercase text-sm tracking-wide \${isWarning ? 'text-amber-700' : 'text-blue-700'}\`}>{section.title}</h4>
+                                                </div>
+                                                <div className={\`grid gap-x-8 gap-y-2 \${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}\`}>
+                                                    {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
+                                                        let elementValue = formData[el.id];
+                                                        if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                                                            elementValue = formData[el.sourceFieldId];
+                                                        }
+                                                        return (
+                                                            <RenderElement key={el.id} element={{...el, required: false}} value={elementValue} onChange={()=>{}} disabled={true} />
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div key={section.id}>
+                                            <h4 className={\`font-bold border-b border-gray-100 pb-2 mb-6 uppercase text-sm tracking-wide \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-800'}\`}>{section.title}</h4>
+                                            <div className={\`grid gap-x-8 gap-y-2 \${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}\`}>
+                                                {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
+                                                    let elementValue = formData[el.id];
+                                                    if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                                                        elementValue = formData[el.sourceFieldId];
+                                                    }
+                                                    return (
+                                                        <RenderElement
+                                                            key={el.id}
+                                                            element={{...el, required: isElementRequired(el, formData)}} 
+                                                            value={elementValue}
+                                                            onChange={(val) => {
+                                                                setFormData(prev => ({...prev, [el.id]: val}));
+                                                                if (formErrors[el.id]) setFormErrors(prev => { const n = {...prev}; delete n[el.id]; return n; });
+                                                            }}
+                                                            onBlur={() => {
+                                                                const msg = validateValue(el, formData[el.id]);
+                                                                if (msg) setFormErrors(prev => ({...prev, [el.id]: msg}));
+                                                            }}
+                                                            error={formErrors[el.id]}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {visibleSections.length === 0 && <div className="text-center py-10 text-gray-400 italic">No visible sections in this stage based on current data.</div>}
                             </div>
 
