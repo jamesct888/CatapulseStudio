@@ -14,24 +14,20 @@ const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000)
   } catch (error: any) {
     const msg = error.message?.toLowerCase() || '';
     
-    // 1. FAIL FAST: Check for Hard Quota Limits (Daily Limit)
-    // If we hit the daily quota, retrying in 10 seconds won't help. We should fail immediately.
+    // 1. FAIL FAST: Check for Hard Quota Limits (Daily Limit/Billing)
     if (msg.includes('quota') || msg.includes('limit exceeded') || msg.includes('billing')) {
         console.error(`[AI Service] 🛑 HARD QUOTA LIMIT REACHED: ${error.message}`);
         throw error; 
     }
 
-    // 2. RETRY: Transient Rate Limits (429 Resource Exhausted / Too Many Requests)
-    const isTransient = msg.includes('429') || error.status === 429 || msg.includes('resource_exhausted') || msg.includes('overloaded');
-    
-    if (retries > 0 && isTransient) {
-      // Wait longer for rate limits (10s), shorter for other transient errors
-      const waitTime = Math.max(delay, 5000);
-      
-      console.warn(`[AI Service] ⚠️ Transient API Error (429/Overloaded), retrying in ${waitTime}ms... (${retries} attempts left).`);
-      
+    // Check if it is a transient rate limit error
+    const isRateLimit = error.status === 429 || msg.includes('429') || msg.includes('resource_exhausted') || msg.includes('overloaded');
+
+    // 2. RETRY: Transient Rate Limits
+    if (retries > 0 && isRateLimit) {
+      const waitTime = Math.max(delay, 10000);
+      console.warn(`[AI Service] ⚠️ Transient API Error (429/Overloaded), retrying in ${waitTime}ms... (${retries} attempts left). Error: ${msg}`);
       await new Promise(res => setTimeout(res, waitTime));
-      // Exponential backoff
       return callWithRetry(fn, retries - 1, waitTime * 1.5);
     } else {
       throw error;
@@ -44,73 +40,55 @@ const cleanAndParseJSON = <T>(text: string | undefined): T | null => {
     if (!text) return null;
     let cleaned = text.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
     
-    // 0. Fast Path: Try parsing directly
     try {
         return JSON.parse(cleaned) as T;
     } catch (e) {
-        // Continue to extraction
-    }
-    
-    // 1. Stack-Based Extraction (Best Effort)
-    const extractJSON = (str: string): string | null => {
-        let start = -1;
-        let end = -1;
-        let balance = 0;
-        let inString = false;
-        let stringChar = '';
-        let isEscaped = false;
+        // Fallback: Stack-Based Extraction
+        const extractJSON = (str: string): string | null => {
+            let start = -1;
+            let end = -1;
+            let balance = 0;
+            let inString = false;
+            let stringChar = '';
+            let isEscaped = false;
 
-        for (let i = 0; i < str.length; i++) {
-            const char = str[i];
-            if (start === -1) {
-                if (char === '{' || char === '[') { start = i; balance = 1; }
-            } else {
-                if (inString) {
-                    if (isEscaped) { isEscaped = false; }
-                    else if (char === '\\') { isEscaped = true; }
-                    else if (char === stringChar) { inString = false; }
+            for (let i = 0; i < str.length; i++) {
+                const char = str[i];
+                if (start === -1) {
+                    if (char === '{' || char === '[') { start = i; balance = 1; }
                 } else {
-                    if (char === '"' || char === "'") { inString = true; stringChar = char; }
-                    else if (char === '{' || char === '[') { balance++; }
-                    else if (char === '}' || char === ']') {
-                        balance--;
-                        if (balance === 0) { end = i; break; }
+                    if (inString) {
+                        if (isEscaped) { isEscaped = false; }
+                        else if (char === '\\') { isEscaped = true; }
+                        else if (char === stringChar) { inString = false; }
+                    } else {
+                        if (char === '"' || char === "'") { inString = true; stringChar = char; }
+                        else if (char === '{' || char === '[') { balance++; }
+                        else if (char === '}' || char === ']') {
+                            balance--;
+                            if (balance === 0) { end = i; break; }
+                        }
                     }
                 }
             }
+            return (start !== -1 && end !== -1) ? str.substring(start, end + 1) : null;
+        };
+
+        let jsonCandidate = extractJSON(cleaned);
+        
+        if (!jsonCandidate) {
+            const firstOpen = cleaned.search(/[\{\[]/);
+            const lastClose = cleaned.search(/[\}\]][^}]*$/);
+            if (firstOpen !== -1 && lastClose !== -1) {
+                 jsonCandidate = cleaned.substring(firstOpen, lastClose + 1);
+            }
         }
-        return (start !== -1 && end !== -1) ? str.substring(start, end + 1) : null;
-    };
 
-    let jsonCandidate = extractJSON(cleaned);
-    
-    // Fallback: Simple regex extraction if stack failed (sometimes better for fragmented output)
-    if (!jsonCandidate) {
-        const firstOpen = cleaned.search(/[\{\[]/);
-        const lastClose = cleaned.search(/[\}\]][^}]*$/);
-        if (firstOpen !== -1 && lastClose !== -1) {
-             jsonCandidate = cleaned.substring(firstOpen, lastClose + 1);
-        }
-    }
+        if (!jsonCandidate) return null;
 
-    if (!jsonCandidate) return null;
-
-    try {
-        return JSON.parse(jsonCandidate) as T;
-    } catch (e) {
-        // Last resort: JS Eval for loose JSON (comments/trailing commas)
         try {
-            // More robust comment stripping that respects strings
-            // regex: matches strings OR single line comments OR multi-line comments
-            const noComments = jsonCandidate.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g1) => g1 ? "" : m).trim();
-            
-            // Prevent empty eval which causes "Unexpected token"
-            if (!noComments) return null;
-
-            const looseParse = new Function('return (' + noComments + ')');
-            return looseParse() as T;
+            return JSON.parse(jsonCandidate) as T;
         } catch (e2) {
-            // console.error("JSON Parse Failed:", e2); // Silence error to prevent console noise
             return null;
         }
     }
@@ -132,8 +110,7 @@ export const sanitizeProcessData = (data: ProcessDefinition): ProcessDefinition 
                          return String(opt);
                     });
                 }
-                
-                // Compatibility for old "visibilityConditions" array
+                // Compatibility
                 const anyEl = el as any;
                 if (anyEl.visibilityConditions && Array.isArray(anyEl.visibilityConditions) && !el.visibility) {
                     el.visibility = { id: `vis_${el.id}`, operator: 'AND', conditions: anyEl.visibilityConditions };
@@ -147,9 +124,73 @@ export const sanitizeProcessData = (data: ProcessDefinition): ProcessDefinition 
     return data;
 }
 
+// --- OPTIMIZATION 1: MONOLITHIC GENERATION (Fastest) ---
+export const generateMonolithicProcess = async (description: string): Promise<ProcessDefinition | null> => {
+    console.log(`[AI Service] 🚀 Attempting Monolithic Generation for: "${description}"`);
+    if (!apiKey) return null;
+
+    const prompt = `
+    Act as an expert UK Business Analyst. 
+    Design a COMPLETE business process for: "${description}".
+    
+    CONTEXT:
+    - Market: UK.
+    - Language: British English.
+    
+    REQUIREMENTS:
+    1. Define Stages (e.g. Intake, Review, Decision).
+    2. Define Sections within stages.
+    3. Define Data Elements (Fields) within sections.
+    4. Return a SINGLE valid JSON object matching ProcessDefinition.
+    
+    Field Types: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static', 'repeater'.
+    
+    JSON Structure:
+    {
+      "id": "proc_auto",
+      "name": "Process Name",
+      "description": "Summary",
+      "stages": [
+        {
+          "id": "stg_1", "title": "Stage 1",
+          "sections": [
+             { "id": "sec_1", "title": "Section 1", "layout": "2col", "elements": [ { "id": "el_1", "label": "Name", "type": "text" } ] }
+          ]
+        }
+      ]
+    }
+    `;
+
+    try {
+        const response = await callWithRetry(async () => {
+            return await ai.models.generateContent({
+                model: modelId,
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    maxOutputTokens: 8192, // Max tokens for one-shot
+                }
+            });
+        }, 1, 2000); // 1 retry only, fail fast to fallback
+
+        const data = cleanAndParseJSON<ProcessDefinition>(response.text);
+        if (data && data.stages && data.stages.length > 0) {
+            return sanitizeProcessData(data);
+        }
+        return null;
+    } catch (e: any) {
+        // If quota error, rethrow to let UI handle demo fallback
+        if (e.message?.includes('quota') || e.message?.includes('limit exceeded') || e.message?.includes('billing')) {
+            throw e;
+        }
+        console.warn("[AI Service] Monolithic generation failed or truncated. Switching to iterative strategy.");
+        return null;
+    }
+};
+
 // --- PHASE 1: GENERATE SKELETON (Stages Only) ---
 export const generateProcessSkeleton = async (description: string): Promise<ProcessDefinition | null> => {
-  console.log(`[AI Service] 🚀 Generating Skeleton for: "${description}"`);
+  console.log(`[AI Service] 🦴 Generating Skeleton for: "${description}"`);
   if (!apiKey) {
     console.error("API Key is missing");
     return null;
@@ -184,7 +225,6 @@ export const generateProcessSkeleton = async (description: string): Promise<Proc
   `;
 
   try {
-    // Increase retries to 5 for skeleton generation to handle cold start rate limits
     const response = await callWithRetry(async () => {
         return await ai.models.generateContent({
             model: modelId,
@@ -195,7 +235,7 @@ export const generateProcessSkeleton = async (description: string): Promise<Proc
                 maxOutputTokens: 2048,
             }
         });
-    }, 5, 4000); // Start with 4s delay, retries=5
+    }, 2, 2000); 
 
     const skeleton = cleanAndParseJSON<ProcessDefinition>(response.text);
     if (!skeleton) return null;
@@ -225,8 +265,7 @@ export const generateStageDetails = async (stage: StageDefinition, processDescri
         1. Define 1-3 Sections.
         2. Each Section must have 3-6 specific Data Elements (Fields).
         3. INCLUDE LOGIC:
-           - Add 'visibility' logic to fields (e.g., "If Marital Status = Married, show Spouse Name").
-           - Logic Schema: "visibility": { "id": "vis_${stage.id}_1", "operator": "AND", "conditions": [ { "targetElementId": "...", "operator": "equals", "value": "..." } ] }
+           - Add 'visibility' logic to fields.
         4. Types: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static', 'repeater'.
         5. IDs: Use unique IDs (e.g., 'sec_${stage.id}_1', 'el_${stage.id}_dob').
 
@@ -256,7 +295,6 @@ export const generateStageDetails = async (stage: StageDefinition, processDescri
         return sections || [];
     } catch (e) {
         console.error(`Error generating details for stage ${stage.title}:`, e);
-        // Return fallback section on error so the UI doesn't hang
         return [{
             id: `sec_err_${stage.id}`,
             title: "Details Generation Failed",
@@ -272,20 +310,9 @@ export const generateStageDetails = async (stage: StageDefinition, processDescri
     }
 };
 
-// Deprecated wrapper kept for backward compatibility if needed
+// Deprecated legacy wrapper
 export const generateProcessStructure = async (description: string): Promise<ProcessDefinition | null> => {
-    console.log("[AI Service] Falling back to legacy monolithic generation...");
-    const skeleton = await generateProcessSkeleton(description);
-    if (!skeleton) return null;
-
-    const detailPromises = skeleton.stages.map(stage => generateStageDetails(stage, skeleton.description));
-    const allSections = await Promise.all(detailPromises);
-
-    skeleton.stages.forEach((stage, index) => {
-        stage.sections = allSections[index];
-    });
-
-    return sanitizeProcessData(skeleton);
+    return generateMonolithicProcess(description);
 };
 
 export const generateProcessFromImage = async (base64Data: string, mimeType: string): Promise<ProcessDefinition | null> => {

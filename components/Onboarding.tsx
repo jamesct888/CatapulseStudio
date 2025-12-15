@@ -1,7 +1,7 @@
 
 import React, { useRef } from 'react';
 import { CatapulseLogo } from './Shared';
-import { Sparkles, Zap, FileText, ScanLine } from 'lucide-react';
+import { Sparkles, Zap, FileText, ScanLine, BrainCircuit } from 'lucide-react';
 
 interface OnboardingProps {
   startPrompt: string;
@@ -9,6 +9,8 @@ interface OnboardingProps {
   handleStart: (useDemo?: boolean) => void;
   handleLegacyFormUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showDemoDrop: boolean;
+  isDetailedMode: boolean;
+  setIsDetailedMode: (val: boolean) => void;
 }
 
 export const Onboarding: React.FC<OnboardingProps> = ({ 
@@ -16,7 +18,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({
   setStartPrompt, 
   handleStart, 
   handleLegacyFormUpload, 
-  showDemoDrop 
+  showDemoDrop,
+  isDetailedMode,
+  setIsDetailedMode
 }) => {
   const legacyInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,6 +85,30 @@ export const Onboarding: React.FC<OnboardingProps> = ({
             </div>
         </div>
 
+        {/* Toggle Strategy Switch */}
+        <div className="flex justify-center mt-6">
+            <label className="flex items-center gap-3 cursor-pointer group select-none">
+                <div className="relative">
+                    <input 
+                        type="checkbox" 
+                        checked={isDetailedMode}
+                        onChange={(e) => setIsDetailedMode(e.target.checked)}
+                        className="sr-only" 
+                    />
+                    <div className={`w-12 h-6 bg-gray-200 rounded-full shadow-inner transition-colors ${isDetailedMode ? 'bg-sw-teal' : ''}`}></div>
+                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isDetailedMode ? 'translate-x-6' : ''}`}></div>
+                </div>
+                <div className="flex flex-col items-start text-left">
+                    <span className={`text-sm font-bold ${isDetailedMode ? 'text-sw-teal' : 'text-gray-500'}`}>
+                        {isDetailedMode ? 'Detailed Mode (Multi-step)' : 'Fast Mode (Single Call)'}
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                        {isDetailedMode ? 'Uses more quota for higher quality.' : 'Quota friendly. Recommended for free tier.'}
+                    </span>
+                </div>
+            </label>
+        </div>
+
         {/* Capsule Suggestions */}
         <div className="flex flex-wrap justify-center gap-3 mt-8">
             {['Transfer In Request', 'Transfer Away', 'Make a Health Claim', 'Change Policy Details', 'Beneficiary Nomination'].map(s => (
@@ -116,9 +144,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({
             </div>
         </div>
 
-        <p className="text-[10px] text-gray-300 pt-8 font-mono">
-            Powered by Gemini 1.5 Flash • Enterprise Grade Security
-        </p>
+        <div className="text-center pt-8 space-y-1">
+            <p className="text-[10px] text-gray-300 font-mono">
+                Powered by Gemini 2.5 Flash • Enterprise Grade Security
+            </p>
+            <p className="text-[10px] text-gray-300 font-mono opacity-60">
+                Catapulse Studio v1.3.3 • Build {new Date().toISOString().split('T')[0]}
+            </p>
+        </div>
       </div>
 
       {/* Hidden input for legacy functionality */}

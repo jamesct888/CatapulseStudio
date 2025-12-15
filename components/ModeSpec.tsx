@@ -39,10 +39,14 @@ export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: El
     };
 
     const formatLogicGroup = (g: LogicGroup): string => {
-        if (!g.conditions.length && (!g.groups || !g.groups.length)) return 'Always';
+        // Safe access with defaults to prevent crashes if AI omits arrays
+        const conditions = g.conditions || [];
+        const groups = g.groups || [];
         
-        const conds = g.conditions.map(formatCondition);
-        const subGroups = g.groups ? g.groups.map(sg => `(${formatLogicGroup(sg)})`) : [];
+        if (!conditions.length && !groups.length) return 'Always';
+        
+        const conds = conditions.map(formatCondition);
+        const subGroups = groups.map(sg => `(${formatLogicGroup(sg)})`);
         const all = [...conds, ...subGroups];
         
         return all.join(` ${g.operator} `);
@@ -194,13 +198,13 @@ export const ModeSpec: React.FC<{ processDef: ProcessDefinition, allElements: El
                                                     <td className="py-3 text-sm text-gray-500 capitalize">{el.type}</td>
                                                     <td className="py-3 text-sm">
                                                         {el.required ? <span className="text-sw-red font-bold">Yes</span> : 'No'}
-                                                        {el.requiredLogic && el.requiredLogic.conditions.length > 0 && <span className="text-xs text-sw-red block">(Conditional)</span>}
+                                                        {el.requiredLogic && (el.requiredLogic.conditions || []).length > 0 && <span className="text-xs text-sw-red block">(Conditional)</span>}
                                                     </td>
                                                     <td className="py-3 text-sm text-gray-500 font-mono text-xs">
-                                                        {el.visibility?.conditions.map((c, i) => (
+                                                        {(el.visibility?.conditions || []).map((c, i) => (
                                                             <div key={i}>Show if {allElements.find(e => e.id === c.targetElementId)?.label} {c.operator} {String(c.value)}</div>
                                                         ))}
-                                                        {(!el.visibility || el.visibility.conditions.length === 0) && '-'}
+                                                        {(!el.visibility || !el.visibility.conditions || el.visibility.conditions.length === 0) && '-'}
                                                     </td>
                                                     <td className="py-3 text-sm text-gray-500">
                                                         {el.validation?.type !== 'none' && el.validation ? (

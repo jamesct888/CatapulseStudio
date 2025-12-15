@@ -44,23 +44,44 @@ export const useProcessState = () => {
     setProcessDef(newDef);
   };
 
-  const deleteSection = (id: string) => {
+  const deleteSection = (sectionId: string, stageId?: string) => {
     if (!processDef) return;
     const newDef = { ...processDef };
-    newDef.stages.forEach(stg => {
-        stg.sections = stg.sections.filter(s => s.id !== id);
-    });
+    
+    if (stageId) {
+        // Scoped Deletion: Remove only from the specific stage (Fixes duplicate ref issue)
+        const stage = newDef.stages.find(s => s.id === stageId);
+        if (stage) {
+            stage.sections = stage.sections.filter(s => s.id !== sectionId);
+        }
+    } else {
+        // Global Deletion (Fallback)
+        newDef.stages.forEach(stg => {
+            stg.sections = stg.sections.filter(s => s.id !== sectionId);
+        });
+    }
     setProcessDef(newDef);
   };
 
-  const deleteElement = (id: string) => {
+  const deleteElement = (elementId: string, sectionId?: string | null, stageId?: string | null) => {
     if (!processDef) return;
     const newDef = { ...processDef };
-    newDef.stages.forEach(stg => {
-        stg.sections.forEach(sec => {
-            sec.elements = sec.elements.filter(e => e.id !== id);
+
+    if (stageId && sectionId) {
+        // Scoped Deletion: Remove only from specific section in specific stage
+        const stage = newDef.stages.find(s => s.id === stageId);
+        const section = stage?.sections.find(s => s.id === sectionId);
+        if (section) {
+            section.elements = section.elements.filter(e => e.id !== elementId);
+        }
+    } else {
+        // Global Deletion (Fallback)
+        newDef.stages.forEach(stg => {
+            stg.sections.forEach(sec => {
+                sec.elements = sec.elements.filter(e => e.id !== elementId);
+            });
         });
-    });
+    }
     setProcessDef(newDef);
   };
 

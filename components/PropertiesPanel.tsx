@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { ElementDefinition, SectionDefinition, StageDefinition, SkillRule, LogicGroup, RepeaterColumn, VisualTheme } from '../types';
-import { Trash2, Info, Layout, Briefcase, ShieldCheck, GitMerge, Eye, X, Edit2, Plus, ArrowLeft, Palette } from 'lucide-react';
+import { ElementDefinition, SectionDefinition, StageDefinition, SkillRule, LogicGroup, RepeaterColumn, VisualTheme, CalculationPart } from '../types';
+import { Trash2, Info, Layout, Briefcase, ShieldCheck, GitMerge, Eye, X, Edit2, Plus, Palette, AlertTriangle, PanelBottom, Calculator, Hash, Type, FastForward, CheckCircle2, Copy, ClipboardPaste, Check } from 'lucide-react';
 import { LogicBuilder } from './LogicBuilder';
 import { ModalWrapper } from './ModalWrapper';
 import { formatLogicSummary } from '../utils/logic';
@@ -20,8 +20,12 @@ interface PropertiesPanelProps {
   onDeleteSection: (id: string) => void;
   onDeleteStage: (id: string) => void;
   visualTheme?: VisualTheme;
-  onUpdateTheme?: (theme: VisualTheme) => void;
+  onOpenSettings: () => void;
   onClose: () => void;
+  // New Clipboard Props
+  clipboardStageLogic?: SkillRule[] | null;
+  onCopyStageLogic?: (rules: SkillRule[]) => void;
+  onPasteStageLogic?: (stageId: string) => void;
 }
 
 const COMMON_SKILLS = [
@@ -47,8 +51,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onDeleteSection,
   onDeleteStage,
   visualTheme,
-  onUpdateTheme,
-  onClose
+  onOpenSettings,
+  onClose,
+  clipboardStageLogic,
+  onCopyStageLogic,
+  onPasteStageLogic
 }) => {
   
   const isEditingElement = !!selectedElement;
@@ -58,9 +65,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const data = selectedElement || selectedSection || selectedStage;
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
-  // Toggle between Selection Properties and Global Settings
-  const [forceGlobalSettings, setForceGlobalSettings] = useState(false);
-
   // Resizable sidebar state - Default to 480px
   const [panelWidth, setPanelWidth] = useState(480);
   const [isResizing, setIsResizing] = useState(false);
@@ -70,21 +74,24 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const [activeRuleIndex, setActiveRuleIndex] = useState<number | null>(null);
   
   const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
+  const [skipLogicModalOpen, setSkipLogicModalOpen] = useState(false);
   const [validationModalOpen, setValidationModalOpen] = useState(false);
+  const [requiredLogicModalOpen, setRequiredLogicModalOpen] = useState(false);
   
   // Shared Modal Resize State (persists across modals for consistency)
   const [modalSize, setModalSize] = useState({ width: 900, height: 700 });
   const [isResizingModal, setIsResizingModal] = useState(false);
 
+  // Copy Feedback State
+  const [copyFeedback, setCopyFeedback] = useState(false);
+
+  // Computed Variables
+  const availableTargets = data ? allElements.filter(e => e.id !== data.id) : [];
+
   useEffect(() => {
     setConfirmDeleteId(null);
   }, [data?.id]);
   
-  // When selection changes, switch back to item properties view automatically
-  useEffect(() => {
-    setForceGlobalSettings(false);
-  }, [selectedElement?.id, selectedSection?.id, selectedStage?.id]);
-
   // Sidebar Resizing
   useEffect(() => {
       const handleMouseMove = (e: MouseEvent) => {
@@ -131,7 +138,191 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const inputClass = "w-full p-3 bg-white text-sw-text border border-gray-300 rounded-lg focus:outline-none focus:border-sw-teal focus:ring-1 focus:ring-sw-teal transition-all text-sm";
   const labelClass = "block text-xs font-bold text-sw-teal uppercase mb-2 tracking-wide";
 
+  // --- HANDLERS ---
+
+  // Generic handler
+  const handleChange = (field: string, value: any) => {
+    if (isEditingElement) {
+        onUpdateElement({ ...selectedElement!, [field]: value });
+    } else if (isEditingSection) {
+        onUpdateSection({ ...selectedSection!, [field]: value });
+    } else if (isEditingStage) {
+        onUpdateStage({ ...selectedStage!, [field]: value });
+    }
+  };
+
+  // Repeater Column Handlers
+  const handleRepeaterChange = (cols: RepeaterColumn[]) => {
+      handleChange('columns', cols);
+  };
+
+  const handleValidationChange = (field: string, value: any) => {
+    if (!isEditingElement) return;
+    const currentValidation = selectedElement?.validation || { type: 'none' };
+    const updatedValidation = { ...currentValidation, [field]: value };
+    onUpdateElement({ ...selectedElement!, validation: updatedValidation });
+  };
+
+  const handleDelete = () => {
+      if (confirmDeleteId === data.id) {
+          if (isEditingElement) onDeleteElement(data.id);
+          else if (isEditingSection) onDeleteSection(data.id);
+          else if (isEditingStage) onDeleteStage(data.id);
+          setConfirmDeleteId(null);
+      } else {
+          setConfirmDeleteId(data.id);
+          setTimeout(() => {
+              setConfirmDeleteId(current => current === data.id ? null : current);
+          }, 3000);
+      }
+  }
+
+  const ensureLogicGroup = (field: 'visibility' | 'requiredLogic' | 'skipLogic') => {
+      const current = (data as any)[field];
+      if (!current) {
+          const newGroup: LogicGroup = { id: 'root', operator: 'AND', conditions: [] };
+          handleChange(field, newGroup);
+      }
+  };
+
+  // Helper to safely stringify options for display in textarea
+  const getOptionsString = (opts: any) => {
+      if (!opts) return '';
+      if (Array.isArray(opts)) {
+          return opts.map(o => {
+              if (typeof o === 'object' && o !== null) return o.label || o.value || o.text || '';
+              return String(o);
+          }).join(','); // Removed .filter(Boolean) to allow typing commas
+      }
+      if (typeof opts === 'object') return ''; // Safety for stray objects
+      return String(opts);
+  };
+
+  // --- LOGIC HANDLING (Stage Copy/Paste) ---
+  const handleCopyRules = () => {
+      if (isEditingStage && onCopyStageLogic && (data as StageDefinition).skillLogic) {
+          onCopyStageLogic((data as StageDefinition).skillLogic || []);
+          setCopyFeedback(true);
+          setTimeout(() => setCopyFeedback(false), 2000);
+      }
+  };
+
+  const handlePasteRules = () => {
+      if (isEditingStage && onPasteStageLogic) {
+          onPasteStageLogic(data.id);
+      }
+  };
+
   // --- SPECIFIC MODAL CONTENTS ---
+  const renderCalculationBuilder = () => {
+      if (!isEditingElement || (data as ElementDefinition).type !== 'calculated') return null;
+      const el = data as ElementDefinition;
+      const calcParts = el.calculation || [];
+
+      const addPart = (type: 'field' | 'constant' | 'operator', value: string) => {
+          const newPart: CalculationPart = { id: Date.now().toString(), type, value };
+          handleChange('calculation', [...calcParts, newPart]);
+      };
+
+      const removePart = (index: number) => {
+          const newParts = [...calcParts];
+          newParts.splice(index, 1);
+          handleChange('calculation', newParts);
+      };
+
+      return (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                  <Calculator size={16} className="text-sw-teal" />
+                  <span className={labelClass.replace('mb-2', 'mb-0')}>Formula Builder</span>
+              </div>
+              
+              <div className="bg-white p-3 rounded-lg border border-gray-300 min-h-[50px] mb-3 flex flex-wrap gap-2 items-center">
+                  {calcParts.length === 0 && <span className="text-gray-400 text-xs italic">Empty formula...</span>}
+                  {calcParts.map((part, idx) => {
+                      let display = part.value;
+                      let bg = 'bg-gray-100';
+                      let icon = null;
+
+                      if (part.type === 'field') {
+                          const field = allElements.find(e => e.id === part.value);
+                          display = field ? `[${field.label}]` : '[Unknown Field]';
+                          bg = 'bg-blue-100 text-blue-700 border-blue-200';
+                          icon = <Type size={10} />;
+                      } else if (part.type === 'operator') {
+                          bg = 'bg-orange-100 text-orange-700 border-orange-200 font-bold';
+                      } else {
+                          bg = 'bg-green-100 text-green-700 border-green-200 font-mono';
+                          icon = <Hash size={10} />;
+                      }
+
+                      return (
+                          <div key={idx} className={`flex items-center gap-1 px-2 py-1 rounded text-xs border ${bg} group relative cursor-pointer`}>
+                              {icon}
+                              <span>{display}</span>
+                              <button 
+                                  onClick={() => removePart(idx)}
+                                  className="ml-1 p-0.5 rounded-full hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                  <X size={10} />
+                              </button>
+                          </div>
+                      );
+                  })}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                  <div className="col-span-2">
+                      <select 
+                          className="w-full text-xs p-2 border rounded bg-white"
+                          onChange={(e) => {
+                              if (e.target.value) {
+                                  addPart('field', e.target.value);
+                                  e.target.value = '';
+                              }
+                          }}
+                      >
+                          <option value="">+ Add Field...</option>
+                          {availableTargets.map(t => (
+                              <option key={t.id} value={t.id}>{t.label}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div className="flex gap-1">
+                      {['+', '-', '*', '/'].map(op => (
+                          <button 
+                              key={op} 
+                              onClick={() => addPart('operator', op)}
+                              className="flex-1 bg-white border border-gray-300 rounded hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 font-bold py-1"
+                          >
+                              {op}
+                          </button>
+                      ))}
+                  </div>
+                  <div className="flex gap-1">
+                      <input 
+                          type="number" 
+                          placeholder="Num" 
+                          className="w-16 text-xs p-1 border rounded"
+                          id="calc-const-input"
+                      />
+                      <button 
+                          onClick={() => {
+                              const el = document.getElementById('calc-const-input') as HTMLInputElement;
+                              if (el.value) {
+                                  addPart('constant', el.value);
+                                  el.value = '';
+                              }
+                          }}
+                          className="flex-1 bg-white border border-gray-300 rounded hover:bg-green-50 hover:border-green-200 hover:text-green-600 text-xs font-bold"
+                      >
+                          Add Const
+                      </button>
+                  </div>
+              </div>
+          </div>
+      );
+  };
 
   const renderSkillModal = () => {
       if (!skillModalOpen || activeRuleIndex === null || !selectedStage) return null;
@@ -225,6 +416,70 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       );
   }
 
+  const renderSkipLogicModal = () => {
+      if (!skipLogicModalOpen || !isEditingStage) return null;
+      const logicGroup = (data as StageDefinition).skipLogic;
+
+      return (
+          <ModalWrapper 
+            title="Configure Skip Conditions" 
+            icon={FastForward} 
+            onClose={() => setSkipLogicModalOpen(false)}
+            modalSize={modalSize}
+            onResizeStart={() => setIsResizingModal(true)}
+          >
+              <div className="max-w-4xl mx-auto">
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-6 text-sm text-amber-800 flex gap-2">
+                        <Info size={20} className="shrink-0" />
+                        <div>
+                            <p className="font-bold">Negative Logic Mode</p>
+                            <p>By default, all stages run in sequence. Define conditions below to <strong>SKIP</strong> this stage.</p>
+                        </div>
+                  </div>
+                  <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
+                      <LogicBuilder 
+                          group={logicGroup} 
+                          onChange={(g) => handleChange('skipLogic', g)} 
+                          availableTargets={availableTargets}
+                      />
+                  </div>
+              </div>
+          </ModalWrapper>
+      );
+  }
+
+  const renderRequiredLogicModal = () => {
+      if (!requiredLogicModalOpen || !isEditingElement) return null;
+      const logicGroup = (data as ElementDefinition).requiredLogic;
+
+      return (
+          <ModalWrapper 
+            title="Configure Mandatory Logic" 
+            icon={CheckCircle2} 
+            onClose={() => setRequiredLogicModalOpen(false)}
+            modalSize={modalSize}
+            onResizeStart={() => setIsResizingModal(true)}
+          >
+              <div className="max-w-4xl mx-auto">
+                  <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-6 text-sm text-amber-800 flex gap-2">
+                        <Info size={20} className="shrink-0" />
+                        <div>
+                            <p className="font-bold">Conditional Requirement</p>
+                            <p>Define rules for when this field becomes mandatory. If rules are met, the user cannot proceed without filling it.</p>
+                        </div>
+                  </div>
+                  <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
+                      <LogicBuilder 
+                          group={logicGroup} 
+                          onChange={(g) => handleChange('requiredLogic', g)} 
+                          availableTargets={availableTargets}
+                      />
+                  </div>
+              </div>
+          </ModalWrapper>
+      );
+  }
+
   const renderValidationModal = () => {
       if (!validationModalOpen || !isEditingElement) return null;
       const el = data as ElementDefinition;
@@ -283,178 +538,37 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       );
   }
 
-  // --- RENDER GLOBAL SETTINGS IF NO SELECTION OR FORCED ---
-  if (!data || forceGlobalSettings) {
-    return (
-      <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40 relative">
-         <div 
-            className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors"
-            onMouseDown={() => setIsResizing(true)}
-         ></div>
-
-         <div className="p-8 border-b border-gray-100 flex items-start gap-4">
-             {data && (
-                <button 
-                    onClick={() => setForceGlobalSettings(false)}
-                    className="mt-1 p-1 -ml-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-full transition-colors"
-                    title="Back to Selection"
-                >
-                    <ArrowLeft size={20} />
-                </button>
-             )}
-             <div className="flex-1">
-                <h2 className="font-serif font-bold text-2xl text-sw-teal">Global Settings</h2>
-                <p className="text-xs text-gray-400 mt-1">Application Styling & Themes</p>
+  // --- Render ---
+  
+  if (!data) {
+      return (
+        <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40 relative">
+             <div 
+                className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors"
+                onMouseDown={() => setIsResizing(true)}
+             ></div>
+             <div className="p-8 border-b border-gray-100 flex justify-end">
+                 <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
+                     <X size={20} />
+                 </button>
              </div>
-             <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
-                 <X size={20} />
-             </button>
-         </div>
-
-         {visualTheme && onUpdateTheme ? (
-             <div className="p-8 space-y-8 flex-1 overflow-y-auto">
-                 {/* Theme Mode Selector */}
-                 <div className="space-y-4">
-                     <label className={labelClass}>Color Theme</label>
-                     <div className="grid grid-cols-2 gap-3">
-                         <button 
-                            id="btn-theme-type1"
-                            onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type1' })}
-                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type1' ? 'border-sw-teal bg-sw-lightGray text-sw-teal ring-1 ring-sw-teal' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
-                         >
-                             <div className="w-12 h-8 bg-sw-teal border border-sw-teal rounded flex items-center justify-center shadow-sm">
-                                 <Palette size={16} className="text-white" />
-                             </div>
-                             <span className="text-xs font-bold">Type 1 (Teal)</span>
-                         </button>
-                         <button 
-                            id="btn-theme-type2"
-                            onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type2' })}
-                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${visualTheme.mode === 'type2' ? 'border-[#e61126] bg-[#e0e0e0] text-[#e61126] ring-1 ring-[#e61126]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
-                         >
-                             <div className="w-12 h-8 bg-[#e61126] border border-[#e61126] rounded flex items-center justify-center shadow-sm">
-                                 <Palette size={16} className="text-white" />
-                             </div>
-                             <span className="text-xs font-bold">Type 2 (Red/Pink)</span>
-                         </button>
-                         <button 
-                            id="btn-theme-type3"
-                            onClick={() => onUpdateTheme({ ...visualTheme, mode: 'type3' })}
-                            className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all col-span-2 ${visualTheme.mode === 'type3' ? 'border-[#006a4d] bg-[#f1f1f1] text-[#006a4d] ring-1 ring-[#006a4d]' : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}`}
-                         >
-                             <div className="w-12 h-8 bg-[#006a4d] border border-[#006a4d] rounded flex items-center justify-center shadow-sm">
-                                 <Palette size={16} className="text-white" />
-                             </div>
-                             <span className="text-xs font-bold">Type 3 (Green)</span>
-                         </button>
-                     </div>
-                 </div>
-
-                 {/* Density Selector */}
-                 <div className="space-y-4">
-                     <label className={labelClass}>Screen Density</label>
-                     <div className="grid grid-cols-2 gap-2">
-                        {['dense', 'compact', 'default', 'spacious'].map((d) => (
-                            <button
-                                key={d}
-                                id={`btn-density-${d}`}
-                                onClick={() => onUpdateTheme({ ...visualTheme, density: d as any })}
-                                className={`px-3 py-2 text-xs font-bold rounded-lg border capitalize transition-all ${visualTheme.density === d ? 'bg-sw-teal text-white border-sw-teal' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
-                            >
-                                {d}
-                            </button>
-                        ))}
-                     </div>
-                 </div>
-
-                 {/* Radius Selector */}
-                 <div className="space-y-4">
-                     <label className={labelClass}>Corner Radius</label>
-                     <div className="flex gap-2">
-                        {['none', 'small', 'medium', 'large'].map((r) => (
-                            <button
-                                key={r}
-                                onClick={() => onUpdateTheme({ ...visualTheme, radius: r as any })}
-                                className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border capitalize transition-all ${visualTheme.radius === r ? 'bg-sw-teal text-white border-sw-teal' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
-                            >
-                                {r}
-                            </button>
-                        ))}
-                     </div>
-                 </div>
-
-                 <div className="pt-6 border-t border-gray-100">
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex gap-3 text-sm text-blue-700">
-                        <Info className="shrink-0" size={18} />
-                        <p>These settings affect the Preview mode and exported HTML prototypes.</p>
-                    </div>
-                 </div>
-             </div>
-         ) : (
              <div className="p-8 text-center text-gray-400">
                 <Info size={48} className="mb-4 opacity-20 mx-auto" />
                 <p className="text-lg font-serif text-sw-teal mb-2">No Selection</p>
                 <p className="text-sm">Select an element to edit properties.</p>
             </div>
-         )}
-      </div>
-    );
+        </div>
+      );
   }
 
-  // Generic handler
-  const handleChange = (field: string, value: any) => {
-    if (isEditingElement) {
-        onUpdateElement({ ...selectedElement!, [field]: value });
-    } else if (isEditingSection) {
-        onUpdateSection({ ...selectedSection!, [field]: value });
-    } else if (isEditingStage) {
-        onUpdateStage({ ...selectedStage!, [field]: value });
-    }
-  };
-
-  // Repeater Column Handlers
-  const handleRepeaterChange = (cols: RepeaterColumn[]) => {
-      handleChange('columns', cols);
-  };
-
-  const handleValidationChange = (field: string, value: any) => {
-    if (!isEditingElement) return;
-    const currentValidation = selectedElement?.validation || { type: 'none' };
-    const updatedValidation = { ...currentValidation, [field]: value };
-    onUpdateElement({ ...selectedElement!, validation: updatedValidation });
-  };
-
-  const handleDelete = () => {
-      if (confirmDeleteId === data.id) {
-          if (isEditingElement) onDeleteElement(data.id);
-          else if (isEditingSection) onDeleteSection(data.id);
-          else if (isEditingStage) onDeleteStage(data.id);
-          setConfirmDeleteId(null);
-      } else {
-          setConfirmDeleteId(data.id);
-          setTimeout(() => {
-              setConfirmDeleteId(current => current === data.id ? null : current);
-          }, 3000);
-      }
-  }
-
-  const availableTargets = allElements.filter(e => e.id !== data.id);
-
-  const ensureLogicGroup = (field: 'visibility' | 'requiredLogic') => {
-      const current = (data as any)[field];
-      if (!current) {
-          const newGroup: LogicGroup = { id: 'root', operator: 'AND', conditions: [] };
-          handleChange(field, newGroup);
-      }
-  };
-
-  // --- Render ---
   return (
     <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40 relative">
       <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors" onMouseDown={() => setIsResizing(true)}></div>
 
       {renderSkillModal()}
       {renderVisibilityModal()}
+      {renderSkipLogicModal()}
+      {renderRequiredLogicModal()}
       {renderValidationModal()}
 
       {/* Header */}
@@ -467,7 +581,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
         <div className="flex items-center gap-1">
              <button 
-                onClick={() => setForceGlobalSettings(true)}
+                onClick={onOpenSettings}
                 className="p-2 text-gray-400 hover:text-sw-teal rounded-full hover:bg-sw-lightGray transition-colors"
                 title="Global Theme Settings"
             >
@@ -508,14 +622,40 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             {isEditingStage && (
                 <>
                     <div><label className={labelClass}>Stage Title</label><input type="text" value={(data as StageDefinition).title} onChange={(e) => handleChange('title', e.target.value)} className={inputClass} /></div>
+                    <div><label className={labelClass}>Description</label><textarea value={(data as StageDefinition).description || ''} onChange={(e) => handleChange('description', e.target.value)} className={inputClass} rows={3} /></div>
                     <div><label className={labelClass}>Default Required Skill</label><input type="text" value={(data as StageDefinition).defaultSkill || ''} onChange={(e) => handleChange('defaultSkill', e.target.value)} className={inputClass} placeholder="e.g. Customer Service Rep" /></div>
                 </>
             )}
             {isEditingSection && (
                 <>
                     <div><label className={labelClass}>Section Title</label><input type="text" value={(data as SectionDefinition).title} onChange={(e) => handleChange('title', e.target.value)} className={inputClass} /></div>
+                    
                     <div>
-                    <label className={labelClass}>Layout Grid</label>
+                        <label className={labelClass}>Section Variant</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {[
+                                { id: 'standard', label: 'Standard', icon: Layout },
+                                { id: 'info', label: 'Info Card', icon: Info },
+                                { id: 'warning', label: 'Warning', icon: AlertTriangle },
+                                { id: 'summary', label: 'Summary', icon: PanelBottom },
+                            ].map(v => (
+                                <button
+                                    key={v.id}
+                                    onClick={() => handleChange('variant', v.id)}
+                                    className={`p-3 border rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${
+                                        ((data as SectionDefinition).variant || 'standard') === v.id 
+                                        ? 'border-sw-teal bg-sw-teal/5 text-sw-teal font-bold ring-1 ring-sw-teal' 
+                                        : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <v.icon size={20} />
+                                    <span className="text-xs uppercase">{v.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div><label className={labelClass}>Layout Grid</label>
                     <div className="grid grid-cols-3 gap-2">
                         {['1col', '2col', '3col'].map(l => (
                             <button 
@@ -529,6 +669,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                         ))}
                     </div>
                  </div>
+                 
+                 <div>
+                     <label className={labelClass}>Section Description / Content</label>
+                     <textarea 
+                        value={(data as SectionDefinition).description || ''} 
+                        onChange={(e) => handleChange('description', e.target.value)} 
+                        className={inputClass} 
+                        rows={3} 
+                        placeholder="Helper text or alert message content..."
+                     />
+                 </div>
                 </>
             )}
             {isEditingElement && (
@@ -536,9 +687,64 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <div><label className={labelClass}>Field Label</label><input type="text" value={(data as ElementDefinition).label} onChange={(e) => handleChange('label', e.target.value)} className={inputClass} /></div>
                     <div><label className={labelClass}>Field Type</label>
                         <select value={(data as ElementDefinition).type} onChange={(e) => handleChange('type', e.target.value)} className={inputClass}>
-                            <option value="text">Single Line Text</option><option value="email">Email Address</option><option value="textarea">Multi-line Text</option><option value="number">Number</option><option value="date">Date</option><option value="currency">Currency</option><option value="select">Dropdown</option><option value="multiselect">Multi-Select Dropdown</option><option value="radio">Radio Buttons</option><option value="checkbox">Checkbox</option><option value="repeater">Repeater List</option><option value="static">Static Text</option>
+                            <option value="text">Single Line Text</option><option value="email">Email Address</option><option value="textarea">Multi-line Text</option><option value="number">Number</option><option value="date">Date</option><option value="currency">Currency</option><option value="select">Dropdown</option><option value="multiselect">Multi-Select Dropdown</option><option value="radio">Radio Buttons</option><option value="checkbox">Checkbox</option><option value="calculated">Calculated Field</option><option value="repeater">Repeater List</option><option value="static">Static Text</option>
                         </select>
                     </div>
+
+                    {renderCalculationBuilder()}
+
+                    {/* Static Text Specifics */}
+                    {(data as ElementDefinition).type === 'static' && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 space-y-4">
+                            <div>
+                                <label className={labelClass}>Content Source</label>
+                                <div className="flex bg-white rounded-lg p-1 border border-gray-200">
+                                    <button
+                                        onClick={() => handleChange('staticDataSource', 'manual')}
+                                        className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${((data as ElementDefinition).staticDataSource || 'manual') === 'manual' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                                    >
+                                        Constant Text
+                                    </button>
+                                    <button
+                                        onClick={() => handleChange('staticDataSource', 'field')}
+                                        className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${((data as ElementDefinition).staticDataSource) === 'field' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                                    >
+                                        Field Reference
+                                    </button>
+                                </div>
+                            </div>
+
+                            {((data as ElementDefinition).staticDataSource === 'field') ? (
+                                <div>
+                                    <label className={labelClass}>Source Field</label>
+                                    <select
+                                        value={(data as ElementDefinition).sourceFieldId || ''}
+                                        onChange={(e) => handleChange('sourceFieldId', e.target.value)}
+                                        className={inputClass}
+                                    >
+                                        <option value="">Select a field to mirror...</option>
+                                        {availableTargets.map(t => (
+                                            <option key={t.id} value={t.id}>{t.label}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[10px] text-gray-400 mt-1">
+                                        This component will display the read-only value of the selected field.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className={labelClass}>Text Content</label>
+                                    <textarea
+                                        value={(data as ElementDefinition).description || ''}
+                                        onChange={(e) => handleChange('description', e.target.value)}
+                                        className={inputClass}
+                                        rows={4}
+                                        placeholder="Enter the static text to display..."
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Repeater Configuration */}
                     {(data as ElementDefinition).type === 'repeater' && (
@@ -591,7 +797,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                         {col.type === 'select' && (
                                              <input 
                                                 type="text" 
-                                                value={col.options?.join(',') || ''}
+                                                value={getOptionsString(col.options)}
                                                 onChange={(e) => {
                                                     const newCols = [...((data as ElementDefinition).columns || [])];
                                                     newCols[idx] = { ...newCols[idx], options: e.target.value.split(',') };
@@ -618,12 +824,55 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     )}
 
                     {['select', 'radio', 'multiselect'].includes((data as ElementDefinition).type) && (
-                        <div><label className={labelClass}>Options (comma separated)</label><textarea value={Array.isArray((data as ElementDefinition).options) ? ((data as ElementDefinition).options as string[]).join(',') : (data as ElementDefinition).options} onChange={(e) => handleChange('options', e.target.value.split(','))} className={inputClass} rows={3} /></div>
+                        <div>
+                            <label className={labelClass}>Options (comma separated)</label>
+                            <textarea 
+                                value={getOptionsString((data as ElementDefinition).options)}
+                                onChange={(e) => handleChange('options', e.target.value.split(','))} 
+                                className={inputClass} 
+                                rows={3} 
+                            />
+                        </div>
                     )}
-                    {(data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (
-                        <div className="flex items-center gap-3 mt-4 p-4 bg-sw-lightGray rounded-xl">
-                            <input type="checkbox" checked={(data as ElementDefinition).required} onChange={(e) => handleChange('required', e.target.checked)} className="w-5 h-5 text-sw-teal rounded focus:ring-sw-teal" />
-                            <label className="text-sm text-sw-teal font-bold">Mandatory Field</label>
+                    {(data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (data as ElementDefinition).type !== 'calculated' && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4">
+                            <label className={labelClass}>Requirement Rules</label>
+                            <div className="flex flex-col gap-3">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={(data as ElementDefinition).required} 
+                                        onChange={(e) => handleChange('required', e.target.checked)} 
+                                        className="w-5 h-5 text-sw-teal rounded focus:ring-sw-teal" 
+                                    />
+                                    <span className="text-sm font-bold text-gray-700">Always Mandatory</span>
+                                </label>
+                                
+                                {!(data as ElementDefinition).required && (
+                                    <div className="pl-8 animate-in slide-in-from-top-2 fade-in">
+                                        <button 
+                                            onClick={() => { ensureLogicGroup('requiredLogic'); setRequiredLogicModalOpen(true); }}
+                                            className={`text-xs w-full text-left border px-3 py-2 rounded-lg font-bold flex items-center justify-between transition-all ${
+                                                ((data as ElementDefinition).requiredLogic?.conditions?.length || 0) > 0 || ((data as ElementDefinition).requiredLogic?.groups?.length || 0) > 0
+                                                ? 'bg-sw-teal text-white border-sw-teal' 
+                                                : 'bg-white text-gray-500 border-gray-300 hover:border-sw-teal hover:text-sw-teal'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 size={14} />
+                                                {((data as ElementDefinition).requiredLogic?.conditions?.length || 0) > 0 || ((data as ElementDefinition).requiredLogic?.groups?.length || 0) > 0 
+                                                    ? 'Conditional Logic Active' 
+                                                    : 'Set Conditional Logic'}
+                                            </div>
+                                            {((data as ElementDefinition).requiredLogic?.conditions?.length || 0) > 0 || ((data as ElementDefinition).requiredLogic?.groups?.length || 0) > 0 && 
+                                                <div className="bg-white/20 px-2 py-0.5 rounded text-[10px]">
+                                                    {((data as ElementDefinition).requiredLogic?.conditions?.length || 0) + ((data as ElementDefinition).requiredLogic?.groups?.length || 0)} Rules
+                                                </div>
+                                            }
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </>
@@ -637,53 +886,88 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             
             {/* STAGE SKILLS */}
             {isEditingStage && (
-                <div className="space-y-4">
-                    <div className="bg-sw-purpleLight/30 p-6 rounded-xl border border-sw-teal/10">
-                        <div className="flex justify-between items-center mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-sw-teal p-2 rounded-lg text-white"><Briefcase size={20} /></div>
-                                <div>
-                                    <h3 className="font-bold text-sw-teal">Skill Routing</h3>
-                                    <p className="text-xs text-gray-500">{(data as StageDefinition).skillLogic?.length || 0} Rules Configured</p>
+                <>
+                    {/* SKIP LOGIC CARD */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => { ensureLogicGroup('skipLogic'); setSkipLogicModalOpen(true); }}>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="p-3 bg-amber-50 rounded-lg text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                                <FastForward size={24} />
+                            </div>
+                            <div className="text-right">
+                                <span className={`text-xs font-bold px-2 py-1 rounded ${((data as StageDefinition).skipLogic?.conditions?.length > 0) ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>
+                                    {((data as StageDefinition).skipLogic?.conditions?.length || 0)} Rules
+                                </span>
+                            </div>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-800 mb-1">Skip Stage Logic</h3>
+                        <p className="text-sm text-gray-500 mb-4">Define conditions when this entire stage should be skipped (Negative Logic).</p>
+                        <button className="w-full py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-all">Configure Skip Rules</button>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="bg-sw-purpleLight/30 p-6 rounded-xl border border-sw-teal/10">
+                            <div className="flex justify-between items-center mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-sw-teal p-2 rounded-lg text-white"><Briefcase size={20} /></div>
+                                    <div>
+                                        <h3 className="font-bold text-sw-teal">Skill Routing</h3>
+                                        <p className="text-xs text-gray-500">{(data as StageDefinition).skillLogic?.length || 0} Rules Configured</p>
+                                    </div>
+                                </div>
+                                {/* NEW: Copy/Paste for Rules */}
+                                <div className="flex gap-1">
+                                    <button 
+                                        onClick={handleCopyRules}
+                                        className="p-1.5 rounded-lg text-sw-teal hover:bg-sw-teal/10 transition-colors relative"
+                                        title="Copy All Routing Rules"
+                                    >
+                                        {copyFeedback ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+                                    </button>
+                                    {clipboardStageLogic && (
+                                        <button 
+                                            onClick={handlePasteRules}
+                                            className="p-1.5 rounded-lg text-sw-teal hover:bg-sw-teal/10 transition-colors animate-pulse"
+                                            title="Paste Routing Rules"
+                                        >
+                                            <ClipboardPaste size={16} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
-                            <div className="flex gap-1">
-                                {/* ... existing buttons ... */}
+                            <div className="mb-4">
+                                <button onClick={() => {
+                                    const newRule: SkillRule = { logic: { id: Date.now().toString(), operator: 'AND', conditions: [] }, requiredSkill: '' };
+                                    const newIndex = (selectedStage.skillLogic?.length || 0);
+                                    onUpdateStage({ ...selectedStage!, skillLogic: [...(selectedStage?.skillLogic || []), newRule] });
+                                    setActiveRuleIndex(newIndex);
+                                    setSkillModalOpen(true);
+                                }} className="w-full text-xs bg-white border border-sw-teal text-sw-teal px-3 py-2 rounded-lg font-bold hover:bg-sw-teal hover:text-white transition-colors">+ Add Routing Condition</button>
+                            </div>
+                            <div className="space-y-2">
+                                {(data as StageDefinition).skillLogic?.map((rule, idx) => {
+                                    const summary = formatLogicSummary(rule.logic, allElements);
+                                    return (
+                                        <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center text-sm group">
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono text-xs text-gray-400">#{idx+1}</span>
+                                                    <span className="font-bold text-gray-700">{rule.requiredSkill || 'Unassigned'}</span>
+                                                </div>
+                                                <div className="text-xs text-gray-400 ml-6 mt-1 font-mono bg-gray-50 p-1 rounded inline-block">
+                                                    If: {summary}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => { setActiveRuleIndex(idx); setSkillModalOpen(true); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-teal"><Edit2 size={14}/></button>
+                                                <button onClick={() => { const nl = [...selectedStage!.skillLogic!]; nl.splice(idx,1); onUpdateStage({...selectedStage!, skillLogic: nl}); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-red"><Trash2 size={14}/></button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
-                        <div className="mb-4">
-                             <button onClick={() => {
-                                const newRule: SkillRule = { logic: { id: Date.now().toString(), operator: 'AND', conditions: [] }, requiredSkill: '' };
-                                const newIndex = (selectedStage.skillLogic?.length || 0);
-                                onUpdateStage({ ...selectedStage!, skillLogic: [...(selectedStage?.skillLogic || []), newRule] });
-                                setActiveRuleIndex(newIndex);
-                                setSkillModalOpen(true);
-                            }} className="w-full text-xs bg-white border border-sw-teal text-sw-teal px-3 py-2 rounded-lg font-bold hover:bg-sw-teal hover:text-white transition-colors">+ Add Routing Condition</button>
-                        </div>
-                        <div className="space-y-2">
-                            {(data as StageDefinition).skillLogic?.map((rule, idx) => {
-                                const summary = formatLogicSummary(rule.logic, allElements);
-                                return (
-                                    <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center text-sm group">
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-mono text-xs text-gray-400">#{idx+1}</span>
-                                                <span className="font-bold text-gray-700">{rule.requiredSkill || 'Unassigned'}</span>
-                                            </div>
-                                            <div className="text-xs text-gray-400 ml-6 mt-1 font-mono bg-gray-50 p-1 rounded inline-block">
-                                                If: {summary}
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => { setActiveRuleIndex(idx); setSkillModalOpen(true); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-teal"><Edit2 size={14}/></button>
-                                            <button onClick={() => { const nl = [...selectedStage!.skillLogic!]; nl.splice(idx,1); onUpdateStage({...selectedStage!, skillLogic: nl}); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-red"><Trash2 size={14}/></button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
                     </div>
-                </div>
+                </>
             )}
 
             {/* VISIBILITY CARD */}
@@ -706,7 +990,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             )}
 
             {/* VALIDATION CARD */}
-            {isEditingElement && (data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (
+            {isEditingElement && (data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (data as ElementDefinition).type !== 'calculated' && (
                 <div id="card-validation" className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => setValidationModalOpen(true)}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-red-50 rounded-lg text-sw-red group-hover:bg-sw-red group-hover:text-white transition-colors">

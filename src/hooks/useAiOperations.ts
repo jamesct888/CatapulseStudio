@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ProcessDefinition } from '../types';
 import { 
+    generateMonolithicProcess,
     generateProcessSkeleton, 
     generateStageDetails, 
     generateProcessFromImage, 
@@ -15,8 +16,7 @@ interface AiOperationsProps {
     setViewMode: (mode: any) => void;
     setStartPrompt: (val: string) => void;
     setSelectedStageId: (id: string) => void;
-    setLoadingStageIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-    handleStartDemo: (useDemo: boolean) => void; // Callback to fallback to demo
+    handleStartDemo: (useDemo: boolean) => void;
 }
 
 export const useAiOperations = ({
@@ -25,12 +25,12 @@ export const useAiOperations = ({
     setViewMode,
     setStartPrompt,
     setSelectedStageId,
-    setLoadingStageIds,
     handleStartDemo
 }: AiOperationsProps) => {
     
     const [isGenerating, setIsGenerating] = useState(false);
     const [showDemoDrop, setShowDemoDrop] = useState(false);
+    const [loadingStageIds, setLoadingStageIds] = useState<Set<string>>(new Set());
 
     // --- Start Generation Flow ---
     const handleStartGeneration = async (prompt: string) => {
@@ -58,6 +58,23 @@ export const useAiOperations = ({
         try {
             console.log(`[AI Hook] 🟢 STARTING GENERATION for: "${prompt}"`);
             
+            // --- STRATEGY 1: ONE-SHOT (MONOLITHIC) ---
+            // Faster, uses fewer tokens, but may truncate large processes.
+            const fullProcess = await generateMonolithicProcess(prompt);
+
+            if (fullProcess) {
+                console.log(`[AI Hook] 🚀 One-Shot Generation Successful!`);
+                setProcessDef(fullProcess);
+                setSelectedStageId(fullProcess.stages[0]?.id || '');
+                setViewMode('editor');
+                setIsGenerating(false);
+                return;
+            }
+
+            // --- STRATEGY 2: ITERATIVE (FALLBACK) ---
+            // If monolithic failed (returned null), fallback to Skeleton + Loop.
+            console.log(`[AI Hook] ⚠️ One-Shot failed. Falling back to Iterative Strategy (Skeleton + Flesh).`);
+            
             // Step 1: Generate Skeleton
             const skeleton = await generateProcessSkeleton(prompt);
             
@@ -74,7 +91,6 @@ export const useAiOperations = ({
                 setIsGenerating(false); // Stop main blocking overlay, background loading continues
 
                 // Step 2: Generate Flesh (Serialized)
-                // IMPORTANT: We must await each request to avoid hitting 429 Rate Limits
                 for (let i = 0; i < skeleton.stages.length; i++) {
                     const stage = skeleton.stages[i];
                     
@@ -109,8 +125,9 @@ export const useAiOperations = ({
                 }
 
             } else {
+                // If skeleton also failed
                 setIsGenerating(false);
-                if (confirm("The AI Service is currently unavailable (Quota Exceeded). Load Demo Mode?")) {
+                if (confirm("The AI Service is currently unavailable (Likely Quota Limit). Load Demo Process instead?")) {
                     handleStartDemo(true);
                 }
             }
@@ -188,6 +205,8 @@ export const useAiOperations = ({
         setIsGenerating,
         showDemoDrop,
         setShowDemoDrop,
+        loadingStageIds,
+        setLoadingStageIds,
         handleStartGeneration,
         handleLegacyFormUpload,
         handleAiModification

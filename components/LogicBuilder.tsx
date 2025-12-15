@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { LogicGroup, Condition } from '../types';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Search } from 'lucide-react';
 
 interface LogicBuilderProps {
     group: LogicGroup;
@@ -9,6 +9,86 @@ interface LogicBuilderProps {
     availableTargets: any[];
     depth?: number;
 }
+
+// --- Internal Searchable Select Component ---
+const SearchableSelect = ({ 
+    value, 
+    onChange, 
+    options, 
+    placeholder 
+}: { 
+    value: string, 
+    onChange: (val: string) => void, 
+    options: {id: string, label: string}[], 
+    placeholder: string 
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [filter, setFilter] = useState('');
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (isOpen && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isOpen]);
+
+    const selectedLabel = options.find(o => o.id === value)?.label;
+    const filteredOptions = options.filter(o => o.label.toLowerCase().includes(filter.toLowerCase()));
+
+    return (
+        <div className="relative w-full" ref={wrapperRef}>
+            {!isOpen ? (
+                <div 
+                    onClick={() => { setIsOpen(true); setFilter(''); }}
+                    className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 cursor-pointer focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm flex justify-between items-center min-h-[34px]"
+                >
+                    <span className="truncate mr-2 block">
+                        {selectedLabel ? selectedLabel : <span className="text-gray-400 italic">{placeholder}</span>}
+                    </span>
+                    <span className="text-gray-400 text-[10px] shrink-0">▼</span>
+                </div>
+            ) : (
+                <div className="absolute top-0 left-0 w-full z-[100] bg-white rounded-md shadow-xl border border-sw-teal animate-in fade-in zoom-in-95 duration-75">
+                    <div className="flex items-center border-b border-gray-100 p-1">
+                        <Search size={12} className="ml-1 text-gray-400"/>
+                        <input 
+                            ref={inputRef}
+                            type="text"
+                            className="w-full p-1.5 text-xs outline-none bg-transparent"
+                            placeholder="Type to search..."
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value)}
+                        />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                        {filteredOptions.length === 0 && <div className="p-3 text-xs text-gray-400 italic text-center">No fields match</div>}
+                        {filteredOptions.map(opt => (
+                            <div 
+                                key={opt.id}
+                                onClick={() => { onChange(opt.id); setIsOpen(false); }}
+                                className={`px-3 py-2 text-xs hover:bg-sw-teal/5 hover:text-sw-teal cursor-pointer text-gray-700 truncate border-b border-gray-50 last:border-0 transition-colors ${opt.id === value ? 'bg-sw-teal/10 font-bold text-sw-teal' : ''}`}
+                                title={opt.label}
+                            >
+                                {opt.label}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, availableTargets, depth = 0 }) => {
     const addCondition = () => {
@@ -132,19 +212,17 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Field</label>
-                                        <select 
-                                            className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                        <SearchableSelect
                                             value={cond.targetElementId}
-                                            onChange={(e) => updateCondition(idx, 'targetElementId', e.target.value)}
-                                        >
-                                            <option value="">Select Field...</option>
-                                            {availableTargets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                                        </select>
+                                            onChange={(val) => updateCondition(idx, 'targetElementId', val)}
+                                            options={availableTargets.map(t => ({ id: t.id, label: t.label }))}
+                                            placeholder="Select Field..."
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Operator</label>
                                         <select 
-                                            className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                            className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm h-[34px]"
                                             value={cond.operator}
                                             onChange={(e) => updateCondition(idx, 'operator', e.target.value)}
                                         >
@@ -167,7 +245,7 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Value</label>
                                         {showValueDropdown ? (
                                             <select
-                                                className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                                className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm h-[34px]"
                                                 value={String(cond.value)}
                                                 onChange={(e) => updateCondition(idx, 'value', e.target.value)}
                                             >
@@ -179,7 +257,7 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                         ) : (
                                             <input 
                                                 type="text" 
-                                                className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 placeholder-gray-400 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm"
+                                                className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 placeholder-gray-400 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm h-[34px]"
                                                 value={String(cond.value)}
                                                 onChange={(e) => updateCondition(idx, 'value', e.target.value)}
                                                 placeholder="Value to match..."

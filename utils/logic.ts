@@ -1,9 +1,5 @@
 
-
-
-
-
-import { Condition, ElementDefinition, SectionDefinition, FormState, LogicGroup } from "../types";
+import { Condition, ElementDefinition, SectionDefinition, FormState, LogicGroup, CalculationPart } from "../types";
 
 export const generateId = (label: string): string => {
   return label
@@ -67,13 +63,19 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
 };
 
 export const evaluateLogicGroup = (group: LogicGroup | undefined, formData: FormState): boolean => {
-    if (!group || (!group.conditions.length && (!group.groups || !group.groups.length))) return true; // Empty group implies true
+    if (!group) return true;
+    
+    // Safety check for array existence
+    const conditions = group.conditions || [];
+    const groups = group.groups || [];
+
+    if (conditions.length === 0 && groups.length === 0) return true; // Empty group implies true
 
     // Evaluate all direct conditions
-    const conditionsResult = group.conditions.map(c => evaluateCondition(c, formData));
+    const conditionsResult = conditions.map(c => evaluateCondition(c, formData));
     
     // Recursively evaluate subgroups
-    const groupsResult = group.groups ? group.groups.map(g => evaluateLogicGroup(g, formData)) : [];
+    const groupsResult = groups.map(g => evaluateLogicGroup(g, formData));
 
     const allResults = [...conditionsResult, ...groupsResult];
 
@@ -82,6 +84,52 @@ export const evaluateLogicGroup = (group: LogicGroup | undefined, formData: Form
     } else { // OR
         return allResults.some(r => r === true);
     }
+};
+
+export const evaluateCalculation = (parts: CalculationPart[] | undefined, formData: FormState): string | number => {
+    if (!parts || parts.length === 0) return '';
+
+    // Simplified evaluation: Treats the list as a sequence of operations
+    // e.g. [100] [+] [FieldA] [*] [2] -> ((100 + FieldA) * 2) 
+    // This ignores standard BODMAS for simplicity in this visual builder context, 
+    // treating it as a step-by-step accumulator.
+
+    let result = 0;
+    let pendingOperator = '+'; // Start by adding the first term to 0
+
+    // Helper to get numeric value
+    const getValue = (part: CalculationPart): number => {
+        if (part.type === 'constant') {
+            return parseFloat(part.value) || 0;
+        } else if (part.type === 'field') {
+            const raw = formData[part.value];
+            if (raw === undefined || raw === null || raw === '') return 0;
+            // Handle currency strings like "£1,000"
+            const clean = String(raw).replace(/[^0-9.-]+/g,"");
+            return parseFloat(clean) || 0;
+        }
+        return 0;
+    };
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+
+        if (part.type === 'operator') {
+            pendingOperator = part.value;
+        } else {
+            const val = getValue(part);
+            
+            switch (pendingOperator) {
+                case '+': result += val; break;
+                case '-': result -= val; break;
+                case '*': result *= val; break;
+                case '/': result = val !== 0 ? result / val : 0; break; // Avoid div by zero
+            }
+        }
+    }
+
+    // Round to 2 decimals for cleanliness
+    return Math.round(result * 100) / 100;
 };
 
 export const isElementVisible = (element: ElementDefinition, formData: FormState): boolean => {
@@ -148,11 +196,15 @@ export const validateValue = (element: ElementDefinition, value: any): string | 
 
 export const formatLogicSummary = (group: LogicGroup | undefined, allElements: {id: string, label: string}[]): string => {
     if (!group) return 'Always';
-    if (group.conditions.length === 0 && (!group.groups || group.groups.length === 0)) return 'Always';
+    
+    const conditions = group.conditions || [];
+    const groups = group.groups || [];
+
+    if (conditions.length === 0 && groups.length === 0) return 'Always';
 
     const parts: string[] = [];
 
-    group.conditions.forEach(c => {
+    conditions.forEach(c => {
         const el = allElements.find(e => e.id === c.targetElementId);
         const label = el ? el.label : 'Unknown Field';
         let op: string = c.operator;
@@ -170,8 +222,8 @@ export const formatLogicSummary = (group: LogicGroup | undefined, allElements: {
         parts.push(`${label} ${op} ${val}`.trim());
     });
 
-    if (group.groups && group.groups.length > 0) {
-        group.groups.forEach(g => {
+    if (groups.length > 0) {
+        groups.forEach(g => {
             const sub = formatLogicSummary(g, allElements);
             if(sub !== 'Always') parts.push(`(${sub})`);
         });

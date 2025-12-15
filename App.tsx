@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, ErrorInfo, ReactNode } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
 import { ModePreview } from './components/ModePreview';
@@ -7,24 +6,62 @@ import { ModeSpec } from './components/ModeSpec';
 import { ModeQA } from './components/ModeQA';
 import { ModePega } from './components/ModePega';
 import { ModeFlow } from './components/ModeFlow';
+import { ModeTable } from './components/ModeTable'; // Import ModeTable
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { GlobalSettingsPanel } from './components/GlobalSettingsPanel';
 import { AppHeader } from './components/AppHeader';
+import { AppFooter } from './components/AppFooter';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { DemoManager } from './components/DemoManager';
 import { DemoFocusOverlay } from './components/DemoFocusOverlay';
 import { useProcessState } from './hooks/useProcessState'; 
+import { useAiOperations } from './hooks/useAiOperations';
 import { 
-  ProcessDefinition, FormState, VisualTheme, UserStory, TestCase, 
-  ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy 
+  FormState, VisualTheme, UserStory, TestCase, 
+  ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy, SkillRule
 } from './types';
-import { 
-  generateProcessStructure, generateProcessFromImage, modifyProcess,
-  generateProcessSkeleton, generateStageDetails 
-} from './services/geminiService';
-import { 
-  demoDigitizedProcess 
-} from './services/demoData';
+
+// --- Error Boundary for Hardening ---
+interface ErrorBoundaryProps {
+  children?: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-screen bg-sw-lightGray text-sw-text p-8 text-center">
+          <h1 className="text-4xl font-serif text-sw-red mb-4">Something went wrong.</h1>
+          <p className="text-gray-600 mb-8">The application encountered an unexpected error.</p>
+          <button 
+            onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
+            className="px-6 py-2 bg-sw-teal text-white rounded-lg hover:bg-sw-tealHover transition-colors"
+          >
+            Reload Application
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // --- Main App Component ---
 const App: React.FC = () => {
@@ -34,11 +71,8 @@ const App: React.FC = () => {
   } = useProcessState();
 
   // UI State
-  const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');
+  const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'table' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');
   const [startPrompt, setStartPrompt] = useState('');
-  const [showDemoDrop, setShowDemoDrop] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingStageIds, setLoadingStageIds] = useState<Set<string>>(new Set()); // Track individual loading stages
   const [activeSidePanel, setActiveSidePanel] = useState<'none' | 'properties' | 'settings'>('properties');
   const [panelWidth, setPanelWidth] = useState(480);
   const [isResizingPanel, setIsResizingPanel] = useState(false);
@@ -54,174 +88,57 @@ const App: React.FC = () => {
   const [formData, setFormData] = useState<FormState>({});
   const [visualTheme, setVisualTheme] = useState<VisualTheme>({ mode: 'type1', density: 'default', radius: 'medium' });
   const [personaPrompt, setPersonaPrompt] = useState('');
+  const [isDetailedMode, setIsDetailedMode] = useState(false); // Default to Fast Mode (Single Call)
   
+  // Clipboard State for Rules
+  const [clipboardStageLogic, setClipboardStageLogic] = useState<SkillRule[] | null>(null);
+
   // QA & Pega State
   const [qaTab, setQaTab] = useState<'stories' | 'cases'>('stories');
   const [storyStrategy, setStoryStrategy] = useState<StoryStrategy>('screen');
-  const [userStories, setUserStories] = useState<UserStory[]>([]);
-  const [testCases, setTestCases] = useState<TestCase[]>([]);
-  const [pegaTab, setPegaTab] = useState<'blueprint' | 'manual' | 'data' | 'logic'>('blueprint');
+  const [pegaTab, setPegaTab] = useState<'design' | 'blueprint' | 'manual' | 'data' | 'logic'>('design');
 
   // Demo State
   const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // --- Handlers ---
-
-  const handleStart = async (useDemo = false) => {
-    if (useDemo) {
-        setIsDemoMode(true);
-        setStartPrompt('');
-        setProcessDef(null); 
-        setViewMode('onboarding');
-        return;
-    }
-
-    if (!startPrompt.trim()) {
-        const defaultProcess: ProcessDefinition = {
-            id: `proc_${Date.now()}`,
-            name: "New Process",
-            description: "Started from scratch",
-            stages: [
-                {
-                    id: 'stg_1',
-                    title: 'Stage 1',
-                    sections: [{ id: 'sec_1', title: 'Section 1', layout: '1col', elements: [] }]
-                }
-            ]
-        };
-        setProcessDef(defaultProcess);
-        setSelectedStageId(defaultProcess.stages[0].id);
-        setViewMode('editor');
-        return;
-    }
-    
-    setIsGenerating(true);
-    try {
-        console.log(`[App] 🟢 STARTING GENERATION for: "${startPrompt}"`);
-        
-        // Step 1: Generate Skeleton (Fast)
-        const skeleton = await generateProcessSkeleton(startPrompt);
-        
-        if (skeleton) {
-            console.log(`[App] ✅ SKELETON RECEIVED with ${skeleton.stages.length} stages.`);
-            
-            // Mark all stages as loading initially
-            const newLoadingSet = new Set<string>();
-            skeleton.stages.forEach(s => newLoadingSet.add(s.id));
-            setLoadingStageIds(newLoadingSet);
-
-            // Render Skeleton Immediately
-            setProcessDef(skeleton);
-            setSelectedStageId(skeleton.stages[0]?.id || '');
-            setViewMode('editor');
-            setIsGenerating(false); // Stop main loading overlay
-
-            // Step 2: Generate Flesh (Serialized with 4s delay to respect 15 RPM limit)
-            console.log(`[App] 🚀 QUEUING ${skeleton.stages.length} REQUESTS for details...`);
-            
-            for (let i = 0; i < skeleton.stages.length; i++) {
-                const stage = skeleton.stages[i];
-                
-                // Add a deliberate 4-second delay before firing next request (except the first one)
-                // This keeps us safely under ~15 RPM.
-                if (i > 0) {
-                    console.log(`[App] 🛑 Pacing request... waiting 4s`);
-                    await new Promise(resolve => setTimeout(resolve, 4000));
-                }
-
-                console.log(`[App] ⏳ Fetching details for Stage ${i + 1}: ${stage.title}`);
-                
-                // Fire request and handle response
-                generateStageDetails(stage, skeleton.description).then((details) => {
-                    console.log(`[App] 📥 Received details for Stage ${i + 1}: ${stage.title} (${details.length} sections)`);
-                    
-                    setProcessDef(prev => {
-                        if (!prev) return prev;
-                        if (prev.id !== skeleton.id) return prev; // Avoid race condition if reset
-
-                        const newStages = [...prev.stages];
-                        // Merge details into the specific stage
-                        const stageIndex = newStages.findIndex(s => s.id === stage.id);
-                        if (stageIndex !== -1) {
-                            newStages[stageIndex] = { ...newStages[stageIndex], sections: details };
-                        }
-                        return { ...prev, stages: newStages };
-                    });
-
-                    // Remove from loading set
-                    setLoadingStageIds(prev => {
-                        const next = new Set(prev);
-                        next.delete(stage.id);
-                        return next;
-                    });
-                });
-            }
-
-        } else {
-            setIsGenerating(false);
-            console.error("[App] ❌ Skeleton generation failed (returned null).");
-            alert("Could not generate process. Rate limit may be exceeded. Please wait 1 minute and try again.");
-        }
-    } catch (e) {
-        setIsGenerating(false);
-        console.error("[App] ❌ CRITICAL ERROR during generation:", e);
-        alert("An error occurred during generation. Please check your network or try again later.");
-    }
+  // --- Helpers for Demo ---
+  const handleStartDemo = (useDemo = false) => {
+      setIsDemoMode(true);
+      setStartPrompt('');
+      setProcessDef(null); 
+      setViewMode('onboarding');
   };
 
-  const handleLegacyFormUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  // --- AI Logic Hook ---
+  const {
+      isGenerating,
+      setIsGenerating,
+      showDemoDrop,
+      setShowDemoDrop,
+      loadingStageIds,
+      handleStartGeneration,
+      handleLegacyFormUpload,
+      handleAiModification
+  } = useAiOperations({
+      processDef,
+      setProcessDef,
+      setViewMode,
+      setStartPrompt,
+      setSelectedStageId,
+      handleStartDemo,
+      isDetailedMode
+  });
 
-      setShowDemoDrop(true);
-      setIsGenerating(true);
-
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-          try {
-              const base64 = reader.result as string;
-              const data = base64.split(',')[1];
-              const result = await generateProcessFromImage(data, file.type);
-              
-              if (result) {
-                  setProcessDef(result);
-                  setSelectedStageId(result.stages[0]?.id || '');
-                  setViewMode('editor');
-              } else {
-                 setProcessDef(demoDigitizedProcess);
-                 setSelectedStageId(demoDigitizedProcess.stages[0].id);
-                 setViewMode('editor');
-                 alert("AI extraction failed or incomplete. Loaded backup for demo continuity.");
-              }
-          } catch (e) {
-              console.error(e);
-              alert("Error analyzing image.");
-          } finally {
-              setShowDemoDrop(false);
-              setIsGenerating(false);
-          }
-      };
-      reader.readAsDataURL(file);
-  };
-
-  const handleAiModification = async () => {
-      if (!processDef || !aiPrompt) return;
-      setIsGenerating(true);
-      try {
-          const context = { selectedStageId, selectedSectionId };
-          const updated = await modifyProcess(processDef, aiPrompt, context);
-          if (updated) {
-              setProcessDef(updated);
-              setAiPrompt('');
-          } else {
-              alert("The AI could not perform this modification. Please try rephrasing your request.");
-          }
-      } catch (e) {
-          console.error(e);
-          alert("Modification failed due to an error.");
-      } finally {
-          setIsGenerating(false);
+  const handleStart = (useDemo = false) => {
+      if (useDemo) {
+          handleStartDemo(true);
+      } else {
+          handleStartGeneration(startPrompt);
       }
+  };
+
+  const onAiModification = () => {
+      handleAiModification(aiPrompt, { selectedStageId, selectedSectionId }, () => setAiPrompt(''));
   };
 
   // Helper to resolve selection objects
@@ -254,6 +171,8 @@ const App: React.FC = () => {
                 handleStart={handleStart}
                 handleLegacyFormUpload={handleLegacyFormUpload}
                 showDemoDrop={showDemoDrop}
+                isDetailedMode={isDetailedMode}
+                setIsDetailedMode={setIsDetailedMode}
             />
             {isGenerating && <LoadingOverlay />}
             {isDemoMode && (
@@ -264,8 +183,8 @@ const App: React.FC = () => {
                     setStartPrompt={setStartPrompt}
                     setShowDemoDrop={setShowDemoDrop}
                     setFormData={setFormData}
-                    setUserStories={setUserStories}
-                    setTestCases={setTestCases}
+                    setUserStories={(stories) => setProcessDef(prev => prev ? { ...prev, userStories: stories } : null)}
+                    setTestCases={(cases) => setProcessDef(prev => prev ? { ...prev, testCases: cases } : null)}
                     setPersonaPrompt={setPersonaPrompt}
                     setAiPrompt={setAiPrompt}
                     setSelectedStageId={setSelectedStageId}
@@ -289,6 +208,7 @@ const App: React.FC = () => {
   if (!processDef) return null;
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-white flex flex-col overflow-hidden font-sans text-sw-text relative">
         <AppHeader 
             processDef={processDef} 
@@ -319,7 +239,7 @@ const App: React.FC = () => {
                             }}
                             aiPrompt={aiPrompt}
                             setAiPrompt={setAiPrompt}
-                            handleAiModification={handleAiModification}
+                            handleAiModification={onAiModification}
                             isGenerating={isGenerating}
                             visualTheme={visualTheme}
                             isSettingsOpen={activeSidePanel !== 'none'}
@@ -328,9 +248,19 @@ const App: React.FC = () => {
                     </div>
                 )}
 
+                {viewMode === 'table' && (
+                    <div className="flex-1 overflow-hidden bg-gray-50">
+                        <ModeTable 
+                            processDef={processDef} 
+                            setProcessDef={setProcessDef}
+                            visualTheme={visualTheme}
+                        />
+                    </div>
+                )}
+
                 {viewMode === 'flow' && (
                     <div className="flex-1 overflow-hidden bg-gray-50">
-                        <ModeFlow processDef={processDef} />
+                        <ModeFlow processDef={processDef} setProcessDef={setProcessDef} />
                     </div>
                 )}
                 
@@ -355,8 +285,10 @@ const App: React.FC = () => {
                             processDef={processDef}
                             qaTab={qaTab} setQaTab={setQaTab}
                             storyStrategy={storyStrategy} setStoryStrategy={setStoryStrategy}
-                            userStories={userStories} setUserStories={setUserStories}
-                            testCases={testCases} setTestCases={setTestCases}
+                            userStories={processDef.userStories || []} 
+                            setUserStories={(stories) => setProcessDef({ ...processDef, userStories: stories })}
+                            testCases={processDef.testCases || []} 
+                            setTestCases={(cases) => setProcessDef({ ...processDef, testCases: cases })}
                             isGenerating={isGenerating} setIsGenerating={setIsGenerating}
                         />
                     </div>
@@ -378,8 +310,18 @@ const App: React.FC = () => {
                             onUpdateElement={updateElement}
                             onUpdateSection={updateSection}
                             onUpdateStage={updateStage}
-                            onDeleteElement={deleteElement}
-                            onDeleteSection={deleteSection}
+                            onDeleteElement={(id) => {
+                                // Scoped Delete: Pass current context to ensure we only remove the instance in this stage/section
+                                deleteElement(id, selectedSectionId, selectedStageId);
+                            }}
+                            onDeleteSection={(id) => {
+                                // Scoped Delete: Pass current stage context
+                                deleteSection(id, selectedStageId);
+                                if (selectedSectionId === id) {
+                                    setSelectedSectionId(null);
+                                    setSelectedElementId(null);
+                                }
+                            }}
                             onDeleteStage={(id) => {
                                 if (!processDef) return;
                                 if (processDef.stages.length <= 1) {
@@ -400,7 +342,27 @@ const App: React.FC = () => {
                                 }
                             }}
                             visualTheme={visualTheme}
+                            onOpenSettings={() => setActiveSidePanel('settings')}
                             onClose={() => setActiveSidePanel('none')}
+                            
+                            // Rule Clipboard Props
+                            clipboardStageLogic={clipboardStageLogic}
+                            onCopyStageLogic={(rules) => setClipboardStageLogic(rules)}
+                            onPasteStageLogic={(stageId) => {
+                                if(!clipboardStageLogic || !processDef) return;
+                                // Append logic to the specific stage
+                                const newDef = { ...processDef };
+                                const stg = newDef.stages.find(s => s.id === stageId);
+                                if(stg) {
+                                    // Deep clone rules to avoid ref issues, giving new IDs
+                                    const newRules = clipboardStageLogic.map(r => ({
+                                        ...r,
+                                        logic: { ...r.logic, id: `grp_${Date.now()}_${Math.random()}` }
+                                    }));
+                                    stg.skillLogic = [...(stg.skillLogic || []), ...newRules];
+                                    setProcessDef(newDef);
+                                }
+                            }}
                         />
                     )}
                     {activeSidePanel === 'settings' && (
@@ -416,6 +378,8 @@ const App: React.FC = () => {
             )}
         </div>
 
+        <AppFooter />
+
         {isDemoMode && (
             <DemoManager 
                 setProcessDef={setProcessDef}
@@ -424,8 +388,8 @@ const App: React.FC = () => {
                 setStartPrompt={setStartPrompt}
                 setShowDemoDrop={setShowDemoDrop}
                 setFormData={setFormData}
-                setUserStories={setUserStories}
-                setTestCases={setTestCases}
+                setUserStories={(stories) => setProcessDef(prev => prev ? { ...prev, userStories: stories } : null)}
+                setTestCases={(cases) => setProcessDef(prev => prev ? { ...prev, testCases: cases } : null)}
                 setPersonaPrompt={setPersonaPrompt}
                 setAiPrompt={setAiPrompt}
                 setSelectedStageId={setSelectedStageId}
@@ -442,6 +406,7 @@ const App: React.FC = () => {
         )}
         <DemoFocusOverlay area="none" highlightId={null} />
     </div>
+    </ErrorBoundary>
   );
 };
 

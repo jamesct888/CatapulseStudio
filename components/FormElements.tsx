@@ -1,8 +1,8 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ElementDefinition, VisualTheme } from '../types';
-import { Plus, Trash2, X, ChevronDown, Check } from 'lucide-react';
+import { Plus, Trash2, X, ChevronDown, Check, Calculator } from 'lucide-react';
+import { evaluateCalculation } from '../utils/logic';
 
 interface FormElementProps {
   element: ElementDefinition;
@@ -12,9 +12,39 @@ interface FormElementProps {
   error?: string;
   disabled?: boolean;
   theme?: VisualTheme;
+  // We need the full formData context to calculate values
+  formData?: any; 
 }
 
-export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' } }) => {
+export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' }, formData }) => {
+  // --- RUNTIME SELF-HEALING ---
+  // If the data has an invalid type (e.g. 'textInput'), map it to a valid one on the fly.
+  let effectiveType = element.type;
+  const rawType = (element.type || '').toLowerCase();
+  
+  const typeMap: Record<string, string> = {
+      'textinput': 'text',
+      'string': 'text',
+      'textfield': 'text',
+      'input': 'text',
+      'bool': 'checkbox',
+      'boolean': 'checkbox',
+      'dropdown': 'select',
+      'option': 'select',
+      'checklist': 'checkbox',
+      'int': 'number',
+      'integer': 'number',
+      'float': 'number',
+      'money': 'currency',
+      'calc': 'calculated',
+      'formula': 'calculated'
+  };
+
+  if (typeMap[rawType]) {
+      effectiveType = typeMap[rawType] as any;
+  }
+  // ---------------------------
+
   // Style Configuration Maps
   const densityConfig = {
     dense: {
@@ -98,38 +128,32 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
   const isType3 = theme.mode === 'type3';
 
   // --- THEME COLOR CLASSES ---
-  // Backgrounds: All use white inputs generally
   const inputBgClass = 'bg-white';
   
-  // Text
   const inputTextClass = isType2 
     ? 'text-[#0b3239] placeholder-gray-400' 
     : isType3 
         ? 'text-[#323233] placeholder-gray-400'
         : 'text-sw-teal placeholder-gray-400';
   
-  // Borders
   const inputBorderClass = isType2 
     ? 'border-gray-300 focus:border-[#e61126] focus:ring-[#e61126]' 
     : isType3
         ? 'border-gray-300 focus:border-[#006a4d] focus:ring-[#006a4d]'
         : 'border-sw-teal focus:border-sw-teal focus:ring-sw-teal';
     
-  // Label Text
   const labelTextClass = isType2 
     ? 'text-[#0b3239]' 
     : isType3 
         ? 'text-[#006a4d]' 
         : 'text-sw-teal';
   
-  // Static Text
   const staticTextClass = isType2 
     ? 'text-[#0b3239]' 
     : isType3 
         ? 'text-[#323233]' 
         : 'text-sw-teal';
 
-  // Error State Hover
   const errorHoverClass = isType2 
     ? "hover:border-[#e61126]" 
     : isType3 
@@ -139,7 +163,6 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
   const d = densityConfig[theme.density];
   const r = radiusConfig[theme.radius];
 
-  // Base input class construction
   const baseClasses = `w-full ${d.inputHeight} ${d.padding} ${d.fontSize} border ${inputBorderClass} ${r} focus:outline-none focus:shadow-input-focus focus:ring-1 transition-all ${inputBgClass} ${inputTextClass} font-sans`;
   
   const errorColorText = isType3 ? 'text-[#c04318]' : 'text-sw-red';
@@ -153,7 +176,6 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
     onChange(e.target.value);
   };
 
-  // --- Sub-Component for Label ---
   const Label = () => (
     <label className={`block font-bold ${labelTextClass} ${d.labelSize} ${d.labelMb}`}>
       {element.label}
@@ -161,15 +183,53 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
     </label>
   );
 
-  // --- Sub-Component for Error ---
   const ErrorMsg = () => error ? <p className={`text-sm ${errorColorText} mt-2 font-medium flex items-center gap-2 before:content-[''] before:bg-[url('https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/alert-circle.svg')] before:w-4 before:h-4`}>{error}</p> : null;
 
+  const getOptionLabel = (opt: any): string => {
+      if (typeof opt === 'string') return opt;
+      if (typeof opt === 'number') return String(opt);
+      if (opt && typeof opt === 'object') {
+          return opt.label || opt.value || opt.text || JSON.stringify(opt);
+      }
+      return '';
+  };
 
-  // --- Specific Render Logic ---
+  // --- Specific Render Logic based on EFFECTIVE Type ---
 
-  if (element.type === 'static') {
+  if (effectiveType === 'calculated') {
+      // Calculate value if formData is present
+      useEffect(() => {
+          if (formData && element.calculation) {
+              const calculatedValue = evaluateCalculation(element.calculation, formData);
+              // Only trigger change if value is different to avoid infinite loops
+              if (calculatedValue !== value) {
+                  onChange(calculatedValue);
+              }
+          }
+      }, [formData, element.calculation]); // Re-run when dependencies change
+
+      return (
+        <div className={`${d.wrapper} group`}>
+          <Label />
+          <div className="relative w-full">
+             <span className={`absolute left-0 top-0 bottom-0 flex items-center ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}`}>
+                <Calculator size={theme.density === 'dense' ? 14 : 18} />
+             </span>
+             <input
+               type="text"
+               readOnly
+               className={`w-full ${d.inputHeight} ${d.padding} ${d.fontSize} pl-8 bg-transparent ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'} font-mono font-bold border-none focus:ring-0 cursor-default`}
+               value={value !== undefined && value !== '' ? value : ''}
+               placeholder="0.00"
+             />
+          </div>
+          <ErrorMsg />
+        </div>
+      );
+  }
+
+  if (effectiveType === 'static') {
     const isReflection = element.staticDataSource === 'field';
-    // Format value for display if it's a reflection
     let displayContent = value;
     if (isReflection) {
         if (typeof value === 'boolean' || value === 'true' || value === 'false') {
@@ -204,14 +264,14 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
   }
 
   // --- Standard Inputs ---
-  switch (element.type) {
+  switch (effectiveType) {
     case 'text':
     case 'email':
       return (
         <div className={`${d.wrapper} group`}>
           <Label />
           <input
-            type={element.type === 'email' ? 'email' : 'text'}
+            type={effectiveType === 'email' ? 'email' : 'text'}
             disabled={disabled}
             className={`${baseClasses} ${errorClasses}`}
             value={value || ''}
@@ -228,13 +288,13 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
         <div className={`${d.wrapper} group`}>
           <Label />
           <div className="relative w-full">
-            {element.type === 'currency' && (
+            {effectiveType === 'currency' && (
               <span className={`absolute left-2 top-0 bottom-0 flex items-center font-bold ${d.fontSize} ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}`}>£</span>
             )}
             <input
               type="number"
               disabled={disabled}
-              className={`${baseClasses} ${errorClasses} ${element.type === 'currency' ? (theme.density === 'dense' ? 'pl-5' : 'pl-8') : ''}`}
+              className={`${baseClasses} ${errorClasses} ${effectiveType === 'currency' ? (theme.density === 'dense' ? 'pl-5' : 'pl-8') : ''}`}
               value={value || ''}
               onChange={handleChange}
               onBlur={onBlur}
@@ -304,7 +364,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
             >
               <option value="" className="text-gray-500">Please Select...</option>
               {options.map((opt, idx) => {
-                const label = String(opt).trim();
+                const label = getOptionLabel(opt);
                 return <option key={idx} value={label} className="text-gray-900">{label}</option>;
               })}
             </select>
@@ -315,7 +375,6 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
     case 'multiselect':
         const msOptions = element.options ? (Array.isArray(element.options) ? element.options : String(element.options).split(',')) : [];
         const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
-        // Custom MultiSelect Hook State
         const [isOpen, setIsOpen] = useState(false);
         const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -332,7 +391,6 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
             onChange(newValues);
         };
 
-        // Click outside to close
         useEffect(() => {
             function handleClickOutside(event: MouseEvent) {
                 if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -375,11 +433,10 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                     </div>
                 </div>
 
-                {/* Dropdown Menu */}
                 {isOpen && !disabled && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                         {msOptions.map((opt, idx) => {
-                            const label = String(opt).trim();
+                            const label = getOptionLabel(opt);
                             const isSelected = selectedValues.includes(label);
                             return (
                                 <div 
@@ -412,10 +469,9 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       return (
         <div className={`${d.wrapper} group`}>
           <Label />
-           {/* Segmented Control Style */}
           <div className={`flex w-full flex-wrap p-1 rounded-lg gap-1 border ${radioContainerClass}`}>
             {radioOpts.map((opt, idx) => {
-              const label = String(opt).trim();
+              const label = getOptionLabel(opt);
               const isSelected = value === label;
               return (
                 <label key={idx} className={`
@@ -433,7 +489,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                     value={label}
                     checked={isSelected}
                     onChange={handleChange}
-                    onBlur={onBlur} // Less common for radio but kept for consistency
+                    onBlur={onBlur} 
                     disabled={disabled}
                     className="hidden"
                   />
@@ -482,7 +538,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
         const rows = Array.isArray(value) ? value : [];
 
         const handleAddRow = () => {
-            onChange([...rows, {}]); // Add empty object
+            onChange([...rows, {}]); 
         };
 
         const handleRemoveRow = (index: number) => {

@@ -31,10 +31,18 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     const [draggedStageIdx, setDraggedStageIdx] = useState<number | null>(null);
     const [draggedSection, setDraggedSection] = useState<{ stageIdx: number, sectionIdx: number } | null>(null);
 
+    const resetDragState = () => {
+        setDraggedStageIdx(null);
+        setDraggedSection(null);
+    };
+
     // --- Stage Drag Handlers ---
     const handleDragStart = (e: React.DragEvent, index: number) => {
+        e.stopPropagation();
+        resetDragState(); // Ensure clean slate
         setDraggedStageIdx(index);
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'stage', index }));
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -42,23 +50,72 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         e.dataTransfer.dropEffect = 'move';
     };
 
-    const handleDrop = (e: React.DragEvent, index: number) => {
+    const handleDrop = (e: React.DragEvent, targetStageIdx: number) => {
         e.preventDefault();
-        if (draggedStageIdx === null || draggedStageIdx === index) return;
+        e.stopPropagation();
 
-        const newStages = [...processDef.stages];
-        const [movedStage] = newStages.splice(draggedStageIdx, 1);
-        newStages.splice(index, 0, movedStage);
-        
-        setProcessDef({ ...processDef, stages: newStages });
-        setDraggedStageIdx(null);
+        let dragData: any = null;
+        try {
+            const raw = e.dataTransfer.getData('application/json');
+            if (raw) dragData = JSON.parse(raw);
+        } catch (err) {
+            console.error("Drag Parse Error", err);
+        }
+
+        // --- CASE 1: Dropping a SECTION onto a Stage Header (Move to Stage) ---
+        if (draggedSection || (dragData && dragData.type === 'section')) {
+             const srcStageIdx = draggedSection ? draggedSection.stageIdx : dragData.stageIdx;
+             const srcSecIdx = draggedSection ? draggedSection.sectionIdx : dragData.sectionIdx;
+
+             const newStages = [...processDef.stages];
+             
+             // 1. Get Source Stage
+             const sourceStage = { ...newStages[srcStageIdx] };
+             sourceStage.sections = [...sourceStage.sections];
+             
+             // 2. Remove from Source
+             const [movedSection] = sourceStage.sections.splice(srcSecIdx, 1);
+             
+             // 3. Update Source in Array (Important if src == target)
+             newStages[srcStageIdx] = sourceStage;
+
+             // 4. Get Target Stage (Refetch from array to get latest state if src == target)
+             const targetStage = { ...newStages[targetStageIdx] };
+             targetStage.sections = [...targetStage.sections];
+
+             // 5. Add to Target (Append to end)
+             targetStage.sections.push(movedSection);
+             newStages[targetStageIdx] = targetStage;
+             
+             setProcessDef({ ...processDef, stages: newStages });
+             resetDragState();
+             
+             // Auto-select the target stage so the user sees the moved item
+             setSelectedStageId(newStages[targetStageIdx].id);
+             return;
+        }
+
+        // --- CASE 2: Reordering STAGES ---
+        if (draggedStageIdx !== null || (dragData && dragData.type === 'stage')) {
+            const srcIdx = draggedStageIdx !== null ? draggedStageIdx : dragData.index;
+            if (srcIdx === targetStageIdx) return;
+
+            const newStages = [...processDef.stages];
+            const [movedStage] = newStages.splice(srcIdx, 1);
+            newStages.splice(targetStageIdx, 0, movedStage);
+            
+            setProcessDef({ ...processDef, stages: newStages });
+            resetDragState();
+        }
     };
 
     // --- Section Drag Handlers ---
     const handleSectionDragStart = (e: React.DragEvent, stageIdx: number, sectionIdx: number) => {
         e.stopPropagation();
+        resetDragState(); // Ensure clean slate
         setDraggedSection({ stageIdx, sectionIdx });
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'section', stageIdx, sectionIdx }));
     };
 
     const handleSectionDragOver = (e: React.DragEvent) => {
@@ -71,24 +128,53 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         e.preventDefault();
         e.stopPropagation();
 
-        if (!draggedSection) return;
-        if (draggedSection.stageIdx !== stageIdx) return; // Only allow reorder within same stage
-        if (draggedSection.sectionIdx === targetSectionIdx) {
-             setDraggedSection(null);
+        let dragData: any = null;
+        try {
+            const raw = e.dataTransfer.getData('application/json');
+            if (raw) dragData = JSON.parse(raw);
+        } catch (err) {
+            console.error("Section Drag Parse Error", err);
+        }
+
+        if (!draggedSection && (!dragData || dragData.type !== 'section')) return;
+
+        const srcStageIdx = draggedSection ? draggedSection.stageIdx : dragData.stageIdx;
+        const srcSecIdx = draggedSection ? draggedSection.sectionIdx : dragData.sectionIdx;
+        
+        // Prevent drop on self
+        if (srcStageIdx === stageIdx && srcSecIdx === targetSectionIdx) {
+             resetDragState();
              return;
         }
 
         const newStages = [...processDef.stages];
-        const stage = newStages[stageIdx];
-        const newSections = [...stage.sections];
         
-        const [movedSection] = newSections.splice(draggedSection.sectionIdx, 1);
-        newSections.splice(targetSectionIdx, 0, movedSection);
+        // 1. Get Source Stage
+        const sourceStage = { ...newStages[srcStageIdx] };
+        sourceStage.sections = [...sourceStage.sections];
         
-        newStages[stageIdx] = { ...stage, sections: newSections };
+        // 2. Remove from Source
+        const [movedSection] = sourceStage.sections.splice(srcSecIdx, 1);
+        newStages[srcStageIdx] = sourceStage; // Update Source
+
+        // 3. Get Target Stage (Refetch to ensure we have latest if src == target)
+        const targetStage = { ...newStages[stageIdx] };
+        targetStage.sections = [...targetStage.sections];
+
+        // 4. Calculate Insertion
+        let insertionIndex = targetSectionIdx;
+        // If moving within the same list and moving downwards, adjust index
+        if (srcStageIdx === stageIdx && srcSecIdx < targetSectionIdx) {
+             insertionIndex--;
+        }
+
+        // 5. Insert
+        targetStage.sections.splice(insertionIndex, 0, movedSection);
+        newStages[stageIdx] = targetStage; // Update Target
         
         setProcessDef({ ...processDef, stages: newStages });
-        setDraggedSection(null);
+        resetDragState();
+        setSelectedStageId(newStages[stageIdx].id);
     };
 
     return (
@@ -98,14 +184,21 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 <div className="space-y-4">
                 {processDef.stages.map((stage, idx) => {
                     const isLoading = loadingStageIds?.has(stage.id);
+                    // Visual cue: If dragging a section, allow drop on any stage
+                    const isSectionDropTarget = draggedSection !== null; 
+                    
                     return (
                     <div 
                         key={stage.id} 
-                        className={`relative group ${draggedStageIdx === idx ? 'opacity-40' : ''}`}
+                        className={`relative group rounded-lg transition-all 
+                            ${draggedStageIdx === idx ? 'opacity-40' : ''} 
+                            ${isSectionDropTarget ? 'ring-1 ring-dashed ring-sw-teal/30 bg-sw-teal/5' : ''}
+                        `}
                         draggable={!isLoading}
                         onDragStart={(e) => !isLoading && handleDragStart(e, idx)}
                         onDragOver={handleDragOver}
                         onDrop={(e) => !isLoading && handleDrop(e, idx)}
+                        onDragEnd={resetDragState}
                     >
                     {/* Connection Line (Hide for last item) */}
                     {idx < processDef.stages.length - 1 && (
@@ -114,8 +207,9 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
                     <div 
                         className={`flex items-center gap-3 p-2 rounded-lg transition-colors pr-8 relative 
-                            ${selectedStageId === stage.id && !selectedSectionId ? 'bg-sw-teal text-white shadow-md' : 'hover:bg-sw-lightGray text-sw-teal'}
+                            ${selectedStageId === stage.id && !selectedSectionId ? 'bg-sw-teal text-white shadow-md' : 'text-sw-teal'}
                             ${isLoading ? 'opacity-70 cursor-wait' : 'cursor-pointer'}
+                            ${selectedStageId !== stage.id ? 'hover:bg-sw-lightGray' : ''}
                         `}
                         onClick={() => {
                             if (isLoading) return;
@@ -152,6 +246,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                 onDragStart={(e) => handleSectionDragStart(e, idx, secIdx)}
                                 onDragOver={handleSectionDragOver}
                                 onDrop={(e) => handleSectionDrop(e, idx, secIdx)}
+                                onDragEnd={(e) => { e.stopPropagation(); resetDragState(); }}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setSelectedSectionId(section.id);

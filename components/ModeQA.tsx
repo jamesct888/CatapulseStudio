@@ -12,15 +12,17 @@ interface ModeQAProps {
     storyStrategy: StoryStrategy;
     setStoryStrategy: (val: StoryStrategy) => void;
     userStories: UserStory[];
-    setUserStories: React.Dispatch<React.SetStateAction<UserStory[]>>;
+    setUserStories: (stories: UserStory[]) => void;
     testCases: TestCase[];
-    setTestCases: React.Dispatch<React.SetStateAction<TestCase[]>>;
+    setTestCases: (cases: TestCase[]) => void;
     isGenerating: boolean;
     setIsGenerating: (val: boolean) => void;
 }
 
 // Simple Markdown Renderer specifically for GWT stories and Tables
-const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }) => {
+    if (!content) return <span className="text-gray-400 italic">No content available.</span>;
+
     const lines = content.split('\n');
     const elements: React.ReactNode[] = [];
     let tableBuffer: string[] = [];

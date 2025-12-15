@@ -1,3 +1,4 @@
+
 export type ElementType = 
   | 'text' 
   | 'email'
@@ -11,7 +12,8 @@ export type ElementType =
   | 'radio' 
   | 'checkbox' 
   | 'static'
-  | 'repeater'; // Added repeater type
+  | 'repeater'
+  | 'calculated'; 
 
 export type Operator = 'equals' | 'notEquals' | 'contains' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 
@@ -23,7 +25,7 @@ export interface ValidationRule {
 }
 
 export interface Condition {
-  id?: string; // unique id for UI handling
+  id?: string; 
   targetElementId: string;
   operator: Operator;
   value: string | number | boolean;
@@ -35,12 +37,11 @@ export interface LogicGroup {
   id: string;
   operator: LogicOperator;
   conditions: Condition[];
-  groups?: LogicGroup[]; // Recursive grouping for complex logic
+  groups?: LogicGroup[]; 
 }
 
-// Operational Logic for Stages
 export interface SkillRule {
-  logic: LogicGroup; // Replaced simple condition with full logic group
+  logic: LogicGroup; 
   requiredSkill: string;
 }
 
@@ -48,39 +49,52 @@ export interface RepeaterColumn {
   id: string;
   label: string;
   type: 'text' | 'date' | 'number' | 'select' | 'checkbox';
-  options?: string[]; // For select types within the repeater
+  options?: string[]; 
 }
 
 export interface DataMapping {
-    dataObject: string; // The class name, e.g., "Data-Address" or "MyOrg-Data-Policy"
-    property: string;   // The property name, e.g., ".Postcode"
+    dataObject: string; 
+    property: string;   
+}
+
+export interface SelectOption {
+    label: string;
+    value: string;
+}
+
+export type CalculationPartType = 'field' | 'constant' | 'operator';
+
+export interface CalculationPart {
+    id: string;
+    type: CalculationPartType;
+    value: string; // For field: elementId, For constant: number string, For operator: symbol
 }
 
 export interface ElementDefinition {
   id: string;
   label: string;
   type: ElementType;
-  options?: string[]; 
+  // Strict typing for options to prevent [object Object] errors
+  options?: (string | SelectOption)[]; 
   defaultValue?: string;
   description?: string; 
   
-  // Repeater Configuration
   columns?: RepeaterColumn[];
+  
+  // Calculation Configuration
+  calculation?: CalculationPart[];
 
   staticDataSource?: 'manual' | 'field';
   sourceFieldId?: string;
 
-  // Logic
   hidden?: boolean; 
-  visibility?: LogicGroup; // New structure (Root group)
+  visibility?: LogicGroup; 
   
   required?: boolean; 
-  requiredLogic?: LogicGroup; // New structure
+  requiredLogic?: LogicGroup; 
 
-  // Validation
   validation?: ValidationRule;
 
-  // Data Model
   dataMapping?: DataMapping;
 }
 
@@ -92,7 +106,6 @@ export interface SectionDefinition {
   variant?: 'standard' | 'summary' | 'warning' | 'info'; 
   elements: ElementDefinition[];
   
-  // Logic
   hidden?: boolean;
   visibility?: LogicGroup;
 }
@@ -103,9 +116,9 @@ export interface StageDefinition {
   description?: string;
   sections: SectionDefinition[];
   
-  // Operational Context
   defaultSkill?: string; 
-  skillLogic?: SkillRule[]; 
+  skillLogic?: SkillRule[];
+  skipLogic?: LogicGroup;
 }
 
 export interface ProcessDefinition {
@@ -113,6 +126,9 @@ export interface ProcessDefinition {
   name: string;
   description: string;
   stages: StageDefinition[];
+  // QA Persistence
+  userStories?: UserStory[];
+  testCases?: TestCase[];
 }
 
 export interface FormState {

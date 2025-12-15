@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { CatapulseLogo } from './Shared';
-import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload, Share, FileJson, MessageSquare, Plus, Trash2, Edit2, ArrowRight, RefreshCw, Wand2, UploadCloud, CheckCircle, Clock, X } from 'lucide-react';
+import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload, Share, FileJson, MessageSquare, Plus, Trash2, Edit2, ArrowRight, RefreshCw, Wand2, UploadCloud, CheckCircle, Clock, X, Table as TableIcon } from 'lucide-react';
 import { ProcessDefinition, VisualTheme, WorkshopSuggestion, ElementDefinition } from '../types';
 import { generateStandaloneHTML } from '../services/htmlExporter';
 import { ModalWrapper } from './ModalWrapper';
@@ -237,6 +237,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <nav className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
                 {[
                     { id: 'editor', icon: Edit3, label: 'Design' },
+                    { id: 'table', icon: TableIcon, label: 'Grid' },
                     { id: 'flow', icon: Network, label: 'Flow' },
                     { id: 'preview', icon: Play, label: 'Preview' },
                     { id: 'spec', icon: FileText, label: 'Spec' },

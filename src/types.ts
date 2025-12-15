@@ -12,7 +12,8 @@ export type ElementType =
   | 'radio' 
   | 'checkbox' 
   | 'static'
-  | 'repeater'; 
+  | 'repeater'
+  | 'calculated'; 
 
 export type Operator = 'equals' | 'notEquals' | 'contains' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 
@@ -61,6 +62,14 @@ export interface SelectOption {
     value: string;
 }
 
+export type CalculationPartType = 'field' | 'constant' | 'operator';
+
+export interface CalculationPart {
+    id: string;
+    type: CalculationPartType;
+    value: string; // For field: elementId, For constant: number string, For operator: symbol
+}
+
 export interface ElementDefinition {
   id: string;
   label: string;
@@ -71,6 +80,9 @@ export interface ElementDefinition {
   description?: string; 
   
   columns?: RepeaterColumn[];
+  
+  // Calculation Configuration
+  calculation?: CalculationPart[];
 
   staticDataSource?: 'manual' | 'field';
   sourceFieldId?: string;

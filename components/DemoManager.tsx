@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { DemoFocusOverlay } from './DemoFocusOverlay';
 import { 
-  ProcessDefinition, SectionDefinition, ElementDefinition, VisualTheme 
+  ProcessDefinition, SectionDefinition, ElementDefinition, VisualTheme, UserStory, TestCase 
 } from '../types';
 import { 
   demoProcess, demoDigitizedProcess, demoFormData, demoUserStories, demoTestCases
@@ -16,8 +16,8 @@ interface DemoManagerProps {
   setStartPrompt: (val: string) => void;
   setShowDemoDrop: (val: boolean) => void;
   setFormData: (val: any) => void;
-  setUserStories: (val: any) => void;
-  setTestCases: (val: any) => void;
+  setUserStories: (val: UserStory[]) => void;
+  setTestCases: (val: TestCase[]) => void;
   setPersonaPrompt: (val: string) => void;
   setAiPrompt: (val: string) => void;
   setSelectedStageId: (val: string) => void;

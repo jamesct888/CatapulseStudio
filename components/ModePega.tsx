@@ -1,18 +1,18 @@
 
 import React, { useState } from 'react';
-import { ProcessDefinition, ElementDefinition, DataObjectSuggestion, StageDefinition, LogicGroup, Condition } from '../types';
-import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode } from 'lucide-react';
+import { ProcessDefinition, ElementDefinition, DataObjectSuggestion, StageDefinition, LogicGroup, Condition, CalculationPart } from '../types';
+import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode, Calculator, Workflow, User, CheckSquare, Mail, Play, AlertTriangle } from 'lucide-react';
 import { CatapulseLogo } from './Shared';
 import { generateDataMapping } from '../services/geminiService';
 import { formatLogicSummary } from '../utils/logic';
 
 interface ModePegaProps {
     processDef: ProcessDefinition;
-    pegaTab: 'blueprint' | 'manual' | 'data' | 'logic';
-    setPegaTab: (val: 'blueprint' | 'manual' | 'data' | 'logic') => void;
+    pegaTab: 'design' | 'blueprint' | 'manual' | 'data' | 'logic';
+    setPegaTab: (val: 'design' | 'blueprint' | 'manual' | 'data' | 'logic') => void;
 }
 
-type PegaRuleType = 'Rule-Obj-When' | 'Rule-Obj-Validate' | 'Rule-HTML-Section' | 'Rule-Declare-Decision';
+type PegaRuleType = 'Rule-Obj-When' | 'Rule-Obj-Validate' | 'Rule-HTML-Section' | 'Rule-Declare-Decision' | 'Rule-Declare-Expressions';
 
 interface PegaRuleItem {
     id: string;
@@ -72,6 +72,19 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
         const rules: PegaRuleItem[] = [];
         const allElements = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements).map(e => ({ id: e.id, label: e.label }));
 
+        const formatCalculation = (parts: CalculationPart[] | undefined) => {
+            if (!parts || parts.length === 0) return 'Value set via external logic';
+            return parts.map(p => {
+                if (p.type === 'operator') return p.value;
+                if (p.type === 'constant') return p.value;
+                if (p.type === 'field') {
+                    const el = allElements.find(e => e.id === p.value);
+                    return el ? `.${el.label.replace(/[^a-zA-Z0-9]/g, '')}` : 'UnknownProp'; 
+                }
+                return '';
+            }).join(' ');
+        }
+
         processDef.stages.forEach(stage => {
             // 1. Decision Rules (Routing)
             if (stage.skillLogic && stage.skillLogic.length > 0) {
@@ -81,12 +94,26 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                     type: 'Rule-Declare-Decision',
                     context: `Stage: ${stage.title}`,
                     logicDescription: `Routes based on ${stage.skillLogic.length} logic conditions (Decision Table)`,
-                    technicalName: `Determine${stage.title.replace(/\s+/g,'')}Routing`
+                    technicalName: `Determine${stage.title.replace(/[^a-zA-Z0-9]/g, '')}Routing`
+                });
+            }
+
+            // 2. Stage Skip Logic (NEW)
+            const skipConditions = stage.skipLogic?.conditions || [];
+            const skipGroups = stage.skipLogic?.groups || [];
+            if (stage.skipLogic && (skipConditions.length > 0 || skipGroups.length > 0)) {
+                rules.push({
+                    id: `skip_${stage.id}`,
+                    label: `${stage.title} Skip Condition`,
+                    type: 'Rule-Obj-When',
+                    context: `Stage: ${stage.title}`,
+                    logicDescription: `SKIP IF: ${formatLogicSummary(stage.skipLogic, allElements)}`,
+                    technicalName: `WhenSkip${stage.title.replace(/[^a-zA-Z0-9]/g, '')}`
                 });
             }
 
             stage.sections.forEach(section => {
-                // 2. Section Rules
+                // 3. Section Rules
                 rules.push({
                     id: `sec_${section.id}`,
                     label: section.title,
@@ -96,8 +123,10 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                     technicalName: section.title.replace(/[^a-zA-Z0-9]/g, '')
                 });
 
-                // 3. When Rules (Section Visibility)
-                if (section.visibility && (section.visibility.conditions.length > 0 || (section.visibility.groups && section.visibility.groups.length > 0))) {
+                // 4. When Rules (Section Visibility)
+                const secConditions = section.visibility?.conditions || [];
+                const secGroups = section.visibility?.groups || [];
+                if (section.visibility && (secConditions.length > 0 || secGroups.length > 0)) {
                     rules.push({
                         id: `when_sec_${section.id}`,
                         label: `${section.title} Visibility`,
@@ -109,8 +138,10 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                 }
 
                 section.elements.forEach(element => {
-                    // 4. When Rules (Field Visibility)
-                    if (element.visibility && (element.visibility.conditions.length > 0 || (element.visibility.groups && element.visibility.groups.length > 0))) {
+                    // 5. When Rules (Field Visibility)
+                    const elConditions = element.visibility?.conditions || [];
+                    const elGroups = element.visibility?.groups || [];
+                    if (element.visibility && (elConditions.length > 0 || elGroups.length > 0)) {
                         rules.push({
                             id: `when_el_${element.id}`,
                             label: `${element.label} Visibility`,
@@ -121,8 +152,10 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                         });
                     }
 
-                    // 5. When Rules (Required Logic)
-                    if (element.requiredLogic && (element.requiredLogic.conditions.length > 0 || (element.requiredLogic.groups && element.requiredLogic.groups.length > 0))) {
+                    // 6. When Rules (Required Logic)
+                    const reqConditions = element.requiredLogic?.conditions || [];
+                    const reqGroups = element.requiredLogic?.groups || [];
+                    if (element.requiredLogic && (reqConditions.length > 0 || reqGroups.length > 0)) {
                         rules.push({
                             id: `req_el_${element.id}`,
                             label: `${element.label} Required`,
@@ -133,7 +166,7 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                         });
                     }
 
-                    // 6. Validate Rules
+                    // 7. Validate Rules
                     if (element.validation && element.validation.type !== 'none') {
                         rules.push({
                             id: `val_${element.id}`,
@@ -144,6 +177,18 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                                 ? (element.validation.customDescription || 'Custom Logic') 
                                 : `Format check: ${element.validation.type}`,
                             technicalName: `Val${element.label.replace(/[^a-zA-Z0-9]/g, '')}`
+                        });
+                    }
+
+                    // 8. Calculated Fields (Declare Expressions)
+                    if (element.type === 'calculated') {
+                        rules.push({
+                            id: `calc_${element.id}`,
+                            label: `${element.label} Calculation`,
+                            type: 'Rule-Declare-Expressions',
+                            context: `Target: .${element.label.replace(/[^a-zA-Z0-9]/g, '')}`,
+                            logicDescription: `Set to: ${formatCalculation(element.calculation)}`,
+                            technicalName: `Exp${element.label.replace(/[^a-zA-Z0-9]/g, '')}`
                         });
                     }
                 });
@@ -159,8 +204,15 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
     };
 
     return (
-        <div className="max-w-6xl mx-auto py-12 px-6">
+        <div className="max-w-7xl mx-auto py-8 px-6">
             <div className="flex justify-center mb-8 bg-gray-100 p-1 rounded-lg inline-flex mx-auto sticky top-4 z-20 shadow-sm border border-gray-200">
+                 <button 
+                    id="tab-pega-design"
+                    onClick={() => setPegaTab('design')}
+                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'design' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                 >
+                    <Layout size={14} /> Case Life Cycle
+                 </button>
                  <button 
                     id="tab-pega-blueprint"
                     onClick={() => setPegaTab('blueprint')}
@@ -191,6 +243,123 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                  </button>
             </div>
   
+            {pegaTab === 'design' && (
+                <div className="overflow-x-auto pb-8">
+                    <div className="flex gap-4 min-w-max">
+                        {/* Start Node */}
+                        <div className="flex flex-col items-center justify-center pt-10 px-4">
+                            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white shadow-md border-4 border-green-100">
+                                <Play size={16} fill="currentColor" />
+                            </div>
+                            <span className="text-xs font-bold text-gray-400 mt-2 uppercase tracking-wide">Create</span>
+                        </div>
+
+                        {/* Stages */}
+                        {processDef.stages.map((stage, idx) => {
+                            const skipConditions = stage.skipLogic?.conditions || [];
+                            const skipGroups = stage.skipLogic?.groups || [];
+                            const hasSkipLogic = stage.skipLogic && (skipConditions.length > 0 || skipGroups.length > 0);
+
+                            return (
+                            <div key={stage.id} className="w-80 flex flex-col shrink-0 group">
+                                {/* Stage Header (Chevron Style) */}
+                                <div className="h-10 bg-white border border-gray-200 flex items-center px-4 relative mb-4 shadow-sm group-hover:border-sw-teal/50 transition-colors">
+                                    <div className="font-bold text-gray-700 text-sm truncate uppercase tracking-tight flex items-center gap-2">
+                                        <div className="w-5 h-5 bg-sw-teal text-white rounded-full flex items-center justify-center text-[10px]">{idx + 1}</div>
+                                        {stage.title}
+                                    </div>
+                                    
+                                    {/* Chevron Right */}
+                                    <div className="absolute top-0 bottom-0 -right-3 w-4 overflow-hidden z-10">
+                                        <div className="h-10 bg-white border-t border-r border-gray-200 transform -rotate-45 origin-top-left translate-y-1.5 group-hover:border-sw-teal/50 transition-colors"></div>
+                                    </div>
+                                    {/* Chevron Left Cutout (Visual Hack) */}
+                                    {idx > 0 && <div className="absolute top-0 bottom-0 left-0 w-4 bg-gray-50 transform -skew-x-12 -translate-x-2 border-r border-gray-200"></div>}
+                                </div>
+
+                                {/* Stage Body - Process Column */}
+                                <div className="bg-gray-100/50 border border-gray-200 border-dashed rounded-lg p-3 min-h-[400px] flex flex-col gap-3 relative">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest absolute top-1 right-2">Primary Stage</span>
+                                    
+                                    {/* Process Container */}
+                                    <div className="bg-white border border-gray-200 rounded shadow-sm p-1">
+                                        <div className="flex items-center gap-2 p-2 border-b border-gray-100">
+                                            <Workflow size={14} className="text-blue-500" />
+                                            <span className="text-xs font-bold text-gray-600">Process</span>
+                                        </div>
+                                        <div className="p-2 flex flex-col gap-2 relative">
+                                            {/* Vertical Process Line */}
+                                            <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200"></div>
+
+                                            {/* Sections mapped to Steps */}
+                                            {stage.sections.map((section, sIdx) => (
+                                                <div key={section.id} className="relative z-10 flex gap-2 items-start">
+                                                    <div className="w-4 h-4 bg-green-500 rounded border-2 border-white shadow-sm mt-2 shrink-0 flex items-center justify-center">
+                                                        <CheckSquare size={10} className="text-white" strokeWidth={3}/>
+                                                    </div>
+                                                    <div className="flex-1 bg-white border border-gray-200 hover:border-sw-teal rounded p-2 shadow-sm cursor-default transition-all group/step">
+                                                        <div className="text-xs font-bold text-gray-800">{section.title}</div>
+                                                        <div className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                                                            <User size={10} /> 
+                                                            {stage.defaultSkill || 'Case Worker'}
+                                                        </div>
+                                                        <div className="text-[9px] text-gray-300 mt-1 uppercase tracking-wider">{section.elements.length} Fields</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {/* Simulated Automation Steps based on Logic */}
+                                            {stage.skillLogic && stage.skillLogic.length > 0 && (
+                                                <div className="relative z-10 flex gap-2 items-start">
+                                                    <div className="w-4 h-4 bg-orange-400 rounded border-2 border-white shadow-sm mt-2 shrink-0 flex items-center justify-center">
+                                                        <GitMerge size={10} className="text-white" />
+                                                    </div>
+                                                    <div className="flex-1 bg-orange-50 border border-orange-200 rounded p-2 shadow-sm">
+                                                        <div className="text-xs font-bold text-orange-800">Route Case</div>
+                                                        <div className="text-[10px] text-orange-600 mt-0.5">Decision Table</div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Email Step Placeholder */}
+                                            <div className="relative z-10 flex gap-2 items-start opacity-60 hover:opacity-100 transition-opacity">
+                                                <div className="w-4 h-4 bg-blue-400 rounded border-2 border-white shadow-sm mt-2 shrink-0 flex items-center justify-center">
+                                                    <Mail size={10} className="text-white" />
+                                                </div>
+                                                <div className="flex-1 bg-gray-50 border border-gray-200 border-dashed rounded p-2">
+                                                    <div className="text-xs font-bold text-gray-500">Send Notification</div>
+                                                    <div className="text-[10px] text-gray-400">Optional Action</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Alternate Paths Visual (if Skip Logic exists) */}
+                                    {hasSkipLogic && (
+                                        <div className="mt-auto border-t-2 border-amber-200 pt-2">
+                                            <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600 mb-1">
+                                                <AlertTriangle size={10} /> Conditional Skip
+                                            </div>
+                                            <div className="bg-amber-50 text-[10px] text-amber-800 p-2 rounded border border-amber-100">
+                                                Skipped if logic met.
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )})}
+
+                        {/* End Node */}
+                        <div className="flex flex-col items-center justify-center pt-10 px-4">
+                            <div className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-white shadow-md border-4 border-gray-200">
+                                <div className="w-4 h-4 bg-white rounded-sm"></div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-400 mt-2 uppercase tracking-wide">Resolve</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {pegaTab === 'blueprint' && (
                 <div className="bg-white rounded-xl shadow-card border border-gray-200 p-8 text-center animate-in fade-in">
                     <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -345,8 +514,8 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                             <h2 className="text-xl font-bold text-gray-800">Technical Rule Inventory</h2>
                             <p className="text-sm text-gray-500">Automatically extracted rule candidates for implementation.</p>
                         </div>
-                        <div className="flex bg-gray-100 p-1 rounded-lg">
-                            {(['ALL', 'Rule-Obj-When', 'Rule-Obj-Validate', 'Rule-HTML-Section', 'Rule-Declare-Decision'] as const).map(f => (
+                        <div className="flex bg-gray-100 p-1 rounded-lg flex-wrap">
+                            {(['ALL', 'Rule-Obj-When', 'Rule-Obj-Validate', 'Rule-HTML-Section', 'Rule-Declare-Decision', 'Rule-Declare-Expressions'] as const).map(f => (
                                 <button
                                     key={f}
                                     onClick={() => setActiveRuleFilter(f)}
@@ -379,6 +548,7 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                                                 rule.type === 'Rule-Obj-When' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                                                 rule.type === 'Rule-Obj-Validate' ? 'bg-red-50 text-red-700 border-red-200' :
                                                 rule.type === 'Rule-HTML-Section' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                rule.type === 'Rule-Declare-Expressions' ? 'bg-teal-50 text-teal-700 border-teal-200' :
                                                 'bg-orange-50 text-orange-700 border-orange-200'
                                             }`}>
                                                 {rule.type}

@@ -4,7 +4,7 @@ import { ProcessDefinition, FormState, VisualTheme } from '../types';
 import { isElementVisible, isElementRequired, isSectionVisible, validateValue, evaluateLogicGroup } from '../utils/logic';
 import { RenderElement } from './FormElements';
 import { generateFormData } from '../services/geminiService';
-import { User, Sparkles, PanelBottom, ArrowRight, AlertTriangle, Info, Shield, ChevronRight, ArrowLeft, Check } from 'lucide-react';
+import { User, Sparkles, PanelBottom, ArrowRight, AlertTriangle, Info, Shield, ChevronRight, ArrowLeft, Check, FastForward } from 'lucide-react';
 import { OperationsHUD } from './OperationsHUD';
 
 interface ModePreviewProps {
@@ -20,6 +20,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
   const [currentStageIdx, setCurrentStageIdx] = useState(0);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [historyStack, setHistoryStack] = useState<number[]>([0]);
   
   // HUD State
   const [isHudEnabled, setIsHudEnabled] = useState(true);
@@ -69,6 +70,22 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
       }
   }, [currentStageIdx, isHudEnabled]);
 
+  // --- STAGE NAVIGATION LOGIC (Recursive Skip Check) ---
+  
+  const getNextValidStageIndex = (startIndex: number): number | null => {
+      if (startIndex >= processDef.stages.length) return null; // End of process
+
+      const stage = processDef.stages[startIndex];
+      // Skip logic: If skipLogic evaluates to TRUE, we skip this stage
+      const shouldSkip = stage.skipLogic && evaluateLogicGroup(stage.skipLogic, formData);
+
+      if (shouldSkip) {
+          console.log(`Skipping Stage: ${stage.title}`);
+          return getNextValidStageIndex(startIndex + 1);
+      }
+      return startIndex;
+  };
+
   const handleNext = () => {
     const errors: {[key: string]: string} = {};
     let isValid = true;
@@ -97,13 +114,29 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
     setFormErrors(errors);
     
     if (isValid) {
-        if (currentStageIdx < processDef.stages.length - 1) {
-            setCurrentStageIdx(prev => prev + 1);
+        const nextIndex = getNextValidStageIndex(currentStageIdx + 1);
+        
+        if (nextIndex !== null) {
+            setHistoryStack(prev => [...prev, nextIndex]);
+            setCurrentStageIdx(nextIndex);
             window.scrollTo(0,0);
         } else {
             alert("Process Completed!");
         }
     }
+  };
+
+  const handleBack = () => {
+      if (historyStack.length > 1) {
+          const newStack = [...historyStack];
+          newStack.pop(); // Remove current
+          const prevIndex = newStack[newStack.length - 1]; // Peek previous
+          setHistoryStack(newStack);
+          setCurrentStageIdx(prevIndex);
+      } else {
+          // Fallback if stack is empty (shouldn't happen)
+          setCurrentStageIdx(0);
+      }
   };
 
   const handleAutoFill = async () => {
@@ -216,18 +249,40 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
             {/* Breadcrumb Trail */}
             <nav className="flex items-center space-x-2 text-sm overflow-x-auto pb-2 scrollbar-none">
                 {processDef.stages.map((s, i) => {
-                    const isPast = i < currentStageIdx;
+                    const isPast = historyStack.includes(i) && i !== currentStageIdx;
                     const isCurrent = i === currentStageIdx;
+                    const isSkipped = s.skipLogic && evaluateLogicGroup(s.skipLogic, formData);
                     
                     const activeText = isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal';
                     const activeBg = isType2 ? 'bg-[#e61126]' : isType3 ? 'bg-[#006a4d]' : 'bg-sw-teal';
                     const activeBorder = isType2 ? 'border-[#e61126]' : isType3 ? 'border-[#006a4d]' : 'border-sw-teal';
 
+                    if (isSkipped && !isCurrent) {
+                        return (
+                            <React.Fragment key={s.id}>
+                                <div className="flex items-center gap-2 opacity-30 grayscale cursor-not-allowed text-gray-400">
+                                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs border border-gray-300 bg-gray-100">
+                                        <FastForward size={10} />
+                                    </div>
+                                    <span className="line-through decoration-gray-400">{s.title}</span>
+                                </div>
+                                {i < processDef.stages.length - 1 && <ChevronRight size={14} className="text-gray-200 shrink-0" />}
+                            </React.Fragment>
+                        );
+                    }
+
                     return (
                         <React.Fragment key={s.id}>
                             <button 
                                 onClick={() => {
-                                    if (isPast) setCurrentStageIdx(i);
+                                    if (isPast) {
+                                        // Find index in history to slice stack
+                                        const histIdx = historyStack.indexOf(i);
+                                        if (histIdx !== -1) {
+                                            setHistoryStack(historyStack.slice(0, histIdx + 1));
+                                            setCurrentStageIdx(i);
+                                        }
+                                    }
                                 }}
                                 disabled={!isPast}
                                 className={`flex items-center gap-2 whitespace-nowrap transition-colors ${isPast ? 'cursor-pointer hover:opacity-70' : 'cursor-default'} ${isCurrent ? `font-bold ${activeText}` : isPast ? 'text-gray-500' : 'text-gray-300'}`}
@@ -299,6 +354,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                                             onChange={()=>{}} // Read only
                                             disabled={true}
                                             theme={{...visualTheme, density: 'compact'}}
+                                            formData={formData} // Pass form data for potential calculations
                                         />
                                     );
                                 })}
@@ -308,7 +364,6 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                 }
 
                 // Standard Rendering - Card Style
-                // Changed: removed overflow-hidden to allow dropdowns to pop out
                 return (
                     <div key={section.id} className={`${cardClass}`}>
                         <div className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30 rounded-t-xl">
@@ -340,6 +395,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                                         }}
                                         error={formErrors[el.id]}
                                         theme={visualTheme}
+                                        formData={formData} // Pass for calculations
                                     />
                                 );
                             })}
@@ -352,7 +408,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
         {/* Footer Actions */}
         <div className="sticky bottom-4 mt-8 flex justify-between items-center bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-200 shadow-xl z-20">
             <button 
-                onClick={() => setCurrentStageIdx(prev => Math.max(0, prev - 1))}
+                onClick={handleBack}
                 disabled={currentStageIdx === 0}
                 className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${backButtonClass}`}
             >
@@ -360,14 +416,14 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
             </button>
             
             <div className="text-xs font-bold text-gray-400 uppercase tracking-widest hidden md:block">
-                {currentStageIdx + 1} of {processDef.stages.length} Steps
+                Stage {currentStageIdx + 1}
             </div>
 
             <button 
                 onClick={handleNext}
                 className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 ${primaryButtonClass}`}
             >
-                {currentStageIdx === processDef.stages.length - 1 ? 'Submit Application' : 'Next Step'}
+                {getNextValidStageIndex(currentStageIdx + 1) === null ? 'Submit Application' : 'Next Step'}
                 <ChevronRight size={18} />
             </button>
         </div>

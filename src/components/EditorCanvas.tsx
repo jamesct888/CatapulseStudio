@@ -45,23 +45,42 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
 
     const handleDrop = (e: React.DragEvent, targetSectionId: string, targetIndex: number) => {
         e.preventDefault();
-        if (!draggedItem) return;
+        
+        let srcSectionId = draggedItem?.sectionId;
+        let srcIndex = draggedItem?.index;
+
+        // Fallback to dataTransfer if state is empty
+        if (!srcSectionId || srcIndex === undefined) {
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                srcSectionId = data.sectionId;
+                srcIndex = data.index;
+            } catch (err) {
+                console.error("Drop Data Parse Error", err);
+            }
+        }
+
+        if (!srcSectionId || srcIndex === undefined) return;
 
         const newDef = { ...processDef };
         const stage = newDef.stages.find(s => s.id === selectedStageId);
         if (!stage) return;
 
-        const sourceSec = stage.sections.find(s => s.id === draggedItem.sectionId);
+        const sourceSec = stage.sections.find(s => s.id === srcSectionId);
         const targetSec = stage.sections.find(s => s.id === targetSectionId);
 
         if (sourceSec && targetSec) {
-            const [item] = sourceSec.elements.splice(draggedItem.index, 1);
+            const [item] = sourceSec.elements.splice(srcIndex, 1);
             targetSec.elements.splice(targetIndex, 0, item);
             setProcessDef(newDef);
             if (selectedElementId === item.id) {
                 setSelectedSectionId(targetSectionId);
             }
         }
+        setDraggedItem(null);
+    };
+
+    const handleDragEnd = () => {
         setDraggedItem(null);
     };
 
@@ -182,6 +201,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                             onDragStart={(e) => handleDragStart(e, section.id, index)}
                                             onDragOver={handleDragOver}
                                             onDrop={(e) => handleDrop(e, section.id, index)}
+                                            onDragEnd={handleDragEnd}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelectedElementId(element.id);
