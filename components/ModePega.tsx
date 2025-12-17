@@ -1,15 +1,14 @@
-
 import React, { useState } from 'react';
 import { ProcessDefinition, ElementDefinition, DataObjectSuggestion, StageDefinition, LogicGroup, Condition, CalculationPart } from '../types';
-import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode, Calculator, Workflow, User, CheckSquare, Mail, Play, AlertTriangle } from 'lucide-react';
+import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode, Calculator, Workflow, User, CheckSquare, Mail, Play, AlertTriangle, Briefcase, Grid, Server, Activity, Plug, Globe } from 'lucide-react';
 import { CatapulseLogo } from './Shared';
 import { generateDataMapping } from '../services/geminiService';
 import { formatLogicSummary } from '../utils/logic';
 
 interface ModePegaProps {
     processDef: ProcessDefinition;
-    pegaTab: 'design' | 'blueprint' | 'manual' | 'data' | 'logic';
-    setPegaTab: (val: 'design' | 'blueprint' | 'manual' | 'data' | 'logic') => void;
+    pegaTab: 'design' | 'blueprint' | 'manual' | 'data' | 'logic' | 'routing';
+    setPegaTab: (val: 'design' | 'blueprint' | 'manual' | 'data' | 'logic' | 'routing') => void;
 }
 
 type PegaRuleType = 'Rule-Obj-When' | 'Rule-Obj-Validate' | 'Rule-HTML-Section' | 'Rule-Declare-Decision' | 'Rule-Declare-Expressions';
@@ -29,6 +28,10 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
     const [editingClassIndex, setEditingClassIndex] = useState<number | null>(null);
     const [tempClassName, setTempClassName] = useState('');
     const [activeRuleFilter, setActiveRuleFilter] = useState<PegaRuleType | 'ALL'>('ALL');
+    
+    // Connectivity State
+    const [sorStatus, setSorStatus] = useState<'connected' | 'connecting' | 'offline'>('connected');
+    const [activeSor, setActiveSor] = useState('PEG-Policy-Admin-v8');
 
     const handleAnalyzeData = async () => {
         setIsAnalyzing(true);
@@ -67,10 +70,12 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
         return null;
     };
 
+    const allElementsList = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements);
+
     // --- Rule Extraction Engine ---
     const getRuleInventory = (): PegaRuleItem[] => {
         const rules: PegaRuleItem[] = [];
-        const allElements = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements).map(e => ({ id: e.id, label: e.label }));
+        const allElements = allElementsList.map(e => ({ id: e.id, label: e.label }));
 
         const formatCalculation = (parts: CalculationPart[] | undefined) => {
             if (!parts || parts.length === 0) return 'Value set via external logic';
@@ -203,47 +208,102 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
         // Could add toast here
     };
 
+    // --- Helper for Matrix Logic Extraction ---
+    const getConditionsForField = (group: LogicGroup | undefined, fieldId: string): Condition[] => {
+        if (!group) return [];
+        let matches: Condition[] = [];
+        
+        // Check direct conditions
+        if (group.conditions) {
+            matches = matches.concat(group.conditions.filter(c => c.targetElementId === fieldId));
+        }
+        
+        // Check nested groups
+        if (group.groups) {
+            group.groups.forEach(g => {
+                matches = matches.concat(getConditionsForField(g, fieldId));
+            });
+        }
+        return matches;
+    };
+
+    const formatOperator = (op: string) => {
+        switch(op) {
+            case 'equals': return '=';
+            case 'notEquals': return '!=';
+            case 'greaterThan': return '>';
+            case 'lessThan': return '<';
+            case 'contains': return 'contains';
+            case 'isEmpty': return 'is empty';
+            case 'isNotEmpty': return 'is populated';
+            default: return op;
+        }
+    };
+
+    // Calculate Routing Matrix Data: Identify all Fields involved in any skill rule across all stages
+    const routingFieldIds: string[] = Array.from(new Set(
+        processDef.stages.flatMap(s => 
+            s.skillLogic?.flatMap(rule => {
+                // deeply extract field IDs from this rule
+                const extractIds = (g: LogicGroup): string[] => {
+                    const cIds = g.conditions?.map(c => c.targetElementId) || [];
+                    const gIds = g.groups?.flatMap(sub => extractIds(sub)) || [];
+                    return [...cIds, ...gIds];
+                };
+                return extractIds(rule.logic);
+            }) || []
+        )
+    ));
+
     return (
         <div className="max-w-7xl mx-auto py-8 px-6">
-            <div className="flex justify-center mb-8 bg-gray-100 p-1 rounded-lg inline-flex mx-auto sticky top-4 z-20 shadow-sm border border-gray-200">
+            <div className="flex justify-center mb-8 bg-gray-100 p-1 rounded-lg inline-flex mx-auto sticky top-4 z-20 shadow-sm border border-gray-200 flex-wrap">
                  <button 
                     id="tab-pega-design"
                     onClick={() => setPegaTab('design')}
-                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'design' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'design' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     <Layout size={14} /> Case Life Cycle
                  </button>
                  <button 
                     id="tab-pega-blueprint"
                     onClick={() => setPegaTab('blueprint')}
-                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${pegaTab === 'blueprint' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${pegaTab === 'blueprint' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     Blueprint Generator
                  </button>
                  <button 
                     id="tab-pega-manual"
                     onClick={() => setPegaTab('manual')}
-                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${pegaTab === 'manual' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${pegaTab === 'manual' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     Implementation Guide
                  </button>
                  <button 
                     id="tab-pega-data"
                     onClick={() => setPegaTab('data')}
-                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'data' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'data' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     <Database size={14}/> Data Dictionary
                  </button>
                  <button 
                     id="tab-pega-logic"
                     onClick={() => setPegaTab('logic')}
-                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'logic' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'logic' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                  >
                     <TableIcon size={14}/> Rule Inventory
+                 </button>
+                 <button 
+                    id="tab-pega-routing"
+                    onClick={() => setPegaTab('routing')}
+                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${pegaTab === 'routing' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                 >
+                    <Grid size={14}/> Routing Matrix
                  </button>
             </div>
   
             {pegaTab === 'design' && (
+                // ... (Design Content) ...
                 <div className="overflow-x-auto pb-8">
                     <div className="flex gap-4 min-w-max">
                         {/* Start Node */}
@@ -417,7 +477,66 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
 
             {pegaTab === 'data' && (
                 <div className="space-y-6 animate-in fade-in">
-                    {/* Header Card */}
+                    
+                    {/* NEW: System Connectivity Panel */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                    <Server size={18} className="text-sw-teal" />
+                                    System Connectivity & Integration
+                                </h3>
+                                <p className="text-sm text-gray-500">Manage System of Record (SOR) bindings and active connectors.</p>
+                            </div>
+                            <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-100">
+                                <Activity size={14} /> System Healthy
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Primary SOR</div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Database size={24} className="text-sw-teal" />
+                                    <select 
+                                        value={activeSor} 
+                                        onChange={(e) => setActiveSor(e.target.value)}
+                                        className="bg-white border border-gray-300 rounded text-sm font-bold p-1.5 focus:ring-sw-teal focus:border-sw-teal flex-1"
+                                    >
+                                        <option value="PEG-Policy-Admin-v8">PEG-Policy-Admin-v8</option>
+                                        <option value="EXT-Legacy-Mainframe">EXT-Legacy-Mainframe</option>
+                                        <option value="SIM-Mock-Data">SIM-Mock-Data</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-green-600 font-medium">
+                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                    Connected (14ms latency)
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Active Integrations</div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-sm bg-white p-2 rounded border border-gray-100">
+                                        <span className="flex items-center gap-2"><Globe size={14} className="text-blue-500"/> Experian Check</span>
+                                        <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">REST</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm bg-white p-2 rounded border border-gray-100">
+                                        <span className="flex items-center gap-2"><Plug size={14} className="text-orange-500"/> SAP Finance</span>
+                                        <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">SOAP</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col justify-center text-center">
+                                <div className="text-2xl font-bold text-sw-teal mb-1">{processDef.stages.length * 4 + 12}</div>
+                                <div className="text-xs text-gray-500 font-medium">Mapped Data Elements</div>
+                                <button className="mt-3 text-xs text-sw-teal font-bold hover:underline">View Mapping Report</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Data Object Normalizer Header Card */}
                     <div className="bg-sw-teal rounded-xl shadow-lg p-8 text-white relative overflow-hidden">
                         <div className="relative z-10">
                             <h2 className="text-2xl font-bold mb-2 flex items-center gap-2"><Database/> Data Object Normalizer</h2>
@@ -582,6 +701,104 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {pegaTab === 'routing' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800">Routing Decision Matrix</h2>
+                                <p className="text-sm text-gray-500">Mapping stage routing rules to properties (Decision Table Representation).</p>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-100 border-b border-gray-200">
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[200px] sticky left-0 bg-gray-100 z-10">
+                                            Stage (Assignment)
+                                        </th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-200 min-w-[150px]">
+                                            Default Route
+                                        </th>
+                                        {routingFieldIds.map((fieldId, idx) => {
+                                            const fieldLabel = allElementsList.find(e => e.id === fieldId)?.label || 'Unknown Field';
+                                            return (
+                                                <th key={idx} className="p-4 text-xs font-bold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[200px] bg-sw-teal/5">
+                                                    {fieldLabel}
+                                                </th>
+                                            );
+                                        })}
+                                        <th className="p-4 text-xs font-bold text-sw-teal uppercase tracking-wider border-l border-gray-200 min-w-[150px] bg-sw-teal/10">
+                                            Return (Route To)
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {processDef.stages.map((stage) => {
+                                        const rules = stage.skillLogic && stage.skillLogic.length > 0 ? stage.skillLogic : null;
+                                        
+                                        if (!rules) {
+                                            // Render single empty row for stage with no logic
+                                            return (
+                                                <tr key={stage.id} className="border-b border-gray-50 hover:bg-gray-50">
+                                                    <td className="p-4 font-bold text-gray-800 border-r border-gray-100 sticky left-0 bg-white">
+                                                        {stage.title}
+                                                    </td>
+                                                    <td className="p-4 text-sm text-gray-600 border-r border-gray-100 font-medium">
+                                                        {stage.defaultSkill || <span className="text-gray-300 italic">Unassigned</span>}
+                                                    </td>
+                                                    {routingFieldIds.map((_, i) => <td key={i} className="border-r border-gray-100"></td>)}
+                                                    <td className="border-l border-gray-100"></td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        // Render row per rule
+                                        return rules.map((rule, ruleIdx) => (
+                                            <tr key={`${stage.id}_rule_${ruleIdx}`} className="border-b border-gray-50 hover:bg-gray-50">
+                                                {ruleIdx === 0 && (
+                                                    <>
+                                                        <td className="p-4 font-bold text-gray-800 border-r border-gray-100 sticky left-0 bg-white align-top" rowSpan={rules.length}>
+                                                            {stage.title}
+                                                        </td>
+                                                        <td className="p-4 text-sm text-gray-600 border-r border-gray-100 font-medium align-top" rowSpan={rules.length}>
+                                                            {stage.defaultSkill || <span className="text-gray-300 italic">Unassigned</span>}
+                                                        </td>
+                                                    </>
+                                                )}
+                                                {routingFieldIds.map((fieldId, cIdx) => {
+                                                    const conds = getConditionsForField(rule.logic, fieldId);
+                                                    return (
+                                                        <td key={cIdx} className="p-4 text-sm border-r border-gray-100 bg-white">
+                                                            {conds.length > 0 ? (
+                                                                <div className="flex flex-col gap-1">
+                                                                    {conds.map((c, i) => (
+                                                                        <div key={i} className="text-xs font-mono text-gray-700 bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                                                                            <span className="font-bold text-sw-teal mr-1">{formatOperator(c.operator)}</span>
+                                                                            {c.operator !== 'isEmpty' && c.operator !== 'isNotEmpty' && String(c.value)}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-200 text-xs">-</span>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className="p-4 text-sm font-bold text-sw-teal border-l border-gray-100 bg-sw-teal/5">
+                                                    {rule.requiredSkill}
+                                                </td>
+                                            </tr>
+                                        ));
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

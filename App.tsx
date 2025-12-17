@@ -1,4 +1,4 @@
-import React, { useState, ErrorInfo, ReactNode } from 'react';
+import React, { Component, useState, ErrorInfo, ReactNode } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
 import { ModePreview } from './components/ModePreview';
@@ -30,11 +30,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {
     return { hasError: true };
@@ -96,7 +93,7 @@ const App: React.FC = () => {
   // QA & Pega State
   const [qaTab, setQaTab] = useState<'stories' | 'cases'>('stories');
   const [storyStrategy, setStoryStrategy] = useState<StoryStrategy>('screen');
-  const [pegaTab, setPegaTab] = useState<'design' | 'blueprint' | 'manual' | 'data' | 'logic'>('design');
+  const [pegaTab, setPegaTab] = useState<'design' | 'blueprint' | 'manual' | 'data' | 'logic' | 'routing'>('design');
 
   // Demo State
   const [isDemoMode, setIsDemoMode] = useState(false);
