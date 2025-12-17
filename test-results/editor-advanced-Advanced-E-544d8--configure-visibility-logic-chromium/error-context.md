@@ -1,0 +1,175 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e13]: Catapulse
+      - navigation [ref=e15]:
+        - button "Design" [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+          - text: Design
+        - button "Grid" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+          - text: Grid
+        - button "Flow" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+          - text: Flow
+        - button "Preview" [ref=e28] [cursor=pointer]:
+          - img [ref=e29]
+          - text: Preview
+        - button "Spec" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+          - text: Spec
+        - button "Stories & Test Cases" [ref=e35] [cursor=pointer]:
+          - img [ref=e36]
+          - text: Stories & Test Cases
+        - button "Pega" [ref=e39] [cursor=pointer]:
+          - img [ref=e40]
+          - text: Pega
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - button "Workshop Review Mode" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+        - button "Import Legacy Schema (Text/JSON)" [ref=e48] [cursor=pointer]:
+          - img [ref=e49]
+        - button "Load Process (JSON)" [ref=e54] [cursor=pointer]:
+          - img [ref=e55]
+        - button "Save Process (JSON)" [ref=e58] [cursor=pointer]:
+          - img [ref=e59]
+        - button "Share Prototype" [ref=e63] [cursor=pointer]:
+          - img [ref=e64]
+          - text: Share Prototype
+      - generic [ref=e68]:
+        - button "Advanced Editor Test" [ref=e69] [cursor=pointer]
+        - paragraph [ref=e70]: proc_adv_123
+      - button [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+  - generic [ref=e75]:
+    - main [ref=e76]:
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - generic [ref=e79]:
+            - heading "Structure" [level=2] [ref=e80]
+            - generic [ref=e81]:
+              - generic [ref=e82]:
+                - generic [ref=e83] [cursor=pointer]:
+                  - generic [ref=e84]: "1"
+                  - img [ref=e86]
+                - generic [ref=e93]:
+                  - generic [ref=e94] [cursor=pointer]:
+                    - img [ref=e95]
+                    - img [ref=e98]
+                  - button "Add Section" [ref=e105] [cursor=pointer]:
+                    - img [ref=e106]
+                    - text: Add Section
+              - button "Add Stage" [ref=e107] [cursor=pointer]:
+                - img [ref=e108]
+                - text: Add Stage
+          - generic [ref=e109]:
+            - generic [ref=e110]:
+              - img [ref=e111]
+              - generic [ref=e113]: AI Copilot
+            - generic [ref=e114]:
+              - textbox "Describe a change (e.g. 'Add a comments field')..." [ref=e115]
+              - button [disabled] [ref=e116]:
+                - img [ref=e117]
+            - paragraph [ref=e119]: "Context: Stage: undefined"
+        - generic [ref=e121]:
+          - generic [ref=e122]:
+            - generic [ref=e123]: Stage 1
+            - heading [level=1]
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - generic [ref=e126]:
+                - generic:
+                  - heading [level=3]
+                - generic [ref=e128]: 1col
+              - generic [ref=e129]:
+                - generic [ref=e130] [cursor=pointer]:
+                  - generic "Drag to reorder" [ref=e131]:
+                    - img [ref=e132]
+                  - generic:
+                    - generic:
+                      - generic: Element 1
+                      - textbox [disabled]
+                - generic [ref=e139] [cursor=pointer]:
+                  - generic "Drag to reorder" [ref=e140]:
+                    - img [ref=e141]
+                  - generic:
+                    - generic:
+                      - generic: Element 2
+                      - textbox [disabled]
+                - generic [ref=e148] [cursor=pointer]:
+                  - generic:
+                    - img
+                    - text: Add Field
+            - generic [ref=e149]:
+              - button "Text" [ref=e150] [cursor=pointer]:
+                - img [ref=e151]
+                - generic [ref=e154]: Text
+              - button "Number" [ref=e155] [cursor=pointer]:
+                - img [ref=e156]
+                - generic [ref=e159]: Number
+              - button "Date" [ref=e160] [cursor=pointer]:
+                - img [ref=e161]
+                - generic [ref=e163]: Date
+              - button "Select" [ref=e164] [cursor=pointer]:
+                - img [ref=e165]
+                - generic [ref=e166]: Select
+              - button "Radio" [ref=e167] [cursor=pointer]:
+                - img [ref=e168]
+                - generic [ref=e171]: Radio
+              - button "Check" [ref=e172] [cursor=pointer]:
+                - img [ref=e173]
+                - generic [ref=e176]: Check
+              - button "Calc" [ref=e177] [cursor=pointer]:
+                - img [ref=e178]
+                - generic [ref=e180]: Calc
+              - button "List" [ref=e181] [cursor=pointer]:
+                - img [ref=e182]
+                - generic [ref=e184]: List
+              - button "Static" [ref=e185] [cursor=pointer]:
+                - img [ref=e186]
+                - generic [ref=e188]: Static
+    - generic [ref=e190]:
+      - generic [ref=e192]:
+        - generic [ref=e193]:
+          - heading "Stage" [level=2] [ref=e194]
+          - generic [ref=e195]: stg_1
+        - generic [ref=e196]:
+          - button "Global Theme Settings" [ref=e197] [cursor=pointer]:
+            - img [ref=e198]
+          - button "Delete" [ref=e204] [cursor=pointer]:
+            - img [ref=e205]
+          - button "Close Panel" [ref=e208] [cursor=pointer]:
+            - img [ref=e209]
+      - generic [ref=e212]:
+        - button "General" [ref=e213] [cursor=pointer]
+        - button "Operations" [ref=e214] [cursor=pointer]
+      - generic [ref=e215]:
+        - generic [ref=e216]:
+          - generic [ref=e217]: Stage Title
+          - textbox [ref=e218]
+        - generic [ref=e219]:
+          - generic [ref=e220]: Description
+          - textbox [ref=e221]
+        - generic [ref=e222]:
+          - generic [ref=e223]: Default Required Skill
+          - textbox "e.g. Customer Service Rep" [ref=e224]
+  - contentinfo [ref=e225]:
+    - generic [ref=e226]:
+      - generic [ref=e227]:
+        - strong [ref=e228]: Catapulse Studio
+        - text: v1.3.3
+      - generic [ref=e229]: "Build: 2025-12-16"
+    - generic [ref=e230]:
+      - generic [ref=e231]:
+        - text: "Environment:"
+        - strong [ref=e232]: Production
+      - generic [ref=e233]:
+        - text: "User:"
+        - strong [ref=e234]: Demo User
+```
