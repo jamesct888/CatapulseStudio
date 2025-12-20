@@ -1,31 +1,31 @@
 
-export type ElementType = 
-  | 'text' 
+export type ElementType =
+  | 'text'
   | 'email'
-  | 'textarea' 
-  | 'number' 
-  | 'date' 
-  | 'datetime' 
-  | 'currency' 
-  | 'select' 
+  | 'textarea'
+  | 'number'
+  | 'date'
+  | 'datetime'
+  | 'currency'
+  | 'select'
   | 'multiselect'
-  | 'radio' 
-  | 'checkbox' 
+  | 'radio'
+  | 'checkbox'
   | 'static'
   | 'repeater'
-  | 'calculated'; 
+  | 'calculated';
 
-export type Operator = 'equals' | 'notEquals' | 'contains' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
+export type Operator = 'equals' | 'notEquals' | 'contains' | 'doesNotContain' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 
 export type ValidationType = 'none' | 'email' | 'phone_uk' | 'nino_uk' | 'date_future' | 'date_past' | 'custom';
 
 export interface ValidationRule {
   type: ValidationType;
-  customDescription?: string; 
+  customDescription?: string;
 }
 
 export interface Condition {
-  id?: string; 
+  id?: string;
   targetElementId: string;
   operator: Operator;
   value: string | number | boolean;
@@ -37,11 +37,11 @@ export interface LogicGroup {
   id: string;
   operator: LogicOperator;
   conditions: Condition[];
-  groups?: LogicGroup[]; 
+  groups?: LogicGroup[];
 }
 
 export interface SkillRule {
-  logic: LogicGroup; 
+  logic: LogicGroup;
   requiredSkill: string;
 }
 
@@ -49,25 +49,25 @@ export interface RepeaterColumn {
   id: string;
   label: string;
   type: 'text' | 'date' | 'number' | 'select' | 'checkbox';
-  options?: string[]; 
+  options?: string[];
 }
 
 export interface DataMapping {
-    dataObject: string; 
-    property: string;   
+  dataObject: string;
+  property: string;
 }
 
 export interface SelectOption {
-    label: string;
-    value: string;
+  label: string;
+  value: string;
 }
 
 export type CalculationPartType = 'field' | 'constant' | 'operator';
 
 export interface CalculationPart {
-    id: string;
-    type: CalculationPartType;
-    value: string; // For field: elementId, For constant: number string, For operator: symbol
+  id: string;
+  type: CalculationPartType;
+  value: string; // For field: elementId, For constant: number string, For operator: symbol
 }
 
 export interface ElementDefinition {
@@ -75,23 +75,23 @@ export interface ElementDefinition {
   label: string;
   type: ElementType;
   // Strict typing for options to prevent [object Object] errors
-  options?: (string | SelectOption)[]; 
+  options?: (string | SelectOption)[];
   defaultValue?: string;
-  description?: string; 
-  
+  description?: string;
+
   columns?: RepeaterColumn[];
-  
+
   // Calculation Configuration
   calculation?: CalculationPart[];
 
   staticDataSource?: 'manual' | 'field';
   sourceFieldId?: string;
 
-  hidden?: boolean; 
-  visibility?: LogicGroup; 
-  
-  required?: boolean; 
-  requiredLogic?: LogicGroup; 
+  hidden?: boolean;
+  visibility?: LogicGroup;
+
+  required?: boolean;
+  requiredLogic?: LogicGroup;
 
   validation?: ValidationRule;
 
@@ -103,9 +103,9 @@ export interface SectionDefinition {
   title: string;
   description?: string;
   layout?: '1col' | '2col' | '3col';
-  variant?: 'standard' | 'summary' | 'warning' | 'info'; 
+  variant?: 'standard' | 'summary' | 'warning' | 'info';
   elements: ElementDefinition[];
-  
+
   hidden?: boolean;
   visibility?: LogicGroup;
 }
@@ -115,8 +115,8 @@ export interface StageDefinition {
   title: string;
   description?: string;
   sections: SectionDefinition[];
-  
-  defaultSkill?: string; 
+
+  defaultSkill?: string;
   skillLogic?: SkillRule[];
   skipLogic?: LogicGroup;
 }
@@ -146,11 +146,11 @@ export interface WorkshopSuggestion {
   type: 'add' | 'remove' | 'modify';
   description: string;
   reasoning: string;
-  targetLabel?: string; 
+  targetLabel?: string;
   newElement?: {
     label: string;
     type: ElementType;
-    sectionTitle?: string; 
+    sectionTitle?: string;
   };
   updateData?: Partial<ElementDefinition>;
 }
@@ -171,7 +171,7 @@ export type StoryStrategy = 'screen' | 'journey' | 'persona' | string;
 export interface StrategyRecommendation {
   id: string;
   strategyName: string;
-  strategyDescription: string; 
+  strategyDescription: string;
   pros: string[];
   cons: string[];
   estimatedCount: number;
@@ -185,19 +185,31 @@ export interface ChatMessage {
   recommendations?: StrategyRecommendation[];
 }
 
+export interface StoryDataElement {
+  id?: string;
+  label: string;
+  type: string;
+  required: boolean;
+  visibility: string; // "Always" or condition
+  validation: string; // Regex or Rule
+  options: string; // Comma-separated or "None"
+}
+
 export interface UserStory {
   id: string;
-  title: string;
-  narrative: string; 
-  acceptanceCriteria: string; 
-  dependencies?: string[]; 
+  title: string; // Summary (Short phrase)
+  description: string; // As a... I want...
+  acceptanceCriteria: string | string[];
+  dataElements?: StoryDataElement[]; // Structured Data Table
+  dependencies?: string[];
+  relatedStageIds?: string[];
 }
 
 export interface DataObjectSuggestion {
-    className: string;
-    description: string;
-    mappings: {
-        elementId: string;
-        suggestedProperty: string;
-    }[];
+  className: string;
+  description: string;
+  mappings: {
+    elementId: string;
+    suggestedProperty: string;
+  }[];
 }

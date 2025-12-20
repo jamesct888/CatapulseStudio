@@ -11,16 +11,16 @@ interface LogicBuilderProps {
 }
 
 // --- Internal Searchable Select Component ---
-const SearchableSelect = ({ 
-    value, 
-    onChange, 
-    options, 
-    placeholder 
-}: { 
-    value: string, 
-    onChange: (val: string) => void, 
-    options: {id: string, label: string}[], 
-    placeholder: string 
+const SearchableSelect = ({
+    value,
+    onChange,
+    options,
+    placeholder
+}: {
+    value: string,
+    onChange: (val: string) => void,
+    options: { id: string, label: string }[],
+    placeholder: string
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [filter, setFilter] = useState('');
@@ -49,7 +49,7 @@ const SearchableSelect = ({
     return (
         <div className="relative w-full" ref={wrapperRef}>
             {!isOpen ? (
-                <div 
+                <div
                     onClick={() => { setIsOpen(true); setFilter(''); }}
                     className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 cursor-pointer focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm flex justify-between items-center min-h-[34px]"
                 >
@@ -61,8 +61,8 @@ const SearchableSelect = ({
             ) : (
                 <div className="absolute top-0 left-0 w-full z-[100] bg-white rounded-md shadow-xl border border-sw-teal animate-in fade-in zoom-in-95 duration-75">
                     <div className="flex items-center border-b border-gray-100 p-1">
-                        <Search size={12} className="ml-1 text-gray-400"/>
-                        <input 
+                        <Search size={12} className="ml-1 text-gray-400" />
+                        <input
                             ref={inputRef}
                             type="text"
                             className="w-full p-1.5 text-xs outline-none bg-transparent"
@@ -74,7 +74,7 @@ const SearchableSelect = ({
                     <div className="max-h-60 overflow-y-auto">
                         {filteredOptions.length === 0 && <div className="p-3 text-xs text-gray-400 italic text-center">No fields match</div>}
                         {filteredOptions.map(opt => (
-                            <div 
+                            <div
                                 key={opt.id}
                                 onClick={() => { onChange(opt.id); setIsOpen(false); }}
                                 className={`px-3 py-2 text-xs hover:bg-sw-teal/5 hover:text-sw-teal cursor-pointer text-gray-700 truncate border-b border-gray-50 last:border-0 transition-colors ${opt.id === value ? 'bg-sw-teal/10 font-bold text-sw-teal' : ''}`}
@@ -148,14 +148,13 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
             {/* Group Header */}
             <div className="flex flex-col gap-2 mb-3">
                 <div className="flex justify-between items-center">
-                    <button 
-                      onClick={toggleOperator}
-                      className={`text-[10px] font-bold px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors border shadow-sm ${
-                          group.operator === 'AND' 
-                          ? 'bg-sw-teal text-white border-sw-teal' 
-                          : 'bg-white text-sw-teal border-sw-teal'
-                      }`}
-                      title="Click to toggle between matching ALL conditions or ANY condition"
+                    <button
+                        onClick={toggleOperator}
+                        className={`text-[10px] font-bold px-3 py-1.5 rounded-md uppercase tracking-wider transition-colors border shadow-sm ${group.operator === 'AND'
+                            ? 'bg-sw-teal text-white border-sw-teal'
+                            : 'bg-white text-sw-teal border-sw-teal'
+                            }`}
+                        title="Click to toggle between matching ALL conditions or ANY condition"
                     >
                         {group.operator === 'AND' ? 'Match ALL (AND)' : 'Match ANY (OR)'}
                     </button>
@@ -181,11 +180,11 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
             <div className="space-y-3">
                 {group.conditions.map((cond, idx) => {
                     const targetEl = availableTargets.find(t => t.id === cond.targetElementId);
-                    
+
                     // Logic to check if we should show a dropdown for the Value field
                     let valueOptions: string[] = [];
-                    const isSelectOrRadio = targetEl && (targetEl.type === 'select' || targetEl.type === 'radio');
-                    
+                    const isSelectOrRadio = targetEl && (targetEl.type === 'select' || targetEl.type === 'multiselect' || targetEl.type === 'radio');
+
                     if (isSelectOrRadio) {
                         if (Array.isArray(targetEl.options)) {
                             valueOptions = targetEl.options;
@@ -198,14 +197,14 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
 
                     return (
                         <div key={cond.id || idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm relative group">
-                            <button 
-                                onClick={() => removeCondition(idx)} 
+                            <button
+                                onClick={() => removeCondition(idx)}
                                 className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-sw-red border border-gray-200 p-1 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
                                 title="Remove Condition"
                             >
                                 <X size={12} />
                             </button>
-                            
+
                             {/* 2-Row Grid Layout for Inputs */}
                             <div className="flex flex-col gap-2">
                                 {/* Row 1: Field & Operator */}
@@ -221,7 +220,7 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Operator</label>
-                                        <select 
+                                        <select
                                             className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm h-[34px]"
                                             value={cond.operator}
                                             onChange={(e) => updateCondition(idx, 'operator', e.target.value)}
@@ -229,6 +228,7 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                             <option value="equals">Equals</option>
                                             <option value="notEquals">Doesn't Equal</option>
                                             <option value="contains">Contains</option>
+                                            <option value="doesNotContain">Does not contain</option>
                                             <option value="greaterThan">Greater Than &gt;</option>
                                             <option value="lessThan">Less Than &lt;</option>
                                             <option value="isNotEmpty">Is Populated</option>
@@ -255,8 +255,8 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                                 ))}
                                             </select>
                                         ) : (
-                                            <input 
-                                                type="text" 
+                                            <input
+                                                type="text"
                                                 className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 placeholder-gray-400 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm h-[34px]"
                                                 value={String(cond.value)}
                                                 onChange={(e) => updateCondition(idx, 'value', e.target.value)}
@@ -276,16 +276,16 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                 <div className="mt-3 space-y-4">
                     {group.groups.map((subGroup, idx) => (
                         <div key={subGroup.id || idx} className="relative">
-                            <button 
+                            <button
                                 onClick={() => removeSubGroup(idx)}
                                 className="absolute top-2 right-2 z-10 text-gray-300 hover:text-sw-red p-1 bg-white rounded-full shadow-sm border border-gray-100"
                                 title="Remove Group"
                             >
                                 <Trash2 size={12} />
                             </button>
-                            <LogicBuilder 
-                                group={subGroup} 
-                                onChange={(g) => updateSubGroup(idx, g)} 
+                            <LogicBuilder
+                                group={subGroup}
+                                onChange={(g) => updateSubGroup(idx, g)}
                                 depth={depth + 1}
                                 availableTargets={availableTargets}
                             />

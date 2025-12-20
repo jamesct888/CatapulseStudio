@@ -14,28 +14,29 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
 
   // Normalize boolean values (from checkboxes) to strings for comparison with config values
   if (typeof value === 'boolean') {
-      value = String(value);
+    value = String(value);
   }
 
   // Handle Array Values (MultiSelect)
   if (Array.isArray(value)) {
-      const targetStr = String(targetValue).trim();
-      
-      // Contains: Check if the array includes the target value
-      if (condition.operator === 'contains') return value.map(String).includes(targetStr);
-      
-      // Is Empty / Is Not Empty checks
-      if (condition.operator === 'isEmpty') return value.length === 0;
-      if (condition.operator === 'isNotEmpty') return value.length > 0;
-      
-      // Equals: Strict check (array has exactly 1 element and it matches target)
-      if (condition.operator === 'equals') return value.length === 1 && String(value[0]) === targetStr;
-      
-      // Not Equals: Check if the array does NOT include the target value
-      if (condition.operator === 'notEquals') return !value.map(String).includes(targetStr);
-      
-      // Fallback for others
-      return false;
+    const targetStr = String(targetValue).trim();
+
+    // Contains: Check if the array includes the target value
+    if (condition.operator === 'contains') return value.map(String).includes(targetStr);
+    if (condition.operator === 'doesNotContain') return !value.map(String).includes(targetStr);
+
+    // Is Empty / Is Not Empty checks
+    if (condition.operator === 'isEmpty') return value.length === 0;
+    if (condition.operator === 'isNotEmpty') return value.length > 0;
+
+    // Equals: Strict check (array has exactly 1 element and it matches target)
+    if (condition.operator === 'equals') return value.length === 1 && String(value[0]) === targetStr;
+
+    // Not Equals: Check if the array does NOT include the target value
+    if (condition.operator === 'notEquals') return !value.map(String).includes(targetStr);
+
+    // Fallback for others
+    return false;
   }
 
   // Robust string conversion for comparison (Handle numbers, booleans, and trimming)
@@ -49,6 +50,8 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
       return valStr !== targetStr;
     case 'contains':
       return valStr.includes(targetStr);
+    case 'doesNotContain':
+      return !valStr.includes(targetStr);
     case 'greaterThan':
       return Number(value) > Number(targetValue);
     case 'lessThan':
@@ -63,73 +66,73 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
 };
 
 export const evaluateLogicGroup = (group: LogicGroup | undefined, formData: FormState): boolean => {
-    if (!group) return true;
-    
-    // Safety check for array existence
-    const conditions = group.conditions || [];
-    const groups = group.groups || [];
+  if (!group) return true;
 
-    if (conditions.length === 0 && groups.length === 0) return true; // Empty group implies true
+  // Safety check for array existence
+  const conditions = group.conditions || [];
+  const groups = group.groups || [];
 
-    // Evaluate all direct conditions
-    const conditionsResult = conditions.map(c => evaluateCondition(c, formData));
-    
-    // Recursively evaluate subgroups
-    const groupsResult = groups.map(g => evaluateLogicGroup(g, formData));
+  if (conditions.length === 0 && groups.length === 0) return true; // Empty group implies true
 
-    const allResults = [...conditionsResult, ...groupsResult];
+  // Evaluate all direct conditions
+  const conditionsResult = conditions.map(c => evaluateCondition(c, formData));
 
-    if (group.operator === 'AND') {
-        return allResults.every(r => r === true);
-    } else { // OR
-        return allResults.some(r => r === true);
-    }
+  // Recursively evaluate subgroups
+  const groupsResult = groups.map(g => evaluateLogicGroup(g, formData));
+
+  const allResults = [...conditionsResult, ...groupsResult];
+
+  if (group.operator === 'AND') {
+    return allResults.every(r => r === true);
+  } else { // OR
+    return allResults.some(r => r === true);
+  }
 };
 
 export const evaluateCalculation = (parts: CalculationPart[] | undefined, formData: FormState): string | number => {
-    if (!parts || parts.length === 0) return '';
+  if (!parts || parts.length === 0) return '';
 
-    // Simplified evaluation: Treats the list as a sequence of operations
-    // e.g. [100] [+] [FieldA] [*] [2] -> ((100 + FieldA) * 2) 
-    // This ignores standard BODMAS for simplicity in this visual builder context, 
-    // treating it as a step-by-step accumulator.
+  // Simplified evaluation: Treats the list as a sequence of operations
+  // e.g. [100] [+] [FieldA] [*] [2] -> ((100 + FieldA) * 2) 
+  // This ignores standard BODMAS for simplicity in this visual builder context, 
+  // treating it as a step-by-step accumulator.
 
-    let result = 0;
-    let pendingOperator = '+'; // Start by adding the first term to 0
+  let result = 0;
+  let pendingOperator = '+'; // Start by adding the first term to 0
 
-    // Helper to get numeric value
-    const getValue = (part: CalculationPart): number => {
-        if (part.type === 'constant') {
-            return parseFloat(part.value) || 0;
-        } else if (part.type === 'field') {
-            const raw = formData[part.value];
-            if (raw === undefined || raw === null || raw === '') return 0;
-            // Handle currency strings like "£1,000"
-            const clean = String(raw).replace(/[^0-9.-]+/g,"");
-            return parseFloat(clean) || 0;
-        }
-        return 0;
-    };
-
-    for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-
-        if (part.type === 'operator') {
-            pendingOperator = part.value;
-        } else {
-            const val = getValue(part);
-            
-            switch (pendingOperator) {
-                case '+': result += val; break;
-                case '-': result -= val; break;
-                case '*': result *= val; break;
-                case '/': result = val !== 0 ? result / val : 0; break; // Avoid div by zero
-            }
-        }
+  // Helper to get numeric value
+  const getValue = (part: CalculationPart): number => {
+    if (part.type === 'constant') {
+      return parseFloat(part.value) || 0;
+    } else if (part.type === 'field') {
+      const raw = formData[part.value];
+      if (raw === undefined || raw === null || raw === '') return 0;
+      // Handle currency strings like "£1,000"
+      const clean = String(raw).replace(/[^0-9.-]+/g, "");
+      return parseFloat(clean) || 0;
     }
+    return 0;
+  };
 
-    // Round to 2 decimals for cleanliness
-    return Math.round(result * 100) / 100;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+
+    if (part.type === 'operator') {
+      pendingOperator = part.value;
+    } else {
+      const val = getValue(part);
+
+      switch (pendingOperator) {
+        case '+': result += val; break;
+        case '-': result -= val; break;
+        case '*': result *= val; break;
+        case '/': result = val !== 0 ? result / val : 0; break; // Avoid div by zero
+      }
+    }
+  }
+
+  // Round to 2 decimals for cleanliness
+  return Math.round(result * 100) / 100;
 };
 
 export const isElementVisible = (element: ElementDefinition, formData: FormState): boolean => {
@@ -140,9 +143,9 @@ export const isElementVisible = (element: ElementDefinition, formData: FormState
 };
 
 export const isSectionVisible = (section: SectionDefinition, formData: FormState): boolean => {
-    if (section.hidden) return false;
-    if (!section.visibility) return true;
-    return evaluateLogicGroup(section.visibility, formData);
+  if (section.hidden) return false;
+  if (!section.visibility) return true;
+  return evaluateLogicGroup(section.visibility, formData);
 };
 
 export const isElementRequired = (element: ElementDefinition, formData: FormState): boolean => {
@@ -168,7 +171,7 @@ export const getValidationRegexString = (type: string): string | null => {
 
 export const validateValue = (element: ElementDefinition, value: any): string | null => {
   if (!element.validation || element.validation.type === 'none') return null;
-  if (value === undefined || value === null || value === '') return null; 
+  if (value === undefined || value === null || value === '') return null;
 
   const strVal = String(value);
 
@@ -188,47 +191,48 @@ export const validateValue = (element: ElementDefinition, value: any): string | 
       if (isNaN(dPast.getTime())) return 'Invalid date';
       return dPast < new Date() ? null : 'Date must be in the past';
     case 'custom':
-      return null; 
+      return null;
     default:
       return null;
   }
 };
 
-export const formatLogicSummary = (group: LogicGroup | undefined, allElements: {id: string, label: string}[]): string => {
-    if (!group) return 'Always';
-    
-    const conditions = group.conditions || [];
-    const groups = group.groups || [];
+export const formatLogicSummary = (group: LogicGroup | undefined, allElements: { id: string, label: string }[]): string => {
+  if (!group) return 'Always';
 
-    if (conditions.length === 0 && groups.length === 0) return 'Always';
+  const conditions = group.conditions || [];
+  const groups = group.groups || [];
 
-    const parts: string[] = [];
+  if (conditions.length === 0 && groups.length === 0) return 'Always';
 
-    conditions.forEach(c => {
-        const el = allElements.find(e => e.id === c.targetElementId);
-        const label = el ? el.label : 'Unknown Field';
-        let op: string = c.operator;
-        switch(c.operator) {
-            case 'equals': op = '='; break;
-            case 'notEquals': op = '!='; break;
-            case 'greaterThan': op = '>'; break;
-            case 'lessThan': op = '<'; break;
-            case 'contains': op = 'contains'; break;
-            case 'isEmpty': op = 'is empty'; break;
-            case 'isNotEmpty': op = 'is populated'; break;
-        }
-        
-        const val = (c.operator === 'isEmpty' || c.operator === 'isNotEmpty') ? '' : `'${c.value}'`;
-        parts.push(`${label} ${op} ${val}`.trim());
-    });
+  const parts: string[] = [];
 
-    if (groups.length > 0) {
-        groups.forEach(g => {
-            const sub = formatLogicSummary(g, allElements);
-            if(sub !== 'Always') parts.push(`(${sub})`);
-        });
+  conditions.forEach(c => {
+    const el = allElements.find(e => e.id === c.targetElementId);
+    const label = el ? el.label : 'Unknown Field';
+    let op: string = c.operator;
+    switch (c.operator) {
+      case 'equals': op = '='; break;
+      case 'notEquals': op = '!='; break;
+      case 'greaterThan': op = '>'; break;
+      case 'lessThan': op = '<'; break;
+      case 'contains': op = 'contains'; break;
+      case 'doesNotContain': op = 'does not contain'; break;
+      case 'isEmpty': op = 'is empty'; break;
+      case 'isNotEmpty': op = 'is populated'; break;
     }
 
-    if (parts.length === 0) return 'Always';
-    return parts.join(` ${group.operator} `);
+    const val = (c.operator === 'isEmpty' || c.operator === 'isNotEmpty') ? '' : `'${c.value}'`;
+    parts.push(`${label} ${op} ${val}`.trim());
+  });
+
+  if (groups.length > 0) {
+    groups.forEach(g => {
+      const sub = formatLogicSummary(g, allElements);
+      if (sub !== 'Always') parts.push(`(${sub})`);
+    });
+  }
+
+  if (parts.length === 0) return 'Always';
+  return parts.join(` ${group.operator} `);
 };

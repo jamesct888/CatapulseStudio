@@ -8,16 +8,16 @@ let supabase: SupabaseClient | null = null;
 const initSupabase = () => {
     const storedUrl = localStorage.getItem('sb_url');
     const storedKey = localStorage.getItem('sb_key');
-    
+
     if (storedUrl && storedKey) {
         try {
             supabase = createClient(storedUrl, storedKey);
         } catch (e) {
             console.error("Failed to init Supabase from local storage", e);
         }
-    } else if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+    } else if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_KEY) {
         try {
-            supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+            supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
         } catch (e) {
             console.error("Failed to init Supabase from env", e);
         }
@@ -34,7 +34,7 @@ export interface SavedProcessMeta {
 }
 
 export interface ProcessHistoryEntry {
-    id: string; 
+    id: string;
     process_id: string;
     created_at: string;
     definition: ProcessDefinition & { _versionComment?: string }; // We inject comment into JSON
@@ -83,7 +83,7 @@ export const saveProcessToCloud = async (processDef: ProcessDefinition, comment:
                 .select('id')
                 .eq('name', processDef.name)
                 .single();
-            
+
             if (existing) {
                 dbId = existing.id; // Found existing UUID
             } else {
@@ -97,7 +97,7 @@ export const saveProcessToCloud = async (processDef: ProcessDefinition, comment:
         // 2. Prepare Payload
         // We inject the comment into the JSON because the schema lacks a comment column
         const defPayload = { ...processDef, _versionComment: comment };
-        
+
         const mainPayload: any = {
             name: processDef.name,
             definition: defPayload,
@@ -114,7 +114,7 @@ export const saveProcessToCloud = async (processDef: ProcessDefinition, comment:
                 .insert(mainPayload)
                 .select('id')
                 .single();
-            
+
             if (error) throw error;
             resultId = data.id;
         } else {
@@ -123,7 +123,7 @@ export const saveProcessToCloud = async (processDef: ProcessDefinition, comment:
                 .from('processes')
                 .update(mainPayload)
                 .eq('id', dbId);
-            
+
             if (error) throw error;
         }
 
@@ -157,7 +157,7 @@ export const fetchProcessList = async (): Promise<{ data: SavedProcessMeta[], er
             .order('updated_at', { ascending: false });
 
         if (error) throw error;
-        
+
         // Map to meta type
         const mapped: SavedProcessMeta[] = (data || []).map((d: any) => ({
             id: d.id,
@@ -174,25 +174,37 @@ export const fetchProcessList = async (): Promise<{ data: SavedProcessMeta[], er
 };
 
 export const loadProcessFromCloud = async (id: string): Promise<{ data: ProcessDefinition | null, error?: string }> => {
-    if (!supabase) return { data: null, error: "Supabase not configured" };
+    console.log("[SupabaseService] Loading process ID:", id);
+    if (!supabase) {
+        console.error("[SupabaseService] Supabase client is null");
+        return { data: null, error: "Supabase not configured" };
+    }
 
     try {
+        console.log("[SupabaseService] Querying 'processes' table...");
         const { data, error } = await supabase
             .from('processes')
             .select('definition, id') // Get ID to ensure sync
             .eq('id', id)
             .single();
 
-        if (error) throw error;
-        
+        if (error) {
+            console.error("[SupabaseService] Query error:", error);
+            throw error;
+        }
+
+        console.log("[SupabaseService] Query successful. Data found:", !!data);
         const def = data?.definition;
         if (def) {
             // Ensure the internal ID matches the DB UUID
             def.id = data.id;
+            console.log("[SupabaseService] Definition extracted & ID synced.");
+        } else {
+            console.warn("[SupabaseService] Definition field was missing or empty.");
         }
         return { data: def || null };
     } catch (e: any) {
-        console.error("Supabase Load Error:", e);
+        console.error("[SupabaseService] Exception during load:", e);
         return { data: null, error: getErrorMessage(e) };
     }
 };

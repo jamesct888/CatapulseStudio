@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ProcessDefinition, TestCase, UserStory, StoryStrategy, ChatMessage } from '../types';
-import { BookOpen, ClipboardList, RefreshCw, Sparkles, Split, BrainCircuit, ThumbsUp, ThumbsDown, Send, FileText, Bot, User, LayoutGrid, Network } from 'lucide-react';
+import { BookOpen, ClipboardList, RefreshCw, Sparkles, Split, BrainCircuit, ThumbsUp, ThumbsDown, Send, FileText, Bot, User, LayoutGrid, Network, Copy } from 'lucide-react';
 import { generateUserStories, generateTestCases, consultStrategyAdvisor } from '../services/geminiService';
 import { StoryDependencyGraph } from './StoryDependencyGraph';
+import StoryMapFlow from './StoryMapFlow'; // NEW
 
 interface ModeQAProps {
     processDef: ProcessDefinition;
@@ -29,11 +30,11 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
 
     const flushTable = () => {
         if (tableBuffer.length === 0) return;
-        
+
         // Basic Markdown Table Parser
         const headers = tableBuffer[0].split('|').map(c => c.trim()).filter(c => c);
         // Row 1 is usually separator |---|---| so we skip it if present, or handle it
-        const dataRows = tableBuffer.slice(2).map(line => 
+        const dataRows = tableBuffer.slice(2).map(line =>
             line.split('|').map(c => c.trim()).filter(c => c)
         );
 
@@ -67,9 +68,9 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
             flushTable();
             // Detect Headers
             if (trimmed.startsWith('###')) {
-                 elements.push(<h4 key={idx} className="font-bold text-gray-800 mt-4 mb-2 border-b border-gray-100 pb-1">{trimmed.replace(/#/g,'').trim()}</h4>);
+                elements.push(<h4 key={idx} className="font-bold text-gray-800 mt-4 mb-2 border-b border-gray-100 pb-1">{trimmed.replace(/#/g, '').trim()}</h4>);
             } else if (trimmed === '') {
-                 elements.push(<div key={idx} className="h-2"></div>);
+                elements.push(<div key={idx} className="h-2"></div>);
             } else {
                 // Parse Bold **text**
                 const parts = line.split(/(\*\*.*?\*\*)/g);
@@ -79,15 +80,19 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
                     }
                     return part;
                 });
-                
+
                 // Check if it's a list item
                 if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
-                     elements.push(
+                    // Strip the bullet from the first element if it's a string
+                    if (typeof renderedLine[0] === 'string') {
+                        renderedLine[0] = renderedLine[0].replace(/^[\*\-]\s+/, '');
+                    }
+                    elements.push(
                         <div key={idx} className="flex gap-2 ml-4">
                             <span className="text-sw-teal">•</span>
-                            <span>{renderedLine.slice(1)}</span> {/* Hacky way to remove the asterisk char from array, better to substring */}
+                            <span>{renderedLine}</span>
                         </div>
-                     );
+                    );
                 } else {
                     elements.push(<div key={idx} className="min-h-[1.4em]">{renderedLine}</div>);
                 }
@@ -99,12 +104,12 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
     return <div className="text-sm font-sans text-gray-600 leading-relaxed space-y-1">{elements}</div>;
 };
 
-export const ModeQA: React.FC<ModeQAProps> = ({ 
-    processDef, qaTab, setQaTab, 
-    storyStrategy, setStoryStrategy, 
-    userStories, setUserStories, 
-    testCases, setTestCases, 
-    isGenerating, setIsGenerating 
+export const ModeQA: React.FC<ModeQAProps> = ({
+    processDef, qaTab, setQaTab,
+    storyStrategy, setStoryStrategy,
+    userStories, setUserStories,
+    testCases, setTestCases,
+    isGenerating, setIsGenerating
 }) => {
     const [showAdvisor, setShowAdvisor] = useState(false);
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -120,6 +125,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
     }, [chatHistory]);
 
     const handleGenerateStories = async () => {
+        console.log("--- PROMPT V3 ACTIVE ---");
         setIsGenerating(true);
         try {
             const stories = await generateUserStories(processDef, storyStrategy);
@@ -129,12 +135,18 @@ export const ModeQA: React.FC<ModeQAProps> = ({
             } else {
                 alert("No stories generated. Please try a different strategy.");
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert("Error generating user stories.");
+            alert(`Error generating user stories: ${e.message}`);
         } finally {
             setIsGenerating(false);
         }
+    };
+
+    const handleCopyStory = (story: UserStory) => {
+        const content = `ID: ${story.id}\nSUMMARY: ${story.title}\n\nDESCRIPTION:\n${story.description}\n\nACCEPTANCE CRITERIA:\n${Array.isArray(story.acceptanceCriteria) ? story.acceptanceCriteria.join('\n') : story.acceptanceCriteria}`;
+        navigator.clipboard.writeText(content);
+        // Could show a toast here, but for now just copy
     };
 
     const handleGenerateTests = async () => {
@@ -164,7 +176,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
         try {
             const initialPrompt = "Review this process and suggest 3 effective user story splitting strategies. Include specific pros and cons based on the data fields and logic used.";
             const response = await consultStrategyAdvisor(processDef, [], initialPrompt);
-            
+
             setChatHistory([
                 { id: '1', role: 'model', text: response.reply, recommendations: response.recommendations }
             ]);
@@ -184,7 +196,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
 
         try {
             const response = await consultStrategyAdvisor(processDef, [...chatHistory, newUserMsg], inputMessage);
-            
+
             setChatHistory(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
@@ -203,14 +215,14 @@ export const ModeQA: React.FC<ModeQAProps> = ({
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-3xl font-serif text-sw-teal">Stories & Test Cases</h2>
                 <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-                    <button 
+                    <button
                         id="tab-qa-stories"
                         onClick={() => setQaTab('stories')}
                         className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${qaTab === 'stories' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                     >
                         <BookOpen size={16} /> User Stories
                     </button>
-                    <button 
+                    <button
                         id="tab-qa-cases"
                         onClick={() => setQaTab('cases')}
                         className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${qaTab === 'cases' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
@@ -219,7 +231,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                     </button>
                 </div>
             </div>
-            
+
             {qaTab === 'stories' && (
                 <div className="space-y-6">
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -229,8 +241,8 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                 Strategy:
                             </div>
                             <div className="relative min-w-[200px]">
-                                <select 
-                                    value={['screen', 'journey', 'persona'].includes(storyStrategy) ? storyStrategy : 'custom'} 
+                                <select
+                                    value={['screen', 'journey', 'persona'].includes(storyStrategy) ? storyStrategy : 'custom'}
                                     onChange={(e) => setStoryStrategy(e.target.value as StoryStrategy)}
                                     className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-sw-teal focus:border-sw-teal w-full text-sw-text"
                                 >
@@ -245,22 +257,22 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                     </div>
                                 )}
                             </div>
-                            
+
                             <div className="h-6 w-px bg-gray-200 mx-2"></div>
 
-                            <button 
+                            <button
                                 onClick={handleInitialAdvisor}
                                 className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors text-sm ${showAdvisor ? 'bg-sw-teal text-white' : 'bg-sw-purpleLight text-sw-teal hover:bg-sw-teal/10'}`}
                             >
-                                <BrainCircuit size={16}/> Strategy Advisor
+                                <BrainCircuit size={16} /> Strategy Advisor
                             </button>
 
-                            <button 
+                            <button
                                 onClick={handleGenerateStories}
                                 disabled={isGenerating}
                                 className="ml-auto bg-sw-teal text-white px-6 py-2 rounded-lg font-bold hover:bg-sw-tealHover disabled:opacity-50 flex items-center gap-2"
                             >
-                                {isGenerating ? <RefreshCw className="animate-spin" size={18}/> : <Sparkles size={18}/>}
+                                {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
                                 Generate Stories
                             </button>
                         </div>
@@ -275,21 +287,21 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                         </div>
                                         <button onClick={() => setShowAdvisor(false)} className="text-xs text-gray-400 hover:text-gray-600">Close</button>
                                     </div>
-                                    
+
                                     <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={scrollRef}>
                                         {chatHistory.map((msg) => (
                                             <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-sw-teal/10 flex items-center justify-center shrink-0"><Bot size={16} className="text-sw-teal"/></div>}
+                                                {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-sw-teal/10 flex items-center justify-center shrink-0"><Bot size={16} className="text-sw-teal" /></div>}
                                                 <div className={`max-w-[80%] space-y-3`}>
                                                     <div className={`p-4 rounded-xl text-sm ${msg.role === 'user' ? 'bg-sw-teal text-white' : 'bg-white border border-gray-200 text-gray-800'}`}>
                                                         {msg.text}
                                                     </div>
-                                                    
+
                                                     {/* Render Recommendations if present */}
                                                     {msg.recommendations && msg.recommendations.length > 0 && (
                                                         <div className="grid gap-3">
                                                             {msg.recommendations.map(rec => (
-                                                                <div 
+                                                                <div
                                                                     key={rec.id}
                                                                     onClick={() => setStoryStrategy(rec.strategyDescription)}
                                                                     className={`bg-white border-2 rounded-xl p-4 cursor-pointer transition-all hover:shadow-md text-left
@@ -298,20 +310,19 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                                                 >
                                                                     <div className="flex justify-between items-start mb-2">
                                                                         <h4 className="font-bold text-gray-800 text-sm">{rec.strategyName}</h4>
-                                                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
-                                                                            rec.recommendationLevel === 'High' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                                                                        }`}>
+                                                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${rec.recommendationLevel === 'High' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                                                                            }`}>
                                                                             {rec.recommendationLevel} Rec
                                                                         </span>
                                                                     </div>
                                                                     <div className="flex gap-2 mb-3">
                                                                         <div className="flex-1">
                                                                             <span className="text-[10px] font-bold text-green-600 flex items-center gap-1"><ThumbsUp size={10} /> PROS</span>
-                                                                            <ul className="text-[10px] text-gray-600 list-disc ml-3">{rec.pros.slice(0,2).map((p,i)=><li key={i}>{p}</li>)}</ul>
+                                                                            <ul className="text-[10px] text-gray-600 list-disc ml-3">{rec.pros.slice(0, 2).map((p, i) => <li key={i}>{p}</li>)}</ul>
                                                                         </div>
                                                                         <div className="flex-1">
                                                                             <span className="text-[10px] font-bold text-red-500 flex items-center gap-1"><ThumbsDown size={10} /> CONS</span>
-                                                                            <ul className="text-[10px] text-gray-600 list-disc ml-3">{rec.cons.slice(0,2).map((c,i)=><li key={i}>{c}</li>)}</ul>
+                                                                            <ul className="text-[10px] text-gray-600 list-disc ml-3">{rec.cons.slice(0, 2).map((c, i) => <li key={i}>{c}</li>)}</ul>
                                                                         </div>
                                                                     </div>
                                                                     <button className={`w-full py-1.5 rounded text-xs font-bold transition-colors ${storyStrategy === rec.strategyDescription ? 'bg-sw-teal text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
@@ -322,12 +333,12 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                                         </div>
                                                     )}
                                                 </div>
-                                                {msg.role === 'user' && <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0"><User size={16} className="text-gray-500"/></div>}
+                                                {msg.role === 'user' && <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0"><User size={16} className="text-gray-500" /></div>}
                                             </div>
                                         ))}
                                         {isThinking && (
                                             <div className="flex gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-sw-teal/10 flex items-center justify-center shrink-0"><Bot size={16} className="text-sw-teal"/></div>
+                                                <div className="w-8 h-8 rounded-full bg-sw-teal/10 flex items-center justify-center shrink-0"><Bot size={16} className="text-sw-teal" /></div>
                                                 <div className="bg-white border border-gray-200 p-4 rounded-xl">
                                                     <div className="flex gap-1">
                                                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
@@ -340,15 +351,15 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                     </div>
 
                                     <div className="p-4 bg-white border-t border-gray-200 rounded-b-xl flex gap-2">
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             value={inputMessage}
                                             onChange={(e) => setInputMessage(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                             placeholder="Ask a follow-up question or suggest a hybrid approach..."
                                             className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sw-teal focus:border-transparent text-sw-text"
                                         />
-                                        <button 
+                                        <button
                                             onClick={handleSendMessage}
                                             disabled={!inputMessage.trim() || isThinking}
                                             className="bg-sw-teal text-white p-2 rounded-lg hover:bg-sw-tealHover disabled:opacity-50 transition-colors"
@@ -381,7 +392,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                     )}
 
                     {storyViewMode === 'map' && userStories.length > 0 ? (
-                        <StoryDependencyGraph stories={userStories} />
+                        <StoryMapFlow stories={userStories} processDef={processDef} />
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {userStories.map(story => (
@@ -391,11 +402,18 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                             <span className="bg-sw-teal text-white text-xs font-mono px-2 py-1 rounded">{story.id}</span>
                                             <h3 className="font-bold text-gray-800 text-sm truncate max-w-[200px]" title={story.title}>{story.title}</h3>
                                         </div>
+                                        <button
+                                            onClick={() => handleCopyStory(story)}
+                                            className="text-gray-400 hover:text-sw-teal transition-colors p-1 rounded hover:bg-gray-100"
+                                            title="Copy Story to Clipboard"
+                                        >
+                                            <Copy size={14} />
+                                        </button>
                                     </div>
                                     <div className="p-6 space-y-4 flex-1 flex flex-col">
                                         <div>
-                                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Narrative</h4>
-                                            <p className="text-gray-700 italic text-sm border-l-4 border-sw-teal pl-4 py-1">{story.narrative}</p>
+                                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Description</h4>
+                                            <p className="text-gray-700 italic text-sm border-l-4 border-sw-teal pl-4 py-1">{story.description}</p>
                                         </div>
                                         {story.dependencies && story.dependencies.length > 0 && (
                                             <div>
@@ -411,8 +429,48 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                         )}
                                         <div className="flex-1">
                                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Acceptance Criteria</h4>
-                                            <div className="bg-gray-50 p-4 rounded-lg h-48 overflow-y-auto border border-gray-100">
-                                                <MarkdownRenderer content={story.acceptanceCriteria} />
+                                            <div className="bg-gray-50 p-4 rounded-lg h-60 overflow-y-auto border border-gray-100 flex flex-col gap-4">
+                                                {/* Gherkin Text */}
+                                                <MarkdownRenderer content={
+                                                    Array.isArray(story.acceptanceCriteria)
+                                                        ? story.acceptanceCriteria.map(c => `- ${c}`).join('\n')
+                                                        : story.acceptanceCriteria
+                                                } />
+
+                                                {/* Structured Data Table (New) */}
+                                                {story.dataElements && story.dataElements.length > 0 && (
+                                                    <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                        <table className="w-full text-xs">
+                                                            <thead className="bg-gray-100 font-bold text-gray-700 uppercase">
+                                                                <tr>
+                                                                    <th className="px-3 py-2 text-left">Label</th>
+                                                                    <th className="px-3 py-2 text-left">Type</th>
+                                                                    <th className="px-3 py-2 text-left">Req</th>
+                                                                    <th className="px-3 py-2 text-left">Visibility</th>
+                                                                    <th className="px-3 py-2 text-left">Validation</th>
+                                                                    <th className="px-3 py-2 text-left">Options</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-gray-100">
+                                                                {story.dataElements.map((el, i) => (
+                                                                    <tr key={i} className="hover:bg-gray-50">
+                                                                        <td className="px-3 py-2 font-bold text-gray-800">{el.label}</td>
+                                                                        <td className="px-3 py-2 font-mono text-sw-teal">{el.type}</td>
+                                                                        <td className="px-3 py-2">
+                                                                            {el.required ?
+                                                                                <span className="text-red-500 font-bold">Yes</span> :
+                                                                                <span className="text-gray-400">No</span>
+                                                                            }
+                                                                        </td>
+                                                                        <td className="px-3 py-2 text-gray-600">{el.visibility}</td>
+                                                                        <td className="px-3 py-2 text-gray-600 font-mono text-[10px] break-all">{el.validation}</td>
+                                                                        <td className="px-3 py-2 text-gray-600 text-[10px]">{el.options}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -431,12 +489,12 @@ export const ModeQA: React.FC<ModeQAProps> = ({
             {qaTab === 'cases' && (
                 <div className="space-y-6">
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-end">
-                         <button 
+                        <button
                             onClick={handleGenerateTests}
                             disabled={isGenerating}
                             className="bg-sw-teal text-white px-6 py-2 rounded-lg font-bold hover:bg-sw-tealHover disabled:opacity-50 flex items-center gap-2"
                         >
-                            {isGenerating ? <RefreshCw className="animate-spin" size={18}/> : <Sparkles size={18}/>}
+                            {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
                             Generate Test Cases
                         </button>
                     </div>
@@ -466,11 +524,10 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                         <td className="px-6 py-4 text-xs text-gray-600">{tc.preConditions}</td>
                                         <td className="px-6 py-4 text-xs text-gray-600">{tc.expectedResult}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
-                                                tc.priority === 'High' ? 'bg-red-100 text-red-600' :
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${tc.priority === 'High' ? 'bg-red-100 text-red-600' :
                                                 tc.priority === 'Medium' ? 'bg-orange-100 text-orange-600' :
-                                                'bg-green-100 text-green-600'
-                                            }`}>
+                                                    'bg-green-100 text-green-600'
+                                                }`}>
                                                 {tc.priority.toUpperCase()}
                                             </span>
                                         </td>
@@ -478,7 +535,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                 ))}
                             </tbody>
                         </table>
-                         {testCases.length === 0 && !isGenerating && (
+                        {testCases.length === 0 && !isGenerating && (
                             <div className="text-center py-12 text-gray-400">
                                 No test cases generated yet.
                             </div>
