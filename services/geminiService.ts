@@ -551,6 +551,37 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
     if (!apiKey) return [];
 
     // ISTQB Certified Prompt
+    // Dynamic Splitting Logic
+    let splittingInstruction = "";
+    const cleanStrategy = typeof strategy === 'string' ? strategy.toLowerCase() : 'screen';
+
+    if (cleanStrategy.includes('section')) {
+        splittingInstruction = `
+    2. **SPLIT STRATEGY: ONE STORY PER SECTION (Granular)**:
+       - **CRITICAL**: The user needs granular tickets. You MUST generate distinct stories for separate sections.
+       - **CONSTRAINT**: **NEVER** combine multiple sections into a single 'Screen' story.
+       - **Title Format**: MUST be "[Stage Name]: [Section Name]" (e.g. "Draft Claim: Policy Details").
+       - **Scope**: The Acceptance Criteria must ONLY reference fields that belong to that specific Section.
+       - **Logic**: 
+         - Iterate through every Section in the Stage.
+         - Create one User Story per Section.
+         - If Stage A has Section 1 and Section 2 -> Output Story A1 (Section 1) and Story A2 (Section 2).`;
+    } else if (cleanStrategy.includes('journey')) {
+        splittingInstruction = `
+    2. **SPLIT STRATEGY: END-TO-END JOURNEY**:
+       - Focus on the flow between stages rather than deep field validation.
+       - Combine simple screens if they are part of a single logical step.`;
+    } else {
+        // Default: Screen Based
+        splittingInstruction = `
+    2. **SPLIT STRATEGY: ONE STORY PER SECTION (GRANULAR)**:
+       - **CRITICAL**: The user wants stories split by SECTION, not just Screen.
+       - **Logic**: For EACH Stage, look at its defined 'sections'. Create a separate user story for EACH section.
+       - **Title**: "[Stage Name]: [Section Name]"
+       - **Constraint**: Do NOT combine multiple sections into one story.
+       - **Goal**: Granular validation where each ticket corresponds to one distinct UI section.`;
+    }
+
     const prompt = `
     ACT AS: An expert UK QA Lead and Business Analyst (ISTQB Certified).
     GOAL: Generate a comprehensive list of User Stories for an **INTERNAL COLLEAGUE/AGENT**.
@@ -558,23 +589,28 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
     STRUCTURE REQUIREMENT:
     1. **STORY 0 (SKELETON)**: The FIRST story MUST be a high-level "Process Skeleton" story.
        - Title: "End-to-End Process Flow"
-       - Description: "As a Process Owner, I want the system to facilitate the end-to-end journey from [Start] to [End]..."
-       - Criteria: "GIVEN I am a Colleague... WHEN I follow the standard process... THEN the process should flow from [Stage A] to [Stage B]." (No Field Details).
+       - Narrative: "As a Process Owner, I want the system to facilitate the end-to-end journey from [Start] to [End]..."
+       - Criteria: 
+         "GIVEN I am a Colleague 
+          WHEN I create a [NAME OF PROCESS] case
+          THEN the [NAME OF FIRST STAGE] screen should appear
+          WHEN I hit Next/Submit
+          THEN the [NAME OF SECOND STAGE] screen should appear
+          (Repeat for all major stages until standard completion)"
     
-    2. **SPLIT STRATEGY PER STAGE**: For EACH Stage/screen in the process, you must generate AT LEAST TWO distinct stories:
-       
-       **A. SCREEN STORY (Display & Validation)**
-       - **Title**: "[Stage Name] Screen"
-       - **Description**: "As a [Role], I want to view and complete the [Stage Name], So that I can capture the necessary data."
-       - **Criteria Focus**: Field visibility, validation, and layout.
-       - **Constraint**: Must include the Data Elements JSON Array.
-       - **Field Reference**: ALL fields in the AC text must be bolded and in brackets, e.g., "**[Customer Name]**".
+    ${splittingInstruction}
 
-       **B. SUBMISSION STORY (CONDITIONAL)**
-       - **CONDITION**: CHECK INPUT DATA. If the stage is an End Event or has no outgoing connections, **DO NOT GENERATE THIS STORY**.
-       - **Constraint**: Only generate if there is a valid transition to a subsequent stage.
-
-     7. **DATA ELEMENTS JSON ARRAY**:
+    3. **SUBMISSION STORY (CONDITIONAL)**:
+       - **CONDITION**: For every STAGE that has a valid transition to another stage.
+       - **Title**: "Submit [Stage Name]"
+       - **Narrative**: "As a System/User, I want to submit the [Stage Name], So that the next assignment is created."
+       - **Criteria Focus**: What happens on click of 'Submit' (Validation & Routing).
+       - **Required Syntax**: 
+         "**WHEN** I click 'Submit' on [Stage Name]
+          **THEN** the system should validate all mandatory data
+          **AND** a new assignment for [Next Stage] should be generated..."
+          
+    4. **DATA ELEMENTS JSON ARRAY**:
        - **STRICTLY GENERATE A 'dataElements' ARRAY**: 
        - **label**: Field Label.
        - **type**: Field Type (text, select, etc).
@@ -584,14 +620,7 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
        - **options**: LIST ALL Dropdown Options here as a CSV String. (e.g. "Name, Address, Other"). 
        
        **CRITICAL**: DO NOT MIX Validation and Options. They are separate fields now.
-       - **Title**: "Submit [Stage Name]"
-       - **Description**: "As a System/User, I want to submit the [Stage Name], So that the next assignment is created."
-       - **Criteria Focus**: What happens on click of 'Submit'.
-       - **Required Syntax**: 
-         "**WHEN** I click 'Submit' on [Stage Name]
-          **THEN** the system should validate all mandatory data
-          **AND** a new assignment for [Next Stage] should be generated..."
-       - **Skill Check**: Mention that access to the next assignment depends on the user having the required skills (if applicable).
+       - **Skill Check**: Mention that access depends on the user having the required skills (if applicable).
 
     CRITICAL OUTPUT ENTITY: 'acceptanceCriteria'. 
     This field MUST be a SINGLE MARKDOWN STRING containing:
@@ -608,7 +637,7 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
         {
             "id": "us_0",
             "title": "End-to-End Process Flow",
-            "description": "As a...",
+            "narrative": "As a...",
             "acceptanceCriteria": "...",
             "acceptanceCriteria": "...",
             "dataElements": [
@@ -767,7 +796,59 @@ export const generateTestCases = async (processDef: ProcessDefinition): Promise<
 
 export const analyzeTranscript = async (processDef: ProcessDefinition, transcriptText: string | null): Promise<WorkshopSuggestion[]> => {
     if (!apiKey) return [];
-    const prompt = 'Analyze this transcript...Process: ' + JSON.stringify(processDef) + '...Transcript: ' + (transcriptText || 'Simulate...');
+
+    const prompt = `
+    ACT AS: A Senior Business Analyst conducting a workshop review.
+    GOAL: Compare the CURRENT PROCESS DEFINITION against the provided WORKSHOP TRANSCRIPT. Identify discrepancies, missing fields, or logic changes requested by the SMEs.
+
+    CURRENT PROCESS:
+    ${JSON.stringify(processDef)}
+
+    TRANSCRIPT:
+    "${transcriptText || 'Simulate a workshop where stakeholders suggest adding a "Date of Birth" field and removing "Middle Name".'}"
+
+    OUTPUT SCHEMA:
+    Return a JSON Array of objects matching this interface:
+    interface WorkshopSuggestion {
+        id: string; // Generate a unique string ID
+        type: 'add' | 'remove' | 'modify';
+        description: string; // Short summary of the change
+        reasoning: string; // Quote or reason from transcript
+        targetLabel?: string; // Label of the field to remove/modify (Exact match if possible)
+        newElement?: { // Only for 'add' type
+            label: string;
+            type: 'text' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'textarea' | 'currency';
+            sectionTitle?: string; // Which section to add it to
+        };
+        updateData?: { // Only for 'modify' type
+             required?: boolean;
+             label?: string;
+             visibility?: { // Simple Logic Group
+                id: string;
+                operator: 'AND' | 'OR';
+                conditions: Array<{
+                    targetElementId: string; // The ID of the field that controls this (e.g. 'maritalStatus')
+                    operator: 'equals' | 'notEquals' | 'contains' | 'doesNotContain' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
+                    value: string;
+                }>;
+             };
+        };
+    }
+
+    RULES:
+    1. EXTRACT clear action items from the conversation.
+    2. IGNORE general chatter. Focus on data requirements.
+    3. If they say "Add X", usage type 'add'.
+    4. If they say "We don't need Y", usage type 'remove'.
+    5. If they say "Make Z mandatory", usage type 'modify' with updateData: { required: true }.
+    6. IF LOGIC/KEYING REQUESTED (e.g., "Only show Spouse Name if Marital Status is Married"):
+       - FIND the 'elementId' of the controlling field (e.g., "maritalStatus") from the provided JSON.
+       - Construct a 'visibility' object with that ID.
+       - Example: updateData: { visibility: { id: "log_1", operator: "AND", conditions: [{ targetElementId: "maritalStatus", operator: "equals", value: "Married" }] } }
+    7. USE 'isNotEmpty' or 'isEmpty' for "is populated" / "has value" checks.
+       - Example: "Show NI Number if Title is selected" -> operator: "isNotEmpty", targetElementId: "title".
+    `;
+
     try {
         const response = await callWithRetry(async () => {
             return await ai.models.generateContent({
@@ -780,9 +861,36 @@ export const analyzeTranscript = async (processDef: ProcessDefinition, transcrip
     } catch (e) { return []; }
 };
 
-export const generateDataMapping = async (elements: { id: string; label: string; type: string }[]): Promise<DataObjectSuggestion[]> => {
+export const generateDataMapping = async (elements: { id: string; label: string; type: string }[], baseClass?: string): Promise<DataObjectSuggestion[]> => {
     if (!apiKey) return [];
-    const prompt = 'Act as Pega System Architect...Fields: ' + JSON.stringify(elements);
+    const prompt = `
+    ACT AS: A Senior Pega System Architect.
+    GOAL: Group the provided fields into logical Pega Data Classes (Data Objects).
+    CONTEXT: The Base Class for this application is: "${baseClass || 'Org-App-Work'}".
+
+    INPUT FIELDS:
+    ${JSON.stringify(elements)}
+
+    OUTPUT REQUIREMENT:
+    Return a JSON Array of objects with this structure AND NOTHING ELSE:
+    [
+        {
+            "className": "${baseClass ? baseClass + '-Data-Customer' : 'Customer'}", 
+            "description": "Customer personal details",
+            "mappings": [
+                { "elementId": "field_id_input", "suggestedProperty": "FirstName" },
+                { "elementId": "field_id_input2", "suggestedProperty": "LastName" }
+            ]
+        }
+    ]
+    
+    STRATEGIC GUIDELINES:
+    1. **GROUPING IS CRITICAL**: Do NOT just list all fields in one class. Analyze the field labels to group them by business entity (e.g., 'Customer', 'Policy', 'Vehicle', 'Claim').
+    2. **Naming**: PREFIX class names with the provided Base Class if applicable (e.g. "${baseClass}-Data-Customer"). Use Pega-compliant property names (CamelCase) for \`suggestedProperty\`.
+    3. **Completeness**: Ensure EVERY input field is mapped to exactly one class.
+    4. **Context**: Use the field label to determine the best \`suggestedProperty\` name (e.g. if specific label 'Cust Name' -> 'CustomerName').
+    `;
+
     try {
         const response = await callWithRetry(async () => {
             return await ai.models.generateContent({
@@ -792,5 +900,8 @@ export const generateDataMapping = async (elements: { id: string; label: string;
             });
         });
         return cleanAndParseJSON<DataObjectSuggestion[]>(response.text) || [];
-    } catch (e) { return []; }
+    } catch (e) {
+        console.error("Error generating Data Mapping:", e);
+        return [];
+    }
 };

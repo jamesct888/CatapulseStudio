@@ -1,15 +1,139 @@
-
+﻿
 import React, { useState, useRef, useEffect } from 'react';
 import { ProcessDefinition, TestCase, UserStory, StoryStrategy, ChatMessage } from '../types';
-import { BookOpen, ClipboardList, RefreshCw, Sparkles, Split, BrainCircuit, ThumbsUp, ThumbsDown, Send, FileText, Bot, User, LayoutGrid, Network, Copy } from 'lucide-react';
+import { BookOpen, ClipboardList, RefreshCw, Sparkles, Split, BrainCircuit, ThumbsUp, ThumbsDown, Send, FileText, Bot, User, LayoutGrid, Network, Copy, TableProperties, Download, Upload } from 'lucide-react';
 import { generateUserStories, generateTestCases, consultStrategyAdvisor } from '../services/geminiService';
+import { downloadJiraCsv, parseJiraCsv } from '../utils/jiraExport';
 import { StoryDependencyGraph } from './StoryDependencyGraph';
 import StoryMapFlow from './StoryMapFlow'; // NEW
 
+// --- Story Card Component ---
+// Extracted to handle local state for editing without re-rendering the whole list or using window.prompt
+const StoryCard = ({ story, onUpdate, onRefresh }: { story: UserStory, onUpdate: (s: UserStory) => void, onRefresh: (s: UserStory) => void }) => {
+    const [isEditingId, setIsEditingId] = React.useState(false);
+    const [tempId, setTempId] = React.useState(story.jiraId || '');
+
+    const handleIdSave = () => {
+        if (tempId !== story.jiraId) {
+            onUpdate({ ...story, jiraId: tempId || undefined });
+        }
+        setIsEditingId(false);
+    };
+    const isMerged = story.id === story.jiraId;
+
+    const handleCopy = () => {
+        const text = `Title: ${story.title}\nID: ${story.jiraId || story.id}\n\nNarrative:\n${story.narrative}\n\nAcceptance Criteria:\n${Array.isArray(story.acceptanceCriteria) ? story.acceptanceCriteria.join('\n') : story.acceptanceCriteria}`;
+        navigator.clipboard.writeText(text);
+    };
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
+            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div className="flex items-center gap-3 overflow-hidden">
+                    {!isMerged && (
+                        <span className="bg-sw-teal text-white text-xs font-mono px-2 py-1 rounded shrink-0">{story.id}</span>
+                    )}
+
+                    {/* Jira ID Badge / Editor */}
+                    <div className="relative group shrink-0">
+                        {isEditingId ? (
+                            <input
+                                autoFocus
+                                type="text"
+                                value={tempId}
+                                onChange={(e) => setTempId(e.target.value)}
+                                onBlur={handleIdSave}
+                                onKeyDown={(e) => e.key === 'Enter' && handleIdSave()}
+                                className="w-24 px-2 py-1 text-xs border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="JIRA-123"
+                            />
+                        ) : (
+                            <div
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTempId(story.jiraId || '');
+                                    setIsEditingId(true);
+                                }}
+                                className="cursor-pointer"
+                                title="Click to edit Jira ID"
+                            >
+                                {story.jiraId ? (
+                                    <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded hover:bg-blue-200 transition-colors">
+                                        {story.jiraId}
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] text-gray-400 border border-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-50 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                                        + Link Jira
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <h3 className="font-bold text-gray-800 text-sm truncate" title={story.title}>{story.title}</h3>
+                </div>
+                <div className="flex gap-1 items-center shrink-0">
+                    <select
+                        value={story.status || 'To Do'}
+                        onChange={(e) => onUpdate({ ...story, status: e.target.value as any })}
+                        className={`text-[10px] font-bold px-2 py-1 rounded border-none focus:ring-1 cursor-pointer transition-colors ${story.status === 'Done' ? 'bg-green-100 text-green-700' :
+                            story.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-500'
+                            }`}
+                    >
+                        <option value="To Do">To Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Done">Done</option>
+                    </select>
+
+                    {story.jiraId && (
+                        <button
+                            onClick={() => onRefresh(story)}
+                            className="text-gray-400 hover:text-sw-teal transition-colors p-1 rounded hover:bg-gray-100"
+                            title="Refresh Content"
+                        >
+                            <RefreshCw size={14} />
+                        </button>
+                    )}
+                    <button
+                        onClick={handleCopy}
+                        className="text-gray-400 hover:text-sw-teal transition-colors p-1 rounded hover:bg-gray-100"
+                        title="Copy to Clipboard"
+                    >
+                        <Copy size={14} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="p-6 space-y-4 flex-1 overflow-y-auto max-h-[400px]">
+                <div className="mb-4">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Narrative</h4>
+                    <div className="border-l-4 border-sw-teal pl-4 py-1">
+                        <MarkdownRenderer content={story.narrative} />
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg border border-gray-100 p-4">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+                        <FileText size={12} /> Acceptance Criteria
+                    </h4>
+                    <div className="bg-white p-3 rounded border border-gray-100">
+                        <MarkdownRenderer content={
+                            Array.isArray(story.acceptanceCriteria)
+                                ? story.acceptanceCriteria.join('\n')
+                                : story.acceptanceCriteria
+                        } />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface ModeQAProps {
     processDef: ProcessDefinition;
-    qaTab: 'stories' | 'cases';
-    setQaTab: (val: 'stories' | 'cases') => void;
+    qaTab: 'stories' | 'cases' | 'dictionary';
+    setQaTab: (val: 'stories' | 'cases' | 'dictionary') => void;
     storyStrategy: StoryStrategy;
     setStoryStrategy: (val: StoryStrategy) => void;
     userStories: UserStory[];
@@ -30,21 +154,13 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
 
     const flushTable = () => {
         if (tableBuffer.length === 0) return;
-
-        // Basic Markdown Table Parser
         const headers = tableBuffer[0].split('|').map(c => c.trim()).filter(c => c);
-        // Row 1 is usually separator |---|---| so we skip it if present, or handle it
-        const dataRows = tableBuffer.slice(2).map(line =>
-            line.split('|').map(c => c.trim()).filter(c => c)
-        );
-
+        const dataRows = tableBuffer.slice(2).map(line => line.split('|').map(c => c.trim()).filter(c => c));
         elements.push(
             <div key={`tbl-${elements.length}`} className="my-4 overflow-x-auto border border-gray-200 rounded-lg shadow-sm bg-white">
                 <table className="min-w-full text-xs">
                     <thead className="bg-gray-100 text-gray-700 font-bold uppercase tracking-wider">
-                        <tr>
-                            {headers.map((h, i) => <th key={i} className="px-4 py-2 border-b border-gray-200 text-left">{h}</th>)}
-                        </tr>
+                        <tr>{headers.map((h, i) => <th key={i} className="px-4 py-2 border-b border-gray-200 text-left">{h}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {dataRows.map((row, rI) => (
@@ -61,18 +177,16 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
 
     lines.forEach((line, idx) => {
         const trimmed = line.trim();
-        // Detect Table Row
         if (trimmed.startsWith('|')) {
             tableBuffer.push(trimmed);
         } else {
             flushTable();
-            // Detect Headers
             if (trimmed.startsWith('###')) {
                 elements.push(<h4 key={idx} className="font-bold text-gray-800 mt-4 mb-2 border-b border-gray-100 pb-1">{trimmed.replace(/#/g, '').trim()}</h4>);
             } else if (trimmed === '') {
                 elements.push(<div key={idx} className="h-2"></div>);
             } else {
-                // Parse Bold **text**
+                // Improved Bold Parsing
                 const parts = line.split(/(\*\*.*?\*\*)/g);
                 const renderedLine = parts.map((part, pIdx) => {
                     if (part.startsWith('**') && part.endsWith('**')) {
@@ -81,16 +195,14 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
                     return part;
                 });
 
-                // Check if it's a list item
                 if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
-                    // Strip the bullet from the first element if it's a string
-                    if (typeof renderedLine[0] === 'string') {
-                        renderedLine[0] = renderedLine[0].replace(/^[\*\-]\s+/, '');
-                    }
+                    const content = Array.isArray(renderedLine) && typeof renderedLine[0] === 'string' ?
+                        [renderedLine[0].replace(/^[\*\-]\s+/, ''), ...renderedLine.slice(1)] : renderedLine;
+
                     elements.push(
                         <div key={idx} className="flex gap-2 ml-4">
                             <span className="text-sw-teal">•</span>
-                            <span>{renderedLine}</span>
+                            <span>{content}</span>
                         </div>
                     );
                 } else {
@@ -100,7 +212,6 @@ const MarkdownRenderer: React.FC<{ content: string | undefined }> = ({ content }
         }
     });
     flushTable();
-
     return <div className="text-sm font-sans text-gray-600 leading-relaxed space-y-1">{elements}</div>;
 };
 
@@ -128,10 +239,30 @@ export const ModeQA: React.FC<ModeQAProps> = ({
         console.log("--- PROMPT V3 ACTIVE ---");
         setIsGenerating(true);
         try {
-            const stories = await generateUserStories(processDef, storyStrategy);
-            if (stories && stories.length > 0) {
-                setUserStories(stories);
+            // 1. Identify Locked Stories (those with Jira IDs)
+            const lockedStories = userStories.filter(s => s.jiraId);
+            const lockedTitles = new Set(lockedStories.map(s => s.title));
+
+            // 2. Generate New Stories
+            const newStories = await generateUserStories(processDef, storyStrategy);
+
+            if (newStories && newStories.length > 0) {
+                // 3. Filter out new stories that duplicate locked stories (by ID or Title)
+                const lockedIds = new Set(lockedStories.map(s => s.id));
+                const uniqueNewStories = newStories.filter(s =>
+                    !lockedTitles.has(s.title) &&
+                    !lockedIds.has(s.id)
+                );
+
+                // 4. Merge: Locked + Unique New
+                const finalStories = [...lockedStories, ...uniqueNewStories];
+
+                setUserStories(finalStories);
                 setShowAdvisor(false);
+
+                if (lockedStories.length > 0) {
+                    alert(`Sync Complete:\n- Kept ${lockedStories.length} locked stories (Jira Linked)\n- Added ${uniqueNewStories.length} new generated stories\n- Skipped ${newStories.length - uniqueNewStories.length} duplicates`);
+                }
             } else {
                 alert("No stories generated. Please try a different strategy.");
             }
@@ -143,8 +274,119 @@ export const ModeQA: React.FC<ModeQAProps> = ({
         }
     };
 
+    const handleRefreshStory = async (storyToRefresh: UserStory) => {
+        // Change Request Logic
+        if (storyToRefresh.status === 'In Progress' || storyToRefresh.status === 'Done') {
+            if (!confirm(`Create Change Request for "${storyToRefresh.title}"?\n\nThis story is "${storyToRefresh.status}". We will NOT overwrite it.\nInstead, we will create a NEW "Delta" story for the updates.`)) return;
+        } else {
+            if (!confirm(`Refresh "${storyToRefresh.title}"?\n\nThis will re-generate the Description, Criteria, and Data Elements based on the current design.\nYour Jira ID (${storyToRefresh.jiraId}) will be preserved.`)) return;
+        }
+
+        setIsGenerating(true);
+        try {
+            // Generate full set (can't target single story easily with current API, so we filter)
+            const freshStories = await generateUserStories(processDef, storyStrategy);
+
+            // Find match by Title
+            const match = freshStories.find(s => s.title === storyToRefresh.title);
+
+            if (match) {
+                if (storyToRefresh.status === 'In Progress' || storyToRefresh.status === 'Done') {
+                    // DELTA STORY (Change Request)
+                    const deltaStory: UserStory = {
+                        ...match,
+                        id: `CR-${Math.floor(Math.random() * 1000)}`, // Temp ID
+                        title: `Update: ${match.title}`,
+                        narrative: `**CHANGE REQUEST**\nThis is an update to locked story ${storyToRefresh.jiraId || storyToRefresh.id}.\n\n${match.narrative}`,
+                        status: 'To Do',
+                        jiraId: undefined // New story needs new Jira ID
+                    };
+                    setUserStories([...userStories, deltaStory]);
+                    alert(`Change Request Created: "${deltaStory.title}"`);
+                } else {
+                    // IN-PLACE UPDATE (Safe for To Do)
+                    const updatedStories = userStories.map(s => {
+                        if (s.id === storyToRefresh.id) {
+                            return {
+                                ...s,
+                                narrative: match.narrative,
+                                acceptanceCriteria: match.acceptanceCriteria,
+                                dataElements: match.dataElements,
+                                // PRESERVE ID and JIRA ID
+                            };
+                        }
+                        return s;
+                    });
+                    setUserStories(updatedStories);
+                    alert(`Story "${storyToRefresh.title}" refreshed successfully!`);
+                }
+            } else {
+                alert(`Could not find a matching story for "${storyToRefresh.title}" in the new generation.\n\nDid you rename the stage? If so, please update the story title matches manually or regenerate all.`);
+            }
+        } catch (e: any) {
+            alert(`Error refreshing story: ${e.message}`);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    // --- Data Dictionary Logic ---
+    const dataDictionary = React.useMemo(() => {
+        const dict: Record<string, { element: any, stories: string[] }> = {};
+        userStories.forEach(story => {
+            if (story.dataElements) {
+                story.dataElements.forEach(el => {
+                    // Unique Key: Label + Type
+                    const key = `${el.label}::${el.type}`;
+                    if (!dict[key]) {
+                        dict[key] = { element: el, stories: [] };
+                    }
+                    // Add reference if not already present
+                    if (!dict[key].stories.includes(story.id)) {
+                        dict[key].stories.push(story.id);
+                    }
+                });
+            }
+        });
+        return Object.values(dict).sort((a, b) => a.element.label.localeCompare(b.element.label));
+    }, [userStories]);
+
+    // Jira Import Handler
+    const handleJiraImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string;
+                const map = parseJiraCsv(text);
+
+                if (map.size === 0) {
+                    alert("No valid mappings found. Ensure CSV has 'Summary' and 'Key' columns.");
+                    return;
+                }
+
+                // Update Stories
+                const updatedStories = userStories.map(story => {
+                    const jiraKey = map.get(story.title); // Match by Title
+                    if (jiraKey) {
+                        return { ...story, jiraId: jiraKey };
+                    }
+                    return story;
+                });
+
+                setUserStories(updatedStories);
+                alert(`Successfully mapped ${map.size} Jira IDs!`);
+            } catch (err: any) {
+                alert("Error parsing CSV: " + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+
     const handleCopyStory = (story: UserStory) => {
-        const content = `ID: ${story.id}\nSUMMARY: ${story.title}\n\nDESCRIPTION:\n${story.description}\n\nACCEPTANCE CRITERIA:\n${Array.isArray(story.acceptanceCriteria) ? story.acceptanceCriteria.join('\n') : story.acceptanceCriteria}`;
+        const content = `ID: ${story.id}\nSUMMARY: ${story.title}\n\nNARRATIVE:\n${story.narrative}\n\nACCEPTANCE CRITERIA:\n${Array.isArray(story.acceptanceCriteria) ? story.acceptanceCriteria.join('\n') : story.acceptanceCriteria}`;
         navigator.clipboard.writeText(content);
         // Could show a toast here, but for now just copy
     };
@@ -223,6 +465,13 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                         <BookOpen size={16} /> User Stories
                     </button>
                     <button
+                        id="tab-qa-dictionary"
+                        onClick={() => setQaTab('dictionary')}
+                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${qaTab === 'dictionary' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                    >
+                        <TableProperties size={16} /> Data Dictionary
+                    </button>
+                    <button
                         id="tab-qa-cases"
                         onClick={() => setQaTab('cases')}
                         className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${qaTab === 'cases' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
@@ -246,7 +495,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                     onChange={(e) => setStoryStrategy(e.target.value as StoryStrategy)}
                                     className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-sw-teal focus:border-sw-teal w-full text-sw-text"
                                 >
-                                    <option value="screen">By Screen / Component</option>
+                                    <option value="screen">By Screen / Section</option>
                                     <option value="journey">By User Journey</option>
                                     <option value="persona">By Persona</option>
                                     <option value="custom">Custom / AI Selected</option>
@@ -373,7 +622,28 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                     </div>
 
                     {userStories.length > 0 && (
-                        <div className="flex justify-end mb-4">
+                        <div className="flex justify-end mb-4 gap-2">
+                            {/* Hidden File Input */}
+                            <input
+                                type="file"
+                                id="jira-import-input"
+                                accept=".csv"
+                                className="hidden"
+                                onChange={handleJiraImport}
+                            />
+
+                            <button
+                                onClick={() => downloadJiraCsv(userStories, storyStrategy)}
+                                className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all bg-white border border-gray-200 text-gray-600 hover:text-sw-teal hover:border-sw-teal shadow-sm"
+                            >
+                                <Download size={14} /> Export to Jira CSV
+                            </button>
+                            <button
+                                onClick={() => document.getElementById('jira-import-input')?.click()}
+                                className="px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 transition-all bg-white border border-gray-200 text-gray-600 hover:text-sw-teal hover:border-sw-teal shadow-sm"
+                            >
+                                <Upload size={14} /> Import Jira IDs
+                            </button>
                             <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex">
                                 <button
                                     onClick={() => setStoryViewMode('list')}
@@ -396,85 +666,52 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {userStories.map(story => (
-                                <div key={story.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full">
-                                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <span className="bg-sw-teal text-white text-xs font-mono px-2 py-1 rounded">{story.id}</span>
-                                            <h3 className="font-bold text-gray-800 text-sm truncate max-w-[200px]" title={story.title}>{story.title}</h3>
-                                        </div>
-                                        <button
-                                            onClick={() => handleCopyStory(story)}
-                                            className="text-gray-400 hover:text-sw-teal transition-colors p-1 rounded hover:bg-gray-100"
-                                            title="Copy Story to Clipboard"
-                                        >
-                                            <Copy size={14} />
-                                        </button>
-                                    </div>
-                                    <div className="p-6 space-y-4 flex-1 flex flex-col">
-                                        <div>
-                                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Description</h4>
-                                            <p className="text-gray-700 italic text-sm border-l-4 border-sw-teal pl-4 py-1">{story.description}</p>
-                                        </div>
-                                        {story.dependencies && story.dependencies.length > 0 && (
-                                            <div>
-                                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dependencies</h4>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {story.dependencies.map(dep => (
-                                                        <span key={dep} className="text-[10px] bg-sw-purpleLight text-sw-teal px-2 py-1 rounded font-mono font-bold">
-                                                            Blocks {dep}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className="flex-1">
-                                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Acceptance Criteria</h4>
-                                            <div className="bg-gray-50 p-4 rounded-lg h-60 overflow-y-auto border border-gray-100 flex flex-col gap-4">
-                                                {/* Gherkin Text */}
-                                                <MarkdownRenderer content={
-                                                    Array.isArray(story.acceptanceCriteria)
-                                                        ? story.acceptanceCriteria.map(c => `- ${c}`).join('\n')
-                                                        : story.acceptanceCriteria
-                                                } />
+                                <StoryCard
+                                    key={story.id}
+                                    story={story}
+                                    onUpdate={(updated) => {
+                                        // Deep Replace Logic for Jira ID Change
+                                        if (updated.jiraId && updated.jiraId !== story.jiraId) {
+                                            const oldId = story.id;
+                                            const newId = updated.jiraId;
 
-                                                {/* Structured Data Table (New) */}
-                                                {story.dataElements && story.dataElements.length > 0 && (
-                                                    <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                                                        <table className="w-full text-xs">
-                                                            <thead className="bg-gray-100 font-bold text-gray-700 uppercase">
-                                                                <tr>
-                                                                    <th className="px-3 py-2 text-left">Label</th>
-                                                                    <th className="px-3 py-2 text-left">Type</th>
-                                                                    <th className="px-3 py-2 text-left">Req</th>
-                                                                    <th className="px-3 py-2 text-left">Visibility</th>
-                                                                    <th className="px-3 py-2 text-left">Validation</th>
-                                                                    <th className="px-3 py-2 text-left">Options</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="divide-y divide-gray-100">
-                                                                {story.dataElements.map((el, i) => (
-                                                                    <tr key={i} className="hover:bg-gray-50">
-                                                                        <td className="px-3 py-2 font-bold text-gray-800">{el.label}</td>
-                                                                        <td className="px-3 py-2 font-mono text-sw-teal">{el.type}</td>
-                                                                        <td className="px-3 py-2">
-                                                                            {el.required ?
-                                                                                <span className="text-red-500 font-bold">Yes</span> :
-                                                                                <span className="text-gray-400">No</span>
-                                                                            }
-                                                                        </td>
-                                                                        <td className="px-3 py-2 text-gray-600">{el.visibility}</td>
-                                                                        <td className="px-3 py-2 text-gray-600 font-mono text-[10px] break-all">{el.validation}</td>
-                                                                        <td className="px-3 py-2 text-gray-600 text-[10px]">{el.options}</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                            // Auto-confirm if migrating from internal "us_" ID
+                                            const isMigration = oldId.startsWith('us_');
+                                            const shouldUpdate = isMigration || confirm(`Update Story ID from "${oldId}" to "${newId}" and update all references?`);
+
+                                            if (shouldUpdate) {
+                                                // Check for collision (excluding self)
+                                                if (userStories.some(s => s.id === newId && s.id !== oldId)) {
+                                                    alert(`ID "${newId}" already exists! Please choose a unique Jira ID.`);
+                                                    return;
+                                                }
+
+                                                const newStories = userStories.map(s => {
+                                                    // 1. Update the target story
+                                                    if (s.id === oldId) {
+                                                        return { ...updated, id: newId };
+                                                    }
+                                                    // 2. Update dependencies in other stories
+                                                    let newDeps = s.dependencies;
+                                                    if (s.dependencies && s.dependencies.includes(oldId)) {
+                                                        newDeps = s.dependencies.map(d => d === oldId ? newId : d);
+                                                    }
+                                                    return { ...s, dependencies: newDeps };
+                                                });
+                                                setUserStories(newStories);
+                                            } else {
+                                                // Just update the property check
+                                                const newStories = userStories.map(s => s.id === updated.id ? updated : s);
+                                                setUserStories(newStories);
+                                            }
+                                        } else {
+                                            // Standard Update (Status change, etc)
+                                            const newStories = userStories.map(s => s.id === updated.id ? updated : s);
+                                            setUserStories(newStories);
+                                        }
+                                    }}
+                                    onRefresh={handleRefreshStory}
+                                />
                             ))}
                             {userStories.length === 0 && !isGenerating && (
                                 <div className="col-span-full text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
@@ -483,6 +720,67 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                             )}
                         </div>
                     )}
+                </div>
+            )}
+
+            {qaTab === 'dictionary' && (
+                <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4">
+                            <TableProperties className="text-sw-teal" />
+                            <h3 className="text-xl font-bold text-gray-800">Global Data Dictionary</h3>
+                        </div>
+                        <p className="text-gray-500 text-sm mb-6">Aggregate view of all data elements defined across all user stories.</p>
+
+                        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                            <table className="min-w-full text-left text-sm">
+                                <thead className="bg-gray-100 text-gray-700 font-bold uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-3 border-b border-gray-200">Label</th>
+                                        <th className="px-6 py-3 border-b border-gray-200">Type</th>
+                                        <th className="px-6 py-3 border-b border-gray-200">Required</th>
+                                        <th className="px-6 py-3 border-b border-gray-200">Visibility Logic</th>
+                                        <th className="px-6 py-3 border-b border-gray-200">Validation</th>
+                                        <th className="px-6 py-3 border-b border-gray-200">Options</th>
+                                        <th className="px-6 py-3 border-b border-gray-200 bg-sw-purpleLight text-sw-teal">Referenced By</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 bg-white">
+                                    {dataDictionary.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-6 py-3 font-bold text-gray-800">{item.element.label}</td>
+                                            <td className="px-6 py-3 font-mono text-sw-teal">{item.element.type}</td>
+                                            <td className="px-6 py-3">
+                                                {item.element.required ?
+                                                    <span className="text-red-600 font-bold uppercase text-xs">Yes</span> :
+                                                    <span className="text-gray-400 text-xs">Optional</span>
+                                                }
+                                            </td>
+                                            <td className="px-6 py-3 text-gray-600">{item.element.visibility}</td>
+                                            <td className="px-6 py-3 font-mono text-xs text-gray-500">{item.element.validation}</td>
+                                            <td className="px-6 py-3 text-xs text-gray-500 max-w-[200px] truncate" title={item.element.options}>{item.element.options}</td>
+                                            <td className="px-6 py-3">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {item.stories.map(sid => (
+                                                        <span key={sid} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-mono border border-gray-200">
+                                                            {sid}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {dataDictionary.length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} className="px-6 py-12 text-center text-gray-400 italic">
+                                                No data elements found. Generate stories first.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             )}
 

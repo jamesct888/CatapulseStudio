@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ProcessDefinition, ElementDefinition, VisualTheme, StageDefinition, SectionDefinition } from '../types';
 import { RenderElement } from './FormElements';
 import { PanelBottom, Plus, Eye, CheckCircle2, FileText, Hash, Calendar, List, CheckSquare, MessageSquare, CircleDot, GripVertical, Table, Database, AlertTriangle, Info, Loader2, Calculator } from 'lucide-react';
@@ -27,10 +27,22 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     selectedStage,
     loadingStageIds
 }) => {
-    const [draggedItem, setDraggedItem] = useState<{sectionId: string, index: number} | null>(null);
+    const [draggedItem, setDraggedItem] = useState<{ sectionId: string, index: number } | null>(null);
+    const sectionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
     // Explicitly check if this specific stage is loading
     const isLoading = loadingStageIds?.has(selectedStageId);
+
+    // Auto-scroll when selectedSectionId changes
+    useEffect(() => {
+        if (selectedSectionId && sectionRefs.current[selectedSectionId]) {
+            sectionRefs.current[selectedSectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); // 'start' usually better so top of section is at top of view? User said "scroll the screen up". 'center' is safer. Let's try 'start' + scrollPadding or just 'center'.
+            // Actually, usually 'center' ensures visibility. User said "scroll screen up".
+            // Let's stick with 'center' or 'nearest'. 'start' might put it behind the sticky header if we aren't careful with padding.
+            // Given the sticky header, 'center' is safer.
+            sectionRefs.current[selectedSectionId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [selectedSectionId]);
 
     const handleDragStart = (e: React.DragEvent, sectionId: string, index: number) => {
         setDraggedItem({ sectionId, index });
@@ -103,7 +115,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                         <div className="w-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
                             <Info size={48} className="text-gray-200 mb-4" />
                             <p className="text-gray-400 font-medium mb-4">No fields generated for this stage.</p>
-                            <button 
+                            <button
                                 onClick={() => {
                                     const newSec: SectionDefinition = {
                                         id: `sec_${Date.now()}`,
@@ -113,7 +125,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                     };
                                     const newDef = { ...processDef };
                                     const stg = newDef.stages.find(s => s.id === selectedStageId);
-                                    if(stg) stg.sections.push(newSec);
+                                    if (stg) stg.sections.push(newSec);
                                     setProcessDef(newDef);
                                 }}
                                 className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:text-sw-teal hover:border-sw-teal transition-all shadow-sm"
@@ -124,8 +136,9 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                     )}
 
                     {selectedStage?.sections.map((section) => (
-                        <div 
-                            key={section.id} 
+                        <div
+                            key={section.id}
+                            ref={el => { if (el) sectionRefs.current[section.id] = el; }}
                             className={`w-full bg-white rounded-2xl shadow-sm border transition-all duration-200
                                 ${selectedSectionId === section.id ? 'border-sw-teal ring-1 ring-sw-teal shadow-md' : 'border-gray-100 hover:border-gray-300'}
                                 ${section.variant === 'summary' ? 'border-t-4 border-t-gray-400 bg-gray-50' : ''}
@@ -138,19 +151,17 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                 setSelectedElementId(null);
                             }}
                         >
-                            <div className={`p-4 border-b border-gray-50 flex justify-between items-center bg-gradient-to-r from-white to-gray-50/50 rounded-t-2xl ${
-                                section.variant === 'warning' ? 'from-amber-50 to-white border-amber-100' :
-                                section.variant === 'info' ? 'from-blue-50 to-white border-blue-100' : ''
-                            }`}>
+                            <div className={`p-4 border-b border-gray-50 flex justify-between items-center bg-gradient-to-r from-white to-gray-50/50 rounded-t-2xl ${section.variant === 'warning' ? 'from-amber-50 to-white border-amber-100' :
+                                    section.variant === 'info' ? 'from-blue-50 to-white border-blue-100' : ''
+                                }`}>
                                 <div className="flex items-center gap-3">
                                     {section.variant === 'summary' && <PanelBottom size={16} className="text-gray-400" />}
                                     {section.variant === 'warning' && <AlertTriangle size={16} className="text-amber-500" />}
                                     {section.variant === 'info' && <Info size={16} className="text-blue-500" />}
-                                    <h3 className={`font-bold text-sm uppercase tracking-wide ${
-                                        section.variant === 'warning' ? 'text-amber-700' :
-                                        section.variant === 'info' ? 'text-blue-700' :
-                                        'text-sw-teal'
-                                    }`}>{section.title}</h3>
+                                    <h3 className={`font-bold text-sm uppercase tracking-wide ${section.variant === 'warning' ? 'text-amber-700' :
+                                            section.variant === 'info' ? 'text-blue-700' :
+                                                'text-sw-teal'
+                                        }`}>{section.title}</h3>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">
@@ -159,12 +170,12 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                     {section.variant === 'summary' && <span className="text-[10px] uppercase font-bold text-white bg-gray-400 px-2 py-1 rounded">Summary</span>}
                                 </div>
                             </div>
-                            
+
                             <div className={`p-6 grid gap-6 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
                                 {section.elements.map((element, index) => {
                                     const isSelected = selectedElementId === element.id;
                                     const isDragging = draggedItem?.sectionId === section.id && draggedItem.index === index;
-                                    
+
                                     // Simulate value for static reflection fields in editor
                                     let displayValue = element.defaultValue;
                                     if (element.type === 'static' && element.staticDataSource === 'field' && element.sourceFieldId) {
@@ -175,7 +186,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                     }
 
                                     return (
-                                        <div 
+                                        <div
                                             key={element.id}
                                             id={element.id}
                                             draggable
@@ -188,14 +199,14 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                                 setSelectedSectionId(section.id);
                                             }}
                                             className={`relative group rounded-xl transition-all p-4 border-2 cursor-pointer
-                                                ${isSelected 
-                                                    ? 'border-sw-teal bg-sw-teal/5' 
+                                                ${isSelected
+                                                    ? 'border-sw-teal bg-sw-teal/5'
                                                     : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
                                                 }
                                                 ${isDragging ? 'opacity-40 border-dashed border-gray-400 bg-gray-50' : ''}
                                             `}
                                         >
-                                            <div 
+                                            <div
                                                 className="absolute top-4 left-2 text-gray-300 cursor-grab active:cursor-grabbing hover:text-sw-teal z-20 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 title="Drag to reorder"
                                             >
@@ -203,15 +214,15 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                             </div>
 
                                             <div className="pointer-events-none pl-6">
-                                                <RenderElement 
-                                                    element={element} 
-                                                    value={displayValue} 
-                                                    onChange={() => {}} 
-                                                    disabled 
+                                                <RenderElement
+                                                    element={element}
+                                                    value={displayValue}
+                                                    onChange={() => { }}
+                                                    disabled
                                                     theme={visualTheme}
                                                 />
                                             </div>
-                                            
+
                                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 {element.type === 'calculated' && (
                                                     <div className="bg-orange-100 text-orange-600 p-1 rounded-md" title="Calculated Field">
@@ -237,7 +248,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                         </div>
                                     );
                                 })}
-                                
+
                                 <div className="border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center p-6 min-h-[100px] hover:border-sw-teal hover:bg-sw-teal/5 transition-all cursor-pointer group"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -247,7 +258,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                             type: 'text',
                                             required: false
                                         };
-                                        const newDef = {...processDef};
+                                        const newDef = { ...processDef };
                                         newDef.stages.find(s => s.id === selectedStageId)?.sections.find(s => s.id === section.id)?.elements.push(newEl);
                                         setProcessDef(newDef);
                                         setSelectedElementId(newEl.id);
@@ -291,7 +302,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                             { type: 'repeater', icon: Table, label: 'List' },
                             { type: 'static', icon: MessageSquare, label: 'Static' }
                         ].map(tool => (
-                            <button 
+                            <button
                                 key={tool.type}
                                 className="p-3 rounded-full hover:bg-sw-lightGray text-sw-teal transition-colors flex flex-col items-center gap-1 w-16 group"
                                 onClick={() => {
@@ -304,8 +315,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                             columns: tool.type === 'repeater' ? [{ id: 'col1', label: 'Item Name', type: 'text' }] : undefined,
                                             calculation: tool.type === 'calculated' ? [] : undefined
                                         };
-                                        const newDef = {...processDef};
-                                        for(const stg of newDef.stages) {
+                                        const newDef = { ...processDef };
+                                        for (const stg of newDef.stages) {
                                             const sec = stg.sections.find(s => s.id === selectedSectionId);
                                             if (sec) {
                                                 sec.elements.push(newEl);

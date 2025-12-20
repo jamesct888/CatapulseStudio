@@ -38,6 +38,7 @@ export interface ProcessHistoryEntry {
     process_id: string;
     created_at: string;
     definition: ProcessDefinition & { _versionComment?: string }; // We inject comment into JSON
+    comment?: string;
 }
 
 export const isSupabaseConfigured = () => !!supabase;

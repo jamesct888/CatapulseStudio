@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
     ReactFlow,
@@ -14,7 +15,11 @@ import {
     MarkerType,
     NodeProps,
     Handle,
-    Position
+    Position,
+    BaseEdge,
+    getSmoothStepPath,
+    EdgeLabelRenderer,
+    EdgeProps
 } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
@@ -29,7 +34,7 @@ interface StoryMapFlowProps {
 // 1. Custom Decision Node (Diamond + Optional Story Chip)
 const DecisionNode = ({ data }: NodeProps) => {
     return (
-        <div style={{ position: 'relative', width: 140, height: 140 }}>
+        <div style={{ position: 'relative', width: 100, height: 100 }}>
             {/* The diamond shape */}
             <div style={{
                 width: '100%', height: '100%',
@@ -53,24 +58,7 @@ const DecisionNode = ({ data }: NodeProps) => {
                 pointerEvents: 'none' // Let clicks pass to handles if needed, or 'all' if interactive
             }}>
 
-                {/* Optional Story Chip Display (Centered) */}
-                {data.story && (
-                    <div style={{ pointerEvents: 'all', marginBottom: '8px' }}>
-                        {/* We pass a partial node object sufficient for the visual component */}
-                        <StoryNode
-                            id="story-chip-inner"
-                            data={data.story as any}
-                            type="story"
-                            selected={false}
-                            zIndex={10}
-                            isConnectable={false}
-                            positionAbsoluteX={0}
-                            positionAbsoluteY={0}
-                            dragging={false}
-                            dragHandle={undefined}
-                        />
-                    </div>
-                )}
+                {/* Optional Story Chip Display (REMOVED - Now on Edge) */}
 
                 {/* The Label */}
                 <div
@@ -97,7 +85,6 @@ const DecisionNode = ({ data }: NodeProps) => {
 };
 
 // 2. Custom Stage Node (Container)
-// Standardized handles on all sides for cleaner routing
 const StageNode = ({ data }: NodeProps) => {
     return (
         <div style={{
@@ -120,10 +107,6 @@ const StageNode = ({ data }: NodeProps) => {
                 {data.label}
             </div>
 
-            {/* Content Area (where child nodes would visually sit if we weren't using absolute nodes) 
-                Since React Flow handles grouping via coordinates, this is just the visual container.
-            */}
-
             {/* Handles for routing flexibility */}
             <Handle type="target" position={Position.Left} id="target-left" style={{ top: '50%', width: 10, height: 10 }} />
             <Handle type="target" position={Position.Top} id="target-top" style={{ left: '50%', width: 10, height: 10 }} />
@@ -136,17 +119,69 @@ const StageNode = ({ data }: NodeProps) => {
 
 // 3. Custom Story Node (Chip Style)
 const StoryNode = ({ data }: NodeProps) => {
-    // Terminology: Service Agent -> Colleague
     const rawDescription = (data.description as string) || '';
     const description = rawDescription.replace(/Service Agent/g, 'Colleague');
 
     return (
         <div
-            title={`${data.fullTitle}\n\n${description}`} // Native tooltip with replacement
+            title={`${data.fullTitle}\n\n${description}`} // Native tooltip
             className="px-3 py-1 bg-sw-teal border border-sw-teal rounded-full text-xs font-bold text-white shadow-sm cursor-help whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] text-center hover:bg-sw-tealHover transition-colors font-sans"
         >
             {data.label}
         </div>
+    );
+};
+
+// 4. Custom Chip Edge
+const ChipEdge = ({
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    style = {},
+    markerEnd,
+    data
+}: EdgeProps) => {
+    const [edgePath, labelX, labelY] = getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+    });
+
+    if (!data?.story) {
+        return <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />;
+    }
+
+    const story = data.story as UserStory;
+
+    return (
+        <>
+            <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
+            <EdgeLabelRenderer>
+                <div
+                    style={{
+                        position: 'absolute',
+                        transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+                        pointerEvents: 'all',
+                    }}
+                    className="nodrag nopan"
+                >
+                    <div
+                        title={`${story.title}\n\n${story.description}`}
+                        className="px-2 py-0.5 bg-sw-teal border border-sw-teal rounded-full text-[10px] font-bold text-white shadow-sm cursor-help hover:bg-sw-tealHover transition-colors font-sans"
+                        style={{ minWidth: '40px', textAlign: 'center' }}
+                    >
+                        {story.id}
+                    </div>
+                </div>
+            </EdgeLabelRenderer>
+        </>
     );
 };
 
@@ -156,9 +191,12 @@ const nodeTypes = {
     story: StoryNode
 };
 
+const edgeTypes = {
+    chip: ChipEdge
+};
+
 const StoryMapFlow: React.FC<StoryMapFlowProps> = ({ stories, processDef }) => {
 
-    // Process the graph logic
     const { nodes: validNodes, edges: validEdges } = useMemo(() => {
         const newNodes: Node[] = [];
         const newEdges: Edge[] = [];
@@ -171,13 +209,12 @@ const StoryMapFlow: React.FC<StoryMapFlowProps> = ({ stories, processDef }) => {
         const gapX = 180;
         const railY = 100; // Main sequence 'Y'
         const branchDrop = 250; // Vertical distance for conditional branches
-        const decisionSize = 140;
+        const decisionSize = 100;
 
         // --- HELPERS ---
         const getConditionLabel = (logic: any) => {
             if (!logic || !logic.conditions) return 'Check';
 
-            // Helper to lookup field name
             const getFieldName = (elId: string) => {
                 for (const stage of processDef.stages) {
                     for (const section of stage.sections) {
@@ -200,192 +237,169 @@ const StoryMapFlow: React.FC<StoryMapFlowProps> = ({ stories, processDef }) => {
         };
 
         const findRuleStory = (stageId: string) => {
-            const candidates = stories.filter(s => s.relatedStageIds?.includes(stageId));
-
-            // PRIORITY: Submit > Decision > Rule > Logic > Condition > Check > Skip
+            const candidates = stories.filter(s =>
+                s.relatedStageIds?.includes(stageId) &&
+                !s.title.toLowerCase().startsWith('submit') && // Exclude submit stories from decision nodes
+                !s.title.toLowerCase().startsWith('process')
+            );
             const priority = ['submit', 'decision', 'rule:', 'logic:', 'condition:', 'check', 'skip'];
-
             return candidates.sort((a, b) => {
-                const aTitle = a.title.toLowerCase();
-                const bTitle = b.title.toLowerCase();
-                const aIdx = priority.findIndex(p => aTitle.includes(p));
-                const bIdx = priority.findIndex(p => bTitle.includes(p));
-
-                // If both match a priority, picking higher priority (lower index)
+                const aIdx = priority.findIndex(p => a.title.toLowerCase().includes(p));
+                const bIdx = priority.findIndex(p => b.title.toLowerCase().includes(p));
                 if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                // If only one matches, prioritize it
                 if (aIdx !== -1) return -1;
                 if (bIdx !== -1) return 1;
                 return 0;
-            }).find(s =>
-                priority.some(p => s.title.toLowerCase().includes(p))
+            }).find(s => priority.some(p => s.title.toLowerCase().includes(p)));
+        };
+
+        const findSubmitStory = (stageId: string) => {
+            return stories.find(s =>
+                s.relatedStageIds?.includes(stageId) &&
+                (s.title.toLowerCase().startsWith('submit') || s.title.toLowerCase().startsWith('process'))
             );
         };
 
         const createStageBlock = (stage: any, x: number, y: number) => {
             const stageStories = stories.filter(s =>
                 s.relatedStageIds?.includes(stage.id) &&
-                !s.title.toLowerCase().includes('skip') // Exclude rule stories from the list
+                !s.title.toLowerCase().includes('skip') &&
+                !s.title.toLowerCase().startsWith('submit') &&
+                !s.title.toLowerCase().startsWith('process')
             );
 
-            // Layout chips inside the stage container
-            // We can do grid or Stack. Let's do simple stack.
-            const chipGap = 10;
-            const contentHeight = stageStories.length * (storyHeight + chipGap) + padding; // Extra padding at bottom
-            const totalHeight = Math.max(150, headerHeight + contentHeight);
-
-            // 1. Stage Container Node
+            // Container
             newNodes.push({
                 id: stage.id,
                 position: { x, y },
                 data: { label: stage.title },
-                type: 'stage', // CUSTOM TYPE
-                style: { width: stageWidth, height: totalHeight },
-                zIndex: 0
+                style: { width: stageWidth, height: headerHeight + padding + (stageStories.length * (storyHeight + 10)) + 20 },
+                type: 'stage',
+                zIndex: 1
             });
 
-            // 2. Story Chips
-            let currentY = headerHeight + chipGap;
+            // Stories inside
+            let currentY = headerHeight + 10;
             stageStories.forEach((s) => {
                 newNodes.push({
                     id: s.id,
+                    position: { x: 10, y: currentY },
                     parentId: stage.id,
-                    position: { x: padding, y: currentY },
                     data: {
-                        label: s.id, // Show ID only
+                        label: s.id,
                         fullTitle: s.title,
                         description: s.description
                     },
                     extent: 'parent',
-                    type: 'story', // CUSTOM TYPE
+                    type: 'story',
                     zIndex: 2
                 });
-                currentY += storyHeight + chipGap;
+                currentY += storyHeight + 10; // gap
             });
 
-            return { id: stage.id, width: stageWidth, height: totalHeight };
+            return { id: stage.id, width: stageWidth };
         };
 
 
         // --- MAIN LOOP ---
         let currentX = 50;
         let prevNodeId: string | null = null;
-        let prevSourceHandle = 'source-right'; // Default flow exit
-
-        // We track branches that need to merge into the next Unconditional block
-        // Format: { id: string, sourceHandle: string }
+        let prevSourceHandle = 'source-right';
         let pendingMerges: { id: string, sourceHandle: string }[] = [];
 
         processDef.stages.forEach((stage, i) => {
             const hasSkip = !!stage.skipLogic;
-
-            // FORCE First Stage to be valid start (ignore skip logic if it's the 0th item)
-            // This fixes the user reported issue where Stage 1 looked conditional.
             const isConditional = hasSkip && i > 0;
 
             if (!isConditional) {
                 // -- UNCONDITIONAL (MAIN RAIL) --
-
-                // Align on Rail Y = 100
                 createStageBlock(stage, currentX, railY);
 
                 // Connect Previous -> Current
                 if (prevNodeId) {
+                    const submitStory = findSubmitStory(prevNodeId);
+                    const hasStory = submitStory && prevNodeId === submitStory.relatedStageIds?.[0];
+
                     newEdges.push({
                         id: `e-${prevNodeId}-${stage.id}`,
                         source: prevNodeId,
                         target: stage.id,
                         sourceHandle: prevSourceHandle,
-                        targetHandle: 'target-left', // Side-to-Side flow
-                        type: 'smoothstep',
-                        label: prevSourceHandle === 'out-else' ? 'Else' : undefined,
+                        targetHandle: 'target-left',
+                        type: hasStory ? 'chip' : 'smoothstep',
+                        data: hasStory ? { story: submitStory } : undefined,
+                        label: !hasStory && prevSourceHandle === 'out-else' ? 'Else' : undefined,
                         style: { stroke: '#64748b', strokeWidth: 2 },
                         markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }
                     });
                 }
 
-                // Connect Pending Merges -> Current (Left or Top?)
-                // If dropping in from above or side... side is cleaner if we route well.
-                // React Flow smoothstep handles mult-input pretty well on Left.
+                // Connect Pending Merges -> Current
                 pendingMerges.forEach(merge => {
+                    const submitStory = findSubmitStory(merge.id);
+                    const hasStory = submitStory && merge.id === submitStory.relatedStageIds?.[0];
+
                     newEdges.push({
                         id: `e-${merge.id}-${stage.id}`,
                         source: merge.id,
                         target: stage.id,
                         sourceHandle: merge.sourceHandle,
-                        targetHandle: 'target-left', // Merge into the main line
-                        type: 'smoothstep',
+                        targetHandle: 'target-left',
+                        type: hasStory ? 'chip' : 'smoothstep',
+                        data: hasStory ? { story: submitStory } : undefined,
                         style: { stroke: '#64748b', strokeWidth: 2 },
                         markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }
                     });
                 });
                 pendingMerges = [];
 
-                // Prepare next
                 prevNodeId = stage.id;
                 prevSourceHandle = 'source-right';
                 currentX += stageWidth + gapX;
 
             } else {
                 // -- Conditional Block (Ladder) --
-
-                // 1. Decision Node (On the Rail)
                 const decId = `dec_${stage.id}`;
                 const ruleStory = findRuleStory(stage.id);
-                // Fallback Label and Tooltip from Logic
                 const condLabel = getConditionLabel(stage.skipLogic);
-
-                // If we have a rule story, the CHIP is the primary label. The diamond should be clean.
-                // If no story, we show '?' in the diamond (cleaner than Rx).
                 const ruleLabel = ruleStory ? '' : '?';
-
                 const ruleTooltip = ruleStory
                     ? `${ruleStory.title}\n----------------\n${ruleStory.description}`
                     : `Logic Gate: ${stage.title}\n\nRule: Proceed if ${condLabel}`;
 
-                // Construct story chip data if story exists
-                const storyChipData = ruleStory ? {
-                    label: ruleStory.id,
-                    fullTitle: ruleStory.title,
-                    description: ruleStory.description
-                } : undefined;
+                // Story Chip is now on the Incoming Edge, not inside the node.
+                // Reverting node to simple 'Decision' label.
 
-                // Center decision in the gap or align?
-                // Visual preference: Decision centers over the column or start of column?
-                // Let's place it at start of column space.
                 const decX = currentX + (stageWidth - decisionSize) / 2;
 
                 newNodes.push({
                     id: decId,
-                    position: { x: decX, y: railY + 20 }, // Vertical alignment tweak
-                    data: { label: ruleLabel, tooltip: ruleTooltip, story: storyChipData },
+                    position: { x: decX, y: railY + 20 },
+                    data: { label: 'Decision', tooltip: ruleTooltip }, // Hardcoded label
                     type: 'decision'
                 });
 
                 // Connect Prev -> Decision
                 if (prevNodeId) {
+                    const submitStory = findSubmitStory(prevNodeId);
+                    const hasStory = submitStory && prevNodeId === submitStory.relatedStageIds?.[0];
+
                     newEdges.push({
                         id: `e-${prevNodeId}-${decId}`,
                         source: prevNodeId,
                         target: decId,
                         sourceHandle: prevSourceHandle,
-                        targetHandle: 'in-left', // Side entry
-                        type: 'smoothstep',
-                        label: prevSourceHandle === 'out-else' ? 'Else' : undefined,
+                        targetHandle: 'in-left',
+                        type: hasStory ? 'chip' : 'smoothstep',
+                        data: hasStory ? { story: submitStory } : undefined,
+                        label: undefined,
                         style: { stroke: '#64748b', strokeWidth: 2 },
                         markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }
                     });
                 }
 
-
-
-
-                // 2. Conditional Stage (Dropped Vertical)
-                // Position X: Same as decision? Or aligned with the column?
-                // Let's align exactly below.
+                // Conditional Stage
                 const stageY = railY + branchDrop;
-                // Center stage on decision?
-                // Stage width 300, Dec 60. Center diff = 120.
                 const stageX = decX - (stageWidth - decisionSize) / 2;
                 createStageBlock(stage, stageX, stageY);
 
@@ -394,22 +408,18 @@ const StoryMapFlow: React.FC<StoryMapFlowProps> = ({ stories, processDef }) => {
                     id: `e-${decId}-${stage.id}`,
                     source: decId,
                     target: stage.id,
-                    sourceHandle: 'out-true', // Bottom
-                    targetHandle: 'target-top', // Top entry
+                    sourceHandle: 'out-true',
+                    targetHandle: 'target-top',
                     label: condLabel,
                     type: 'smoothstep',
                     style: { stroke: '#0f172a', strokeWidth: 2 },
                     markerEnd: { type: MarkerType.ArrowClosed, color: '#0f172a' }
                 });
 
-                // 3. Update State
-                // The "Main Line" continues from the 'Else' handle of the decision
+                // Update State
                 prevNodeId = decId;
                 prevSourceHandle = 'out-else';
-
-                // Pending Merge: The Dropped stage needs to merge back eventually
-                pendingMerges.push({ id: stage.id, sourceHandle: 'source-right' }); // Or bottom?
-
+                pendingMerges.push({ id: stage.id, sourceHandle: 'source-right' });
                 currentX += stageWidth + gapX;
             }
         });
@@ -432,19 +442,22 @@ const StoryMapFlow: React.FC<StoryMapFlowProps> = ({ stories, processDef }) => {
         const finalSources = [{ id: prevNodeId, handle: prevSourceHandle }, ...pendingMerges.map(p => ({ id: p.id, handle: p.sourceHandle }))];
         finalSources.forEach(src => {
             if (src.id) {
+                const submitStory = src.id ? findSubmitStory(src.id) : undefined;
+                const hasStory = submitStory && src.id === submitStory.relatedStageIds?.[0];
+
                 newEdges.push({
                     id: `e-${src.id}-${endId}`,
                     source: src.id,
                     target: endId,
                     sourceHandle: src.handle,
-                    type: 'smoothstep',
-                    label: src.handle === 'out-else' ? 'Else' : undefined,
+                    type: hasStory ? 'chip' : 'smoothstep',
+                    data: hasStory ? { story: submitStory } : undefined,
+                    label: !hasStory && src.handle === 'out-else' ? 'Else' : undefined,
                     style: { stroke: '#64748b', strokeWidth: 2 },
                     markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }
                 });
             }
         });
-
 
         return { nodes: newNodes, edges: newEdges };
     }, [stories, processDef]);
@@ -468,6 +481,7 @@ const StoryMapFlow: React.FC<StoryMapFlowProps> = ({ stories, processDef }) => {
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}

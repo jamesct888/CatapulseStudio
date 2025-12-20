@@ -1,7 +1,6 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { CatapulseLogo } from './Shared';
-import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload, Share, FileJson, MessageSquare, Plus, Trash2, Edit2, ArrowRight, RefreshCw, Wand2, UploadCloud, CheckCircle, Clock, X, Table as TableIcon, CloudUpload, CloudDownload, Cloud, Loader2, Link2, Plug, History, RotateCcw, Database, Copy, Check } from 'lucide-react';
+import { Edit3, Play, FileText, CheckSquare, Settings2, Code, Network, Download, Upload, Share, FileJson, MessageSquare, Plus, Trash2, Edit2, ArrowRight, RefreshCw, Wand2, UploadCloud, CheckCircle, Clock, X, Table as TableIcon, CloudUpload, CloudDownload, Cloud, Loader2, Link2, Plug, History, RotateCcw, Database, Copy, Check, FilePlus } from 'lucide-react';
 import { ProcessDefinition, VisualTheme, WorkshopSuggestion, ElementDefinition } from '../types';
 import { generateStandaloneHTML } from '../services/htmlExporter';
 import { ModalWrapper } from './ModalWrapper';
@@ -19,24 +18,29 @@ import {
     ProcessHistoryEntry
 } from '../services/supabaseService';
 
+type ViewMode = 'editor' | 'table' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega' | 'onboarding';
+
 interface AppHeaderProps {
-    processDef: ProcessDefinition;
-    setProcessDef: (val: ProcessDefinition) => void;
-    viewMode: string;
-    setViewMode: (mode: any) => void;
+    processDef: ProcessDefinition | null; // Allow null to prevent crash during transitions
+    setProcessDef: React.Dispatch<React.SetStateAction<ProcessDefinition | null>>;
+    viewMode: ViewMode;
+    setViewMode: (mode: ViewMode) => void;
     isSettingsOpen: boolean;
     setIsSettingsOpen: (val: boolean) => void;
     visualTheme?: VisualTheme;
+    isDirty: boolean; // NEW
+    onExternalSave: () => void; // NEW
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
-    processDef, setProcessDef, viewMode, setViewMode, isSettingsOpen, setIsSettingsOpen, visualTheme
+    processDef, setProcessDef, viewMode, setViewMode, isSettingsOpen, setIsSettingsOpen, visualTheme,
+    isDirty, onExternalSave
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Renaming State
     const [isRenaming, setIsRenaming] = useState(false);
-    const [tempName, setTempName] = useState(processDef.name);
+    const [tempName, setTempName] = useState(processDef?.name || '');
 
     // Legacy Import State
     const [showLegacyImport, setShowLegacyImport] = useState(false);
@@ -54,6 +58,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     // DB Connectivity State
     const [isSupabaseReady, setIsSupabaseReady] = useState(isSupabaseConfigured());
     const [showConnectionModal, setShowConnectionModal] = useState(false);
+
+    if (!processDef) return null;
     const [showSql, setShowSql] = useState(false);
     const [sbUrl, setSbUrl] = useState(localStorage.getItem('sb_url') || '');
     const [sbKey, setSbKey] = useState(localStorage.getItem('sb_key') || '');
@@ -94,7 +100,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         downloadAnchorNode.setAttribute("download", `${processDef.name.replace(/\s+/g, '_')}.json`);
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
+        downloadAnchorNode.click();
         downloadAnchorNode.remove();
+        onExternalSave(); // Reset dirty state
     };
 
     const handleExportHTML = () => {
@@ -395,9 +403,29 @@ create table public.process_versions (
 ) TABLESPACE pg_default;
 `;
 
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+    const handleNewProject = () => {
+        if (isDirty) {
+            setShowResetConfirm(true);
+        } else {
+            performReset();
+        }
+    };
+
+    const performReset = () => {
+        // Clear autosave
+        localStorage.removeItem('catapulse_autosave');
+        // Reset state
+        setProcessDef(null);
+        setViewMode('onboarding');
+        onExternalSave(); // Resets isDirty
+        setShowResetConfirm(false);
+    };
+
     return (
         <>
-            <header className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-4 z-50 shrink-0 relative">
+            <header className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-4 z-50 shrink-0 sticky top-0">
                 <div className="flex items-center gap-6">
                     <CatapulseLogo scale={0.8} />
                     <div className="h-6 w-px bg-gray-200"></div>
@@ -468,6 +496,14 @@ create table public.process_versions (
                             <MessageSquare size={18} />
                         </button>
                         <button
+                            onClick={handleNewProject}
+                            className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
+                            title="New Project (Reset)"
+                        >
+                            <FilePlus size={18} />
+                        </button>
+                        <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                        <button
                             onClick={() => setShowLegacyImport(true)}
                             className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
                             title="Import Legacy Schema (Text/JSON)"
@@ -483,10 +519,13 @@ create table public.process_versions (
                         </button>
                         <button
                             onClick={handleExport}
-                            className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Save Local File (JSON)"
+                            className={`p-2 rounded-lg transition-colors relative ${isDirty ? 'text-amber-600 bg-amber-50 hover:bg-amber-100 hover:text-amber-700 animate-pulse' : 'text-gray-400 hover:text-sw-teal hover:bg-gray-100'}`}
+                            title={isDirty ? "Unified File has Unsaved Changes (Click to Download)" : "Save Local File (JSON)"}
                         >
                             <Download size={18} />
+                            {isDirty && (
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full border border-white"></span>
+                            )}
                         </button>
                         <div className="w-px h-8 bg-gray-200 mx-1"></div>
                         <button
@@ -835,8 +874,9 @@ create table public.process_versions (
                                 <textarea
                                     value={transcript}
                                     onChange={(e) => setTranscript(e.target.value)}
-                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                    title="Paste text here"
+                                    className={`absolute inset-0 w-full h-full p-6 text-xs text-gray-700 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-sw-teal rounded-xl transition-all ${transcript ? 'opacity-100 bg-white z-10' : 'opacity-0 cursor-pointer z-20'}`}
+                                    placeholder="Paste transcript here..."
+                                    title="Paste transcript here or drag file"
                                 />
                             </div>
 
@@ -976,6 +1016,39 @@ create table public.process_versions (
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </div>
+                </ModalWrapper>
+            )}
+
+            {showResetConfirm && (
+                <ModalWrapper
+                    title="Discard Changes?"
+                    icon={Trash2}
+                    modalSize={{ width: 450, height: 280 }}
+                    onResizeStart={() => { }}
+                    onClose={() => setShowResetConfirm(false)}
+                >
+                    <div className="space-y-4">
+                        <p className="text-gray-600">
+                            You have unsaved changes in your current project. Starting a new project will <strong>discard all current work</strong>.
+                        </p>
+                        <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-sm text-amber-800">
+                            Are you sure you want to proceed?
+                        </div>
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                onClick={() => setShowResetConfirm(false)}
+                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={performReset}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-sm"
+                            >
+                                Discard & Start New
+                            </button>
                         </div>
                     </div>
                 </ModalWrapper>

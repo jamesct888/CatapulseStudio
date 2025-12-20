@@ -197,12 +197,16 @@ export interface StoryDataElement {
 
 export interface UserStory {
   id: string;
-  title: string; // Summary (Short phrase)
-  description: string; // As a... I want...
-  acceptanceCriteria: string | string[];
-  dataElements?: StoryDataElement[]; // Structured Data Table
-  dependencies?: string[];
+  jiraId?: string; // Optional external ID
+  status?: 'To Do' | 'In Progress' | 'Done';
+  title: string;
+  narrative: string; // Added narrative
+  acceptanceCriteria: string;
+  dependencies: string[];
+  // Mapping to Process
   relatedStageIds?: string[];
+  relatedSectionIds?: string[];
+  dataElements?: StoryDataElement[];
 }
 
 export interface DataObjectSuggestion {
