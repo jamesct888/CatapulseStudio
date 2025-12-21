@@ -4,8 +4,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Advanced Editor Functions', () => {
 
     test.beforeEach(async ({ page }) => {
-        // 1. Mock the specific AI endpoint
-        await page.route('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', async route => {
+        // 1. Mock the specific AI endpoint using Regex
+        await page.route(/.*generateContent.*/, async route => {
             const json = {
                 candidates: [{
                     content: {
@@ -37,7 +37,7 @@ test.describe('Advanced Editor Functions', () => {
                     }
                 }]
             };
-            await route.fulfill({ json });
+            await route.fulfill({ json, contentType: 'application/json' });
         });
 
         // 2. Load and Generate
@@ -51,9 +51,11 @@ test.describe('Advanced Editor Functions', () => {
         // 1. Select Element 1
         // Target the Node Wrapper explicitly to ensure click registration
         // Double click can sometimes bypass drag-initiation checks in canvas tests
-        const element = page.locator('.react-flow__node').filter({ hasText: 'Element 1' });
+        // Use getByText for robustness
+        const element = page.getByText('Element 1');
         await expect(element).toBeVisible({ timeout: 20000 });
-        await element.dblclick({ force: true });
+        // Click to select (dblclick might be unnecessary or flaky with drag handlers)
+        await element.click({ force: true });
 
         // Wait for panel to open and show correct context
         const panel = page.locator('#panel');

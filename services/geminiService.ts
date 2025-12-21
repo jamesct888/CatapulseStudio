@@ -96,6 +96,43 @@ const cleanAndParseJSON = <T>(text: string | undefined): T | null => {
     }
 }
 
+// --- Helper: Shared Generation Logic ---
+const generateJSON = async <T>(
+    prompt: string | any[],
+    options: {
+        maxTokens?: number;
+        retries?: number;
+        systemInstruction?: string;
+        model?: string;
+        logLabel?: string;
+    } = {}
+): Promise<T | null> => {
+    const { maxTokens = 8192, retries = 2, systemInstruction, model = modelId, logLabel = "Generation" } = options;
+
+    try {
+        const response = await callWithRetry(async () => {
+            return await ai.models.generateContent({
+                model: model,
+                contents: typeof prompt === 'string' ? prompt : prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    maxOutputTokens: maxTokens,
+                    systemInstruction: systemInstruction
+                }
+            });
+        }, retries);
+
+        return cleanAndParseJSON<T>(response.text);
+    } catch (e: any) {
+        // Propagate Quota Errors for UI handling
+        if (e.message?.includes('quota') || e.message?.includes('limit exceeded') || e.message?.includes('billing')) {
+            throw e;
+        }
+        console.warn(`[AI Service] ${logLabel} failed:`, e.message);
+        return null;
+    }
+};
+
 // Recursively ensure logic groups have valid arrays
 const sanitizeLogicGroup = (group: LogicGroup | undefined) => {
     if (!group) return;
@@ -186,27 +223,18 @@ export const generateMonolithicProcess = async (description: string): Promise<Pr
 `;
 
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    maxOutputTokens: 8192, // Max tokens for one-shot
-                }
-            });
-        }, 1, 2000); // 1 retry only, fail fast to fallback
+        const data = await generateJSON<ProcessDefinition>(prompt, {
+            retries: 1,
+            logLabel: "Monolithic Generation"
+        });
 
-        const data = cleanAndParseJSON<ProcessDefinition>(response.text);
         if (data && data.stages && data.stages.length > 0) {
             return sanitizeProcessData(data);
         }
         return null;
     } catch (e: any) {
-        // If quota error, rethrow to let UI handle demo fallback
-        if (e.message?.includes('quota') || e.message?.includes('limit exceeded') || e.message?.includes('billing')) {
-            throw e;
-        }
+        // Rethrow quota errors
+        if (e.message?.includes('quota') || e.message?.includes('limit exceeded')) throw e;
         console.warn("[AI Service] Monolithic generation failed or truncated. Switching to iterative strategy.");
         return null;
     }
@@ -248,29 +276,19 @@ export const generateProcessSkeleton = async (description: string): Promise<Proc
     }
 `;
 
-    try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: skeletonPrompt,
-                config: {
-                    responseMimeType: "application/json",
-                    systemInstruction: "You are a JSON generator. Output ONLY valid JSON. No conversational text.",
-                    maxOutputTokens: 2048,
-                }
-            });
-        }, 2, 2000);
+    const skeleton = await generateJSON<ProcessDefinition>(skeletonPrompt, {
+        maxTokens: 2048,
+        systemInstruction: "You are a JSON generator. Output ONLY valid JSON. No conversational text.",
+        logLabel: "Skeleton Generation"
+    });
 
-        const skeleton = cleanAndParseJSON<ProcessDefinition>(response.text);
-        if (!skeleton) return null;
+    if (!skeleton) return null;
 
-        // Initialize sections array for safety
+    // Initialize sections array for safety
+    if (skeleton.stages) {
         skeleton.stages.forEach(s => s.sections = []);
-        return skeleton;
-    } catch (error) {
-        console.error("Error generating skeleton:", error);
-        return null;
     }
+    return skeleton;
 };
 
 // --- PHASE 2: GENERATE FLESH (One-Shot Batch) ---
@@ -304,18 +322,7 @@ export const generateProcessFlesh = async (skeleton: ProcessDefinition): Promise
 `;
 
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    maxOutputTokens: 8192,
-                }
-            });
-        });
-
-        const stageMap = cleanAndParseJSON<Record<string, SectionDefinition[]>>(response.text);
+        const stageMap = await generateJSON<Record<string, SectionDefinition[]>>(prompt);
         if (!stageMap) return null;
 
         // Merge back into skeleton
@@ -331,7 +338,7 @@ export const generateProcessFlesh = async (skeleton: ProcessDefinition): Promise
 
     } catch (e: any) {
         console.error(`Error generating batch details: `, e);
-        if (e.message?.includes('quota') || e.message?.includes('limit exceeded') || e.message?.includes('billing') || e.status === 429) {
+        if (e.message?.includes('quota') || e.message?.includes('limit exceeded') || e.message?.includes('billing')) {
             throw e;
         }
         return null;
@@ -370,17 +377,7 @@ export const generateStageDetails = async (stage: StageDefinition, processDescri
     `;
 
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: detailPrompt,
-                config: {
-                    responseMimeType: "application/json",
-                    maxOutputTokens: 8192,
-                }
-            });
-        });
-        const sections = cleanAndParseJSON<SectionDefinition[]>(response.text);
+        const sections = await generateJSON<SectionDefinition[]>(detailPrompt);
 
         // We must sanitize this partial result manually since it's just sections
         if (sections) {
@@ -415,14 +412,7 @@ export const generateProcessFromImage = async (base64Data: string, mimeType: str
     if (!apiKey) return null;
     const prompt = `Act as an expert UK Business Analyst.Analyze this document...`;
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: [{ text: prompt }, { inlineData: { mimeType: mimeType, data: base64Data } }],
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        const data = cleanAndParseJSON<ProcessDefinition>(response.text);
+        const data = await generateJSON<ProcessDefinition>([{ text: prompt }, { inlineData: { mimeType: mimeType, data: base64Data } }]);
         return data ? sanitizeProcessData(data) : null;
     } catch (error) { console.error("Vision API Error:", error); return null; }
 }
@@ -431,14 +421,7 @@ export const importLegacyContent = async (textContext: string): Promise<ProcessD
     if (!apiKey) return null;
     const prompt = `Act as a Migration Architect.Convert this legacy schema / text into a Catapulse Process Definition.LEGACY CONTENT: ${textContext} `;
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        const data = cleanAndParseJSON<ProcessDefinition>(response.text);
+        const data = await generateJSON<ProcessDefinition>(prompt);
         return data ? sanitizeProcessData(data) : null;
     } catch (error) { console.error("Legacy Import Error:", error); return null; }
 }
@@ -471,14 +454,7 @@ export const modifyProcess = async (currentProcess: ProcessDefinition, instructi
     Execute the instruction now.
     `;
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        const data = cleanAndParseJSON<ProcessDefinition>(response.text);
+        const data = await generateJSON<ProcessDefinition>(prompt);
         return data ? sanitizeProcessData(data) : null;
     } catch (error) { console.error("Error modifying process:", error); return null; }
 };
@@ -488,14 +464,7 @@ export const generateFormData = async (processDef: ProcessDefinition, personaDes
     const fields = processDef.stages.flatMap(s => s.sections.flatMap(sec => sec.elements.map(el => ({ id: el.id, label: el.label, type: el.type, options: el.options, columns: el.columns }))));
     const prompt = 'Act as a testing data generator...Fields: ' + JSON.stringify(fields) + '...Persona: "' + personaDescription + '"...';
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        return cleanAndParseJSON<FormState>(response.text);
+        return await generateJSON<FormState>(prompt);
     } catch (e) { console.error("Error generating form data", e); return null; }
 }
 
@@ -535,14 +504,7 @@ export const consultStrategyAdvisor = async (processDef: ProcessDefinition, chat
     VALID STRATEGY KEYS for 'strategyDescription': 'screen', 'journey', 'persona', or a custom short string.
     `;
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        const data = cleanAndParseJSON<{ reply: string, recommendations: StrategyRecommendation[] }>(response.text);
+        const data = await generateJSON<{ reply: string, recommendations: StrategyRecommendation[] }>(prompt);
         return data || { reply: "I couldn't analyze that.", recommendations: [] };
     } catch (e) { console.error("Error consulting strategy advisor:", e); return { reply: "Error.", recommendations: [] }; }
 };
@@ -714,16 +676,9 @@ export const generateUserStories = async (processDef: ProcessDefinition, strateg
     `;
 
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        console.log("[Gemini] Stories Raw Response:", response.text);
+        console.log("[Gemini] Generating User Stories...");
 
-        const parsed = cleanAndParseJSON<any>(response.text);
+        const parsed = await generateJSON<any>(prompt);
         if (!parsed) throw new Error("Failed to parse AI response.");
 
         // UNWRAPPER
@@ -783,14 +738,7 @@ export const generateTestCases = async (processDef: ProcessDefinition): Promise<
     if (!apiKey) return [];
     const prompt = 'Act as a UK QA Lead... Generate Manual Test Cases...Process: ' + JSON.stringify(processDef);
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        return cleanAndParseJSON<TestCase[]>(response.text) || [];
+        return await generateJSON<TestCase[]>(prompt) || [];
     } catch (error) { console.error("Error generating Test Cases:", error); return []; }
 };
 
@@ -850,14 +798,7 @@ export const analyzeTranscript = async (processDef: ProcessDefinition, transcrip
     `;
 
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        return cleanAndParseJSON<WorkshopSuggestion[]>(response.text) || [];
+        return await generateJSON<WorkshopSuggestion[]>(prompt) || [];
     } catch (e) { return []; }
 };
 
@@ -892,14 +833,7 @@ export const generateDataMapping = async (elements: { id: string; label: string;
     `;
 
     try {
-        const response = await callWithRetry(async () => {
-            return await ai.models.generateContent({
-                model: modelId,
-                contents: prompt,
-                config: { responseMimeType: "application/json", maxOutputTokens: 8192 }
-            });
-        });
-        return cleanAndParseJSON<DataObjectSuggestion[]>(response.text) || [];
+        return await generateJSON<DataObjectSuggestion[]>(prompt) || [];
     } catch (e) {
         console.error("Error generating Data Mapping:", e);
         return [];

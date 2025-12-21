@@ -3,8 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Onboarding Flow', () => {
     test.beforeEach(async ({ page }) => {
         // Mock the Gemini API call to return a valid process definition
-        await page.route('**/models/gemini-2.5-flash:generateContent*', async route => {
-            console.log('*** MOCK HIT: gemini-2.5-flash:generateContent ***');
+        // Use Regex to match any generateContent call
+        await page.route(/.*generateContent.*/, async route => {
+            console.log('*** MOCK HIT: generateContent ***');
             const json = {
                 candidates: [{
                     finishReason: "STOP",
@@ -35,7 +36,7 @@ test.describe('Onboarding Flow', () => {
                     }
                 }]
             };
-            await route.fulfill({ json });
+            await route.fulfill({ json, contentType: 'application/json' });
         });
 
         await page.goto('/');

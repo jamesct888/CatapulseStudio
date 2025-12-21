@@ -144,6 +144,7 @@ export interface VisualTheme {
 export interface WorkshopSuggestion {
   id: string;
   type: 'add' | 'remove' | 'modify';
+  applied?: boolean;
   description: string;
   reasoning: string;
   targetLabel?: string;

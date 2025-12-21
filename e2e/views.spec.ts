@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('View Modes', () => {
     test.beforeEach(async ({ page }) => {
-        // Mock for setup
-        await page.route('**/models/gemini-2.5-flash:generateContent*', async route => {
+        // Mock for setup using Regex
+        await page.route(/.*generateContent.*/, async route => {
             const json = {
                 candidates: [{
                     finishReason: "STOP",
@@ -32,7 +32,7 @@ test.describe('View Modes', () => {
                     }
                 }]
             };
-            await route.fulfill({ json });
+            await route.fulfill({ json, contentType: 'application/json' });
         });
 
         await page.goto('/');
