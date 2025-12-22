@@ -12,8 +12,6 @@ import { GlobalSettingsPanel } from './components/GlobalSettingsPanel';
 import { AppHeader } from './components/AppHeader';
 import { AppFooter } from './components/AppFooter';
 import { LoadingOverlay } from './components/LoadingOverlay';
-import { DemoManager } from './components/DemoManager';
-import { DemoFocusOverlay } from './components/DemoFocusOverlay';
 import { useProcessState } from './hooks/useProcessState';
 import { useAiOperations } from './hooks/useAiOperations';
 import { useAutoBackup } from './hooks/useAutoBackup'; // Import Backup Hook
@@ -99,6 +97,7 @@ const App: React.FC = () => {
     const [aiPrompt, setAiPrompt] = useState('');
     const [activePropTab, setActivePropTab] = useState<'general' | 'logic'>('general');
     const [formData, setFormData] = useState<FormState>({});
+    const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({}); // Lifted State
     const [visualTheme, setVisualTheme] = useState<VisualTheme>({ mode: 'type1', density: 'default', radius: 'medium' });
     const [personaPrompt, setPersonaPrompt] = useState('');
     const [isDetailedMode, setIsDetailedMode] = useState(false); // Default to Fast Mode (Single Call)
@@ -110,9 +109,6 @@ const App: React.FC = () => {
     const [qaTab, setQaTab] = useState<'stories' | 'cases' | 'dictionary'>('stories');
     const [storyStrategy, setStoryStrategy] = useState<StoryStrategy>('screen');
     const [pegaTab, setPegaTab] = useState<'design' | 'blueprint' | 'manual' | 'data' | 'logic' | 'routing'>('design');
-
-    // Demo State
-    const [isDemoMode, setIsDemoMode] = useState(false);
 
     // Dirty State (Unsaved Changes)
     const [isDirty, setIsDirty] = useState(false);
@@ -139,12 +135,21 @@ const App: React.FC = () => {
         }
     }, []); // Run once on mount
 
-    // 2. Auto-Save on Change
+    // --- RESET HANDLER ---
+    // If processDef is null (Reset), ensure all run-time state is cleared
     useEffect(() => {
-        if (processDef) {
-            localStorage.setItem('catapulse_autosave', JSON.stringify(processDef));
-            setIsDirty(true); // Any change marks as dirty
+        if (!processDef) {
+            setFormData({});
+            setFormErrors({});
         }
+    }, [processDef]);
+
+    // --- AUTO-SAVE (Delegated to Hook) ---
+    // Removed redundant useEffect to prevent double-writes or race conditions. useAutoBackup handles it.
+
+    // Dirty State Tracker
+    useEffect(() => {
+        if (processDef) setIsDirty(true);
     }, [processDef]);
 
     // Unload Warning
@@ -158,14 +163,6 @@ const App: React.FC = () => {
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isDirty]);
-
-    // --- Helpers for Demo ---
-    const handleStartDemo = (useDemo = false) => {
-        setIsDemoMode(true);
-        setStartPrompt('');
-        setProcessDef(null);
-        setViewMode('onboarding');
-    };
 
     // --- AI Logic Hook ---
     const {
@@ -183,7 +180,6 @@ const App: React.FC = () => {
         setViewMode,
         setStartPrompt,
         setSelectedStageId,
-        handleStartDemo,
         isDetailedMode
     });
 
@@ -322,35 +318,18 @@ const App: React.FC = () => {
                     setStartPrompt={setStartPrompt}
                     handleStart={handleStart}
                     handleLegacyFormUpload={handleLegacyFormUpload}
+                    handleLoadTemplate={(def) => {
+                        console.log("Loading template:", def.name);
+                        setProcessDef(def);
+                        setFormData({}); // <--- RESET FORM DATA
+                        setStartPrompt('');
+                        setViewMode('editor');
+                    }}
                     showDemoDrop={showDemoDrop}
                     isDetailedMode={isDetailedMode}
                     setIsDetailedMode={setIsDetailedMode}
                 />
                 {isGenerating && <LoadingOverlay />}
-                {isDemoMode && (
-                    <DemoManager
-                        setProcessDef={setProcessDef}
-                        setViewMode={setViewMode}
-                        setIsGenerating={setIsGenerating}
-                        setStartPrompt={setStartPrompt}
-                        setShowDemoDrop={setShowDemoDrop}
-                        setFormData={setFormData}
-                        setUserStories={(stories) => setProcessDef(prev => prev ? { ...prev, userStories: stories } : null)}
-                        setTestCases={(cases) => setProcessDef(prev => prev ? { ...prev, testCases: cases } : null)}
-                        setPersonaPrompt={setPersonaPrompt}
-                        setAiPrompt={setAiPrompt}
-                        setSelectedStageId={setSelectedStageId}
-                        setSelectedSectionId={setSelectedSectionId}
-                        setSelectedElementId={setSelectedElementId}
-                        setActiveSidePanel={() => { }}
-                        setActivePropTab={setActivePropTab}
-                        onStop={() => { setIsDemoMode(false); setViewMode('onboarding'); setProcessDef(null); }}
-                        processDef={processDef}
-                        setVisualTheme={setVisualTheme}
-                        setQaTab={setQaTab}
-                        setPegaTab={setPegaTab}
-                    />
-                )}
             </>
         );
     }
@@ -424,6 +403,8 @@ const App: React.FC = () => {
                                     processDef={processDef}
                                     formData={formData}
                                     setFormData={setFormData}
+                                    formErrors={formErrors}         // Passed Down
+                                    setFormErrors={setFormErrors}   // Passed Down
                                     visualTheme={visualTheme}
                                     personaPrompt={personaPrompt}
                                     setPersonaPrompt={setPersonaPrompt}
@@ -509,32 +490,6 @@ const App: React.FC = () => {
                 </div>
 
                 <AppFooter />
-
-                {isDemoMode && (
-                    <DemoManager
-                        setProcessDef={setProcessDef}
-                        setViewMode={setViewMode}
-                        setIsGenerating={setIsGenerating}
-                        setStartPrompt={setStartPrompt}
-                        setShowDemoDrop={setShowDemoDrop}
-                        setFormData={setFormData}
-                        setUserStories={(stories) => setProcessDef(prev => prev ? { ...prev, userStories: stories } : null)}
-                        setTestCases={(cases) => setProcessDef(prev => prev ? { ...prev, testCases: cases } : null)}
-                        setPersonaPrompt={setPersonaPrompt}
-                        setAiPrompt={setAiPrompt}
-                        setSelectedStageId={setSelectedStageId}
-                        setSelectedSectionId={setSelectedSectionId}
-                        setSelectedElementId={setSelectedElementId}
-                        setActiveSidePanel={setActiveSidePanel}
-                        setActivePropTab={setActivePropTab}
-                        onStop={() => { setIsDemoMode(false); setViewMode('onboarding'); setProcessDef(null); }}
-                        processDef={processDef}
-                        setVisualTheme={setVisualTheme}
-                        setQaTab={setQaTab}
-                        setPegaTab={setPegaTab}
-                    />
-                )}
-                <DemoFocusOverlay area="none" highlightId={null} />
             </div>
         </ErrorBoundary>
     );

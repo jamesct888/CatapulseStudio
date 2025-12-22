@@ -198,7 +198,7 @@ export const HeaderFileMenu: React.FC<HeaderFileMenuProps> = ({
                 <ModalWrapper
                     title="Discard Changes?"
                     icon={Trash2}
-                    modalSize={{ width: 450, height: 280 }}
+                    modalSize={{ width: 500, height: 'auto' }}
                     onResizeStart={() => { }}
                     onClose={() => setShowResetConfirm(false)}
                 >

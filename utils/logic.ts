@@ -236,3 +236,107 @@ export const formatLogicSummary = (group: LogicGroup | undefined, allElements: {
   if (parts.length === 0) return 'Always';
   return parts.join(` ${group.operator} `);
 };
+
+export interface LogicTrace {
+  passed: boolean;
+  breakdown: { label: string; op: string; target: any; actual: any; passed: boolean; }[];
+}
+
+export const getLogicExplanation = (group: LogicGroup | undefined, formData: FormState, allElements: { id: string, label: string }[]): LogicTrace => {
+  if (!group) return { passed: true, breakdown: [] };
+
+  const conditions = group.conditions || [];
+  const breakdown: LogicTrace['breakdown'] = [];
+
+  // Check direct conditions
+  conditions.forEach(c => {
+    const passed = evaluateCondition(c, formData);
+    const el = allElements.find(e => e.id === c.targetElementId);
+    const label = el ? el.label : c.targetElementId;
+    const actual = formData[c.targetElementId];
+
+    breakdown.push({
+      label,
+      op: c.operator,
+      target: c.value,
+      actual: actual,
+      passed
+    });
+  });
+
+  // We skip recursing groups for v1 simplicity, focusing on direct rules people write
+  // Extending this to recursion is easy later if needed
+
+  const passed = evaluateLogicGroup(group, formData);
+  return { passed, breakdown };
+};
+
+export interface CalculationTrace {
+  formula: string;
+  result: number;
+  steps: { part: string, val: number, op?: string }[];
+}
+
+export const getCalculationExplanation = (parts: CalculationPart[] | undefined, formData: FormState, allElements: { id: string, label: string }[]): CalculationTrace => {
+  if (!parts || parts.length === 0) return { formula: 'No formula', result: 0, steps: [] };
+
+  let result = 0;
+  let pendingOperator = '+';
+  const steps: CalculationTrace['steps'] = [];
+  const formulaParts: string[] = [];
+
+  const getValue = (part: CalculationPart): { val: number, label: string } => {
+    if (part.type === 'constant') {
+      const v = parseFloat(part.value) || 0;
+      return { val: v, label: `${v}` };
+    } else if (part.type === 'field') {
+      const raw = formData[part.value];
+      const clean = raw ? String(raw).replace(/[^0-9.-]+/g, "") : '0';
+      const v = parseFloat(clean) || 0;
+      const el = allElements.find(e => e.id === part.value);
+      return { val: v, label: el ? el.label : part.value };
+    }
+    return { val: 0, label: '?' };
+  };
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+
+    if (part.type === 'operator') {
+      pendingOperator = part.value;
+      formulaParts.push(part.value);
+    } else {
+      const { val, label } = getValue(part);
+
+      // Build formula string part e.g. "Age(25)"
+      const displayLabel = part.type === 'field' ? `${label}(${val})` : label;
+      formulaParts.push(displayLabel);
+
+      switch (pendingOperator) {
+        case '+': result += val; break;
+        case '-': result -= val; break;
+        case '*': result *= val; break;
+        case '/': result = val !== 0 ? result / val : 0; break;
+      }
+      steps.push({ part: displayLabel, val, op: pendingOperator });
+    }
+  }
+
+  return {
+    formula: formulaParts.join(' '),
+    result: Math.round(result * 100) / 100,
+    steps
+  };
+};
+
+export const doesDependsOn = (group: LogicGroup | undefined, targetId: string): boolean => {
+  if (!group) return false;
+
+  // Check direct conditions
+  if (group.conditions?.some(c => c.targetElementId === targetId)) return true;
+
+  // Check subgroups recursively
+  if (group.groups?.some(g => doesDependsOn(g, targetId))) return true;
+
+  return false;
+};

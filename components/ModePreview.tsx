@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { ProcessDefinition, FormState, VisualTheme } from '../types';
-import { isElementVisible, isElementRequired, isSectionVisible, validateValue, evaluateLogicGroup } from '../utils/logic';
+import { isElementVisible, isElementRequired, isSectionVisible, validateValue, evaluateLogicGroup, getLogicExplanation, getCalculationExplanation, doesDependsOn } from '../utils/logic';
 import { RenderElement } from './FormElements';
 import { generateFormData } from '../services/geminiService';
-import { User, Sparkles, PanelBottom, ArrowRight, AlertTriangle, Info, Shield, ChevronRight, ArrowLeft, Check, FastForward } from 'lucide-react';
+import { User, Sparkles, PanelBottom, ArrowRight, AlertTriangle, Info, Shield, ChevronRight, ArrowLeft, Check, FastForward, Eye, EyeOff, Map, Link2 } from 'lucide-react';
 import { OperationsHUD } from './OperationsHUD';
 
 import { UserStory } from '../types'; // Import UserStory
@@ -13,15 +13,19 @@ interface ModePreviewProps {
     processDef: ProcessDefinition;
     formData: FormState;
     setFormData: React.Dispatch<React.SetStateAction<FormState>>;
+    formErrors: { [key: string]: string };           // <--- New Prop
+    setFormErrors: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>; // <--- New Prop
     visualTheme: VisualTheme;
     personaPrompt: string;
     setPersonaPrompt: (val: string) => void;
-    userStories: UserStory[]; // Add userStories prop
+    userStories: UserStory[];
 }
 
-export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, setFormData, visualTheme, personaPrompt, setPersonaPrompt, userStories }) => {
+export const ModePreview: React.FC<ModePreviewProps> = ({
+    processDef, formData, setFormData, formErrors, setFormErrors, visualTheme, personaPrompt, setPersonaPrompt, userStories
+}) => {
     const [currentStageIdx, setCurrentStageIdx] = useState(0);
-    const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+    // Removed local formErrors state
     const [isGenerating, setIsGenerating] = useState(false);
     const [historyStack, setHistoryStack] = useState<number[]>([0]);
 
@@ -37,6 +41,10 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
 
     const isType2 = visualTheme.mode === 'type2';
     const isType3 = visualTheme.mode === 'type3';
+
+    // Logic Debug State
+    const [isLogicDebugEnabled, setIsLogicDebugEnabled] = useState(false);
+    const [hoveredFieldId, setHoveredFieldId] = useState<string | null>(null);
 
     // 1. Calculate Active Skill (Runs on Data or Stage Change)
     useEffect(() => {
@@ -224,6 +232,13 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
 
                         <div className={`flex gap-2 items-center p-2 rounded-xl border shadow-sm ${isType2 ? 'bg-white border-white' : 'bg-white border-gray-200'}`}>
                             <button
+                                onClick={() => setIsLogicDebugEnabled(!isLogicDebugEnabled)}
+                                className={`p-2 rounded-lg transition-all flex items-center justify-center ${isLogicDebugEnabled ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}`}
+                                title={isLogicDebugEnabled ? "Logic Debug: ON" : "Logic Debug: OFF"}
+                            >
+                                {isLogicDebugEnabled ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </button>
+                            <button
                                 onClick={() => setIsHudEnabled(!isHudEnabled)}
                                 className={`p-2 rounded-lg transition-all flex items-center justify-center ${isHudEnabled ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}`}
                                 title={isHudEnabled ? "Operations HUD: ON" : "Operations HUD: OFF"}
@@ -342,6 +357,8 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                             visualTheme={visualTheme}
                             sectionTitleColor={sectionTitleColor}
                             cardClass={cardClass}
+                            isLogicDebugEnabled={isLogicDebugEnabled}
+                            allElements={processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements)}
                         />
                     ))}
                 </div>
@@ -359,6 +376,36 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                     <div className="text-xs font-bold text-gray-400 uppercase tracking-widest hidden md:block">
                         Stage {currentStageIdx + 1}
                     </div>
+
+                    {/* Routing Forecast */}
+                    {isLogicDebugEnabled && (
+                        <div className="absolute -top-12 right-0 bg-white border border-gray-200 shadow-lg p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 z-30">
+                            <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                                <Map size={16} />
+                            </div>
+                            <div className="text-right">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Routing Forecast</div>
+                                {(() => {
+                                    const nextIdx = getNextValidStageIndex(currentStageIdx + 1);
+                                    if (nextIdx === null) return <div className="text-sm font-bold text-gray-800">Finish Application</div>;
+
+                                    const skippedCount = nextIdx - (currentStageIdx + 1);
+                                    const nextStage = processDef.stages[nextIdx];
+
+                                    return (
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-gray-800">Next: {nextStage.title}</span>
+                                            {skippedCount > 0 && (
+                                                <span className="text-[10px] text-orange-600 font-bold flex items-center justify-end gap-1">
+                                                    <FastForward size={8} /> Skips {skippedCount} Stage{skippedCount > 1 ? 's' : ''}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
 
                     <button
                         onClick={handleNext}
@@ -440,7 +487,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
 // --- Memoized Components ---
 
 interface SectionProps {
-    section: any; // Type accurately in real component
+    section: any;
     formData: FormState;
     setFormData: React.Dispatch<React.SetStateAction<FormState>>;
     formErrors: { [key: string]: string };
@@ -448,43 +495,88 @@ interface SectionProps {
     visualTheme: VisualTheme;
     sectionTitleColor: string;
     cardClass: string;
+    isLogicDebugEnabled: boolean;
+    allElements: any[];
+    hoveredFieldId: string | null;
+    setHoveredFieldId: (id: string | null) => void;
 }
 
 const SectionComponent: React.FC<SectionProps> = ({
-    section, formData, setFormData, formErrors, setFormErrors, visualTheme, sectionTitleColor, cardClass
+    section, formData, setFormData, formErrors, setFormErrors, visualTheme, sectionTitleColor, cardClass, isLogicDebugEnabled, allElements, hoveredFieldId, setHoveredFieldId
 }) => {
-    // Filter out 'Summary' sections from main flow - they belong in footer
+    // Filter out 'Summary' sections from main flow
     if (section.variant === 'summary') return null;
 
     // Check if this is a 'Warning' or 'Info' section
     const isWarning = section.variant === 'warning';
     const isInfo = section.variant === 'info';
-    const isSpecial = isWarning || isInfo;
 
-    if (isSpecial) {
+    // Logic Debug for SECTIONS
+    const sectionVisible = isSectionVisible(section, formData);
+    if (!sectionVisible && !isLogicDebugEnabled) return null; // Hidden and not debugging
+
+    const isHiddenDebug = !sectionVisible && isLogicDebugEnabled;
+    const hasLogic = section.visibility && (section.visibility.conditions?.length > 0 || section.visibility.groups?.length > 0);
+    const isVisibleDebug = sectionVisible && isLogicDebugEnabled && hasLogic;
+
+    // Check Section Dependency
+    const isSectionDependent = isLogicDebugEnabled && hoveredFieldId && section.visibility && doesDependsOn(section.visibility, hoveredFieldId);
+
+    const debugTrace = (isHiddenDebug || isVisibleDebug) ? getLogicExplanation(section.visibility, formData, allElements) : null;
+
+
+    // ... Existing Warning/Info Block Logic ...
+    if (section.variant === 'warning' || section.variant === 'info') {
         return (
-            <div className={`p-6 rounded-xl border shadow-sm ${isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
+            <div className={`p-6 rounded-xl border shadow-sm relative ${isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'} ${isSectionDependent ? 'ring-4 ring-purple-400 ring-offset-2 transition-all' : ''} ${isHiddenDebug ? 'opacity-50 grayscale border-2 border-dashed border-gray-300' : ''}`}>
+                {isSectionDependent && (
+                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 bg-purple-600 text-white p-1 rounded-full shadow-lg z-20 animate-in zoom-in">
+                        <Link2 size={16} />
+                    </div>
+                )}
+                {isHiddenDebug && (
+                    <div className="absolute -top-3 left-4 bg-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-10">
+                        <EyeOff size={10} /> HIDDEN
+                    </div>
+                )}
+                {isVisibleDebug && (
+                    <div className="absolute -top-3 right-4 bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-10">
+                        <Eye size={10} /> Logic Match
+                    </div>
+                )}
+                {(isVisibleDebug || isHiddenDebug) && debugTrace && (
+                    <div className={`mb-3 p-2 border rounded text-[10px] font-mono ${isVisibleDebug ? 'bg-green-50 border-green-100 text-gray-600' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                        {debugTrace.breakdown.map((b, i) => (
+                            <div key={i} className="flex gap-1 items-center">
+                                <span className="font-bold flex-1 truncate">{b.label}</span>
+                                <span>{b.op}</span>
+                                <span className="font-bold">{String(b.target)}</span>
+                                <span className={b.passed ? "text-green-600 font-bold" : "text-red-600 font-bold ml-1"}>
+                                    {b.passed ? '✅' : `❌ (Act: ${String(b.actual)})`}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
                 <div className="flex items-center gap-2 mb-4">
                     {isWarning ? <AlertTriangle size={20} className="text-amber-600" /> : <Info size={20} className="text-blue-600" />}
                     <h4 className={`font-bold uppercase text-sm tracking-wide ${isWarning ? 'text-amber-700' : 'text-blue-700'}`}>{section.title}</h4>
                 </div>
                 <div className={`grid gap-x-8 gap-y-4 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                    {section.elements.filter((el: any) => isElementVisible(el, formData)).map((el: any) => {
-                        // Handle Reflection Logic
+                    {section.elements.filter((el: any) => isElementVisible(el, formData) || isLogicDebugEnabled).map((el: any) => {
                         let elementValue = formData[el.id];
                         if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
                             elementValue = formData[el.sourceFieldId];
                         }
-
                         return (
                             <RenderElement
                                 key={el.id}
-                                element={{ ...el, required: false }} // Force non-required as it's read-only
+                                element={{ ...el, required: false }}
                                 value={elementValue}
-                                onChange={() => { }} // Read only
+                                onChange={() => { }}
                                 disabled={true}
                                 theme={{ ...visualTheme, density: 'compact' }}
-                                formData={formData} // Pass form data for potential calculations
+                                formData={formData}
                             />
                         );
                     })}
@@ -495,40 +587,137 @@ const SectionComponent: React.FC<SectionProps> = ({
 
     // Standard Rendering - Card Style
     return (
-        <div className={`${cardClass}`}>
+        <div className={`${cardClass} relative ${isSectionDependent ? 'ring-4 ring-purple-400 ring-offset-2 transition-all' : ''} ${isHiddenDebug ? 'opacity-50 grayscale border-2 border-dashed border-gray-300' : ''}`}>
+            {isSectionDependent && (
+                <div className="absolute -left-3 top-1/2 -translate-y-1/2 bg-purple-600 text-white p-1 rounded-full shadow-lg z-20 animate-in zoom-in">
+                    <Link2 size={16} />
+                </div>
+            )}
+            {isHiddenDebug && (
+                <div className="absolute -top-3 left-4 bg-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-10">
+                    <EyeOff size={10} /> HIDDEN
+                </div>
+            )}
+            {isVisibleDebug && (
+                <div className="absolute -top-3 right-4 bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-10">
+                    <Eye size={10} /> Logic Match
+                </div>
+            )}
             <div className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30 rounded-t-xl">
                 <h4 className={`font-bold uppercase text-sm tracking-wide ${sectionTitleColor}`}>{section.title}</h4>
                 {section.description && <span className="text-xs text-gray-400">{section.description}</span>}
             </div>
+            {(isVisibleDebug || isHiddenDebug) && debugTrace && (
+                <div className="px-8 pt-2 pb-0">
+                    <div className={`p-2 border rounded text-[10px] font-mono ${isVisibleDebug ? 'bg-green-50 border-green-100 text-gray-600' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                        {debugTrace.breakdown.map((b, i) => (
+                            <div key={i} className="flex gap-1 items-center">
+                                <span className="font-bold flex-1 truncate">{b.label}</span>
+                                <span>{b.op}</span>
+                                <span className="font-bold">{String(b.target)}</span>
+                                <span className={b.passed ? "text-green-600 font-bold" : "text-red-600 font-bold ml-1"}>
+                                    {b.passed ? '✅' : `❌ (Act: ${String(b.actual)})`}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             <div className={`p-8 grid gap-x-8 gap-y-6 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                {section.elements.filter((el: any) => isElementVisible(el, formData)).map((el: any) => {
-                    // Logic for handling "Reflection" fields
-                    let elementValue = formData[el.id];
-                    if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
-                        elementValue = formData[el.sourceFieldId];
-                    }
+                {section.elements
+                    .filter((el: any) => isElementVisible(el, formData) || isLogicDebugEnabled) // SHOW ALL if debug
+                    .map((el: any) => {
 
-                    return (
-                        <RenderElement
-                            key={el.id}
-                            element={{ ...el, required: isElementRequired(el, formData) }}
-                            value={elementValue}
-                            onChange={(val) => {
-                                setFormData(prev => ({ ...prev, [el.id]: val }));
-                                if (formErrors[el.id]) {
-                                    setFormErrors(prev => { const n = { ...prev }; delete n[el.id]; return n; });
-                                }
-                            }}
-                            onBlur={() => {
-                                const msg = validateValue(el, formData[el.id]);
-                                if (msg) setFormErrors(prev => ({ ...prev, [el.id]: msg }));
-                            }}
-                            error={formErrors[el.id]}
-                            theme={visualTheme}
-                            formData={formData} // Pass for calculations
-                        />
-                    );
-                })}
+                        const isVisible = isElementVisible(el, formData);
+                        const hasElementLogic = el.visibility && (el.visibility.conditions?.length > 0 || el.visibility.groups?.length > 0);
+
+                        const isDebugHidden = !isVisible && isLogicDebugEnabled;
+                        const isDebugVisible = isVisible && hasElementLogic && isLogicDebugEnabled;
+                        const isDebugCalc = isVisible && el.type === 'calculated' && isLogicDebugEnabled;
+
+                        const debugTrace = (isDebugHidden || isDebugVisible) ? getLogicExplanation(el.visibility, formData, allElements) : null;
+                        const calcTrace = isDebugCalc ? getCalculationExplanation(el.calculation, formData, allElements) : null;
+
+                        // Dependency Highlight
+                        const isDependencyMatch = isLogicDebugEnabled && hoveredFieldId && el.visibility && doesDependsOn(el.visibility, hoveredFieldId);
+
+                        // Reflection Logic
+                        let elementValue = formData[el.id];
+                        if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                            elementValue = formData[el.sourceFieldId];
+                        }
+
+                        return (
+                            <div
+                                key={el.id}
+                                onMouseEnter={() => isLogicDebugEnabled && setHoveredFieldId(el.id)}
+                                onMouseLeave={() => isLogicDebugEnabled && setHoveredFieldId(null)}
+                                className={`relative transition-all duration-300 ${isDebugHidden ? 'opacity-50 grayscale p-2 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50' : ''} ${isDependencyMatch ? 'ring-4 ring-purple-400 ring-offset-2 rounded-lg bg-purple-50/50' : ''}`}
+                            >
+                                {isDependencyMatch && (
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 bg-purple-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-in zoom-in slide-in-from-bottom-2">
+                                        <Link2 size={10} /> Linked Logic
+                                    </div>
+                                )}
+                                {isDebugHidden && (
+                                    <div className="absolute -top-2 -right-2 z-10 bg-gray-800 text-white text-[10px] px-2 py-0.5 rounded shadow">
+                                        HIDDEN
+                                    </div>
+                                )}
+                                {isDebugVisible && (
+                                    <div className="absolute -top-2 -right-2 z-10 bg-green-100 text-green-700 border border-green-300 text-[10px] px-2 py-0.5 rounded shadow flex items-center gap-1">
+                                        <Check size={8} /> Logic
+                                    </div>
+                                )}
+                                {isDebugCalc && (
+                                    <div className="absolute -top-2 -right-12 z-10 bg-blue-100 text-blue-700 border border-blue-300 text-[10px] px-2 py-0.5 rounded shadow flex items-center gap-1">
+                                        <Sparkles size={8} /> Formula
+                                    </div>
+                                )}
+                                <RenderElement
+                                    element={{ ...el, required: isElementRequired(el, formData) }}
+                                    value={elementValue}
+                                    onChange={(val) => {
+                                        setFormData(prev => ({ ...prev, [el.id]: val }));
+                                        if (formErrors[el.id]) {
+                                            setFormErrors(prev => { const n = { ...prev }; delete n[el.id]; return n; });
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        const msg = validateValue(el, formData[el.id]);
+                                        if (msg) setFormErrors(prev => ({ ...prev, [el.id]: msg }));
+                                    }}
+                                    error={formErrors[el.id]}
+                                    theme={visualTheme}
+                                    formData={formData}
+                                />
+                                {(isDebugHidden || isDebugVisible) && debugTrace && (
+                                    <div className={`mt-1 p-2 border rounded text-[10px] font-mono ${isDebugVisible ? 'bg-green-50 border-green-200 text-green-800' : 'bg-yellow-50 border-yellow-200 text-gray-600'}`}>
+                                        {debugTrace.breakdown.map((b, i) => (
+                                            <div key={i} className="flex gap-1 items-center">
+                                                <span className="font-bold flex-1 truncate">{b.label}</span>
+                                                <span>{b.op}</span>
+                                                <span className="font-bold">{String(b.target)}</span>
+                                                <span className={b.passed ? "text-green-600 font-bold" : "text-red-600 font-bold ml-1"}>
+                                                    {b.passed ? '✅' : `❌ (Act: ${String(b.actual)})`}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {isDebugCalc && calcTrace && (
+                                    <div className="mt-1 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-800 font-mono">
+                                        <div className="font-bold mb-1 border-b border-blue-200 pb-1">
+                                            Result: {calcTrace.result}
+                                        </div>
+                                        <div className="text-gray-500">
+                                            {calcTrace.formula}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
             </div>
         </div>
     );

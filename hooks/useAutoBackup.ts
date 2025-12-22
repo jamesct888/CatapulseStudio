@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { ProcessDefinition } from '../types';
 
-const BACKUP_KEY = 'catapulse_auto_backup';
+const BACKUP_KEY = 'catapulse_autosave';
 const BACKUP_TIMESTAMP_KEY = 'catapulse_backup_timestamp';
 
 export const useAutoBackup = (processDef: ProcessDefinition | null, setProcessDef: (def: ProcessDefinition) => void) => {

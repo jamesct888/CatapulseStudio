@@ -3,11 +3,14 @@ import React, { useRef } from 'react';
 import { CatapulseLogo } from './Shared';
 import { Sparkles, Zap, FileText, ScanLine, BrainCircuit } from 'lucide-react';
 
+import { GALLERY_TEMPLATES } from '../templates';
+
 interface OnboardingProps {
   startPrompt: string;
   setStartPrompt: (val: string) => void;
   handleStart: (useDemo?: boolean) => void;
   handleLegacyFormUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleLoadTemplate: (def: any) => void; // New Prop
   showDemoDrop: boolean;
   isDetailedMode: boolean;
   setIsDetailedMode: (val: boolean) => void;
@@ -18,6 +21,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({
   setStartPrompt,
   handleStart,
   handleLegacyFormUpload,
+  handleLoadTemplate,
   showDemoDrop,
   isDetailedMode,
   setIsDetailedMode
@@ -52,7 +56,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({
         </div>
       )}
 
-      <div className="max-w-3xl w-full z-10 text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
+      <div className="max-w-4xl w-full z-10 text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
         <div className="flex justify-center mb-2">
           <CatapulseLogo scale={1.5} theme="dark" align="center" />
         </div>
@@ -62,7 +66,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({
         </h1>
 
         <p className="text-xl text-gray-500 max-w-2xl mx-auto font-light leading-relaxed">
-          Describe your business process, and let AI structure the stages, fields, and logic for you.
+          Describe your business process, or start from a Golden Template.
         </p>
 
         {/* Input Area - Floating Card Style */}
@@ -86,45 +90,32 @@ export const Onboarding: React.FC<OnboardingProps> = ({
           </div>
         </div>
 
-        {/* Toggle Strategy Switch */}
-        <div className="flex justify-center mt-6">
-          <label className="flex items-center gap-3 cursor-pointer group select-none">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={isDetailedMode}
-                onChange={(e) => setIsDetailedMode(e.target.checked)}
-                className="sr-only"
-              />
-              <div className={`w-12 h-6 bg-gray-200 rounded-full shadow-inner transition-colors ${isDetailedMode ? 'bg-sw-teal' : ''}`}></div>
-              <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${isDetailedMode ? 'translate-x-6' : ''}`}></div>
-            </div>
-            <div className="flex flex-col items-start text-left">
-              <span className={`text-sm font-bold ${isDetailedMode ? 'text-sw-teal' : 'text-gray-500'}`}>
-                {isDetailedMode ? 'Detailed Mode (Multi-step)' : 'Fast Mode (Single Call)'}
-              </span>
-              <span className="text-[10px] text-gray-400">
-                {isDetailedMode ? 'Uses more quota for higher quality.' : 'Quota friendly. Recommended for free tier.'}
-              </span>
-            </div>
-          </label>
-        </div>
-
-        {/* Capsule Suggestions */}
-        <div className="flex flex-wrap justify-center gap-3 mt-8">
-          {['Transfer In Request', 'Transfer Away', 'Make a Health Claim', 'Change Policy Details', 'Beneficiary Nomination'].map(s => (
+        {/* --- Template Gallery --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto mt-12">
+          {GALLERY_TEMPLATES.map(t => (
             <button
-              key={s}
-              onClick={() => setStartPrompt(s)}
-              className="px-5 py-2 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-500 hover:border-sw-teal hover:text-sw-teal hover:shadow-md transition-all"
+              key={t.id}
+              onClick={() => handleLoadTemplate(t.processDef)}
+              className="group relative bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-lg transition-all text-left overflow-hidden flex flex-col gap-2"
             >
-              {s}
+              <div className={`absolute top-0 left-0 w-1 h-full ${t.color}`}></div>
+              <div className="flex justify-between items-start">
+                <h3 className="font-bold text-gray-800 group-hover:text-sw-teal transition-colors">{t.title}</h3>
+                <div className={`w-2 h-2 rounded-full ${t.color}`}></div>
+              </div>
+              <p className="text-xs text-gray-500 line-clamp-2">{t.description}</p>
+              <div className="flex gap-2 mt-2">
+                {t.tags.map(tag => (
+                  <span key={tag} className="px-2 py-0.5 bg-gray-50 text-[10px] uppercase font-bold text-gray-400 rounded-md tracking-wider">{tag}</span>
+                ))}
+              </div>
             </button>
           ))}
         </div>
 
+
         {/* Footer Links & Actions */}
-        <div className="pt-12 flex flex-col items-center gap-4">
+        <div className="pt-8 flex flex-col items-center gap-4">
           <button
             id="card-digitize"
             onClick={() => legacyInputRef.current?.click()}
@@ -134,15 +125,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({
             Import from Document / Legacy Form
           </button>
 
-          <div className="flex items-center justify-center gap-6 text-sm font-bold text-gray-400">
-            <button onClick={() => { setStartPrompt(''); handleStart(); }} className="hover:text-sw-teal transition-colors">
+          <div className="flex flex-col items-center gap-2">
+            <button onClick={() => { setStartPrompt(''); handleStart(); }} className="text-sm font-bold text-gray-400 hover:text-sw-teal transition-colors">
               Skip & Start from Scratch
             </button>
-            <span className="text-gray-300">|</span>
-            <button onClick={() => handleStart(true)} className="flex items-center gap-1.5 text-sw-red hover:text-sw-redHover transition-colors">
-              <Zap size={16} fill="currentColor" /> Demo Mode
-            </button>
           </div>
+
         </div>
 
         <div className="text-center pt-8 space-y-1">

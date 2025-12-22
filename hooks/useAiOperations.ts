@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import { ProcessDefinition } from '../types';
-import { 
+import {
     generateMonolithicProcess,
-    generateProcessSkeleton, 
-    generateStageDetails, 
-    generateProcessFromImage, 
-    modifyProcess 
+    generateProcessSkeleton,
+    generateStageDetails,
+    generateProcessFromImage,
+    modifyProcess
 } from '../services/geminiService';
 import { demoDigitizedProcess } from '../services/demoData';
 
@@ -16,8 +16,7 @@ interface AiOperationsProps {
     setViewMode: (mode: any) => void;
     setStartPrompt: (val: string) => void;
     setSelectedStageId: (id: string) => void;
-    handleStartDemo: (useDemo: boolean) => void;
-    isDetailedMode?: boolean; 
+    isDetailedMode?: boolean;
 }
 
 export const useAiOperations = ({
@@ -26,10 +25,9 @@ export const useAiOperations = ({
     setViewMode,
     setStartPrompt,
     setSelectedStageId,
-    handleStartDemo,
     isDetailedMode = false
 }: AiOperationsProps) => {
-    
+
     const [isGenerating, setIsGenerating] = useState(false);
     const [showDemoDrop, setShowDemoDrop] = useState(false);
     const [loadingStageIds, setLoadingStageIds] = useState<Set<string>>(new Set());
@@ -48,21 +46,21 @@ export const useAiOperations = ({
             setViewMode('editor');
             return;
         }
-        
+
         setIsGenerating(true);
         try {
             console.log(`[AI Hook] 🟢 STARTING GENERATION for: "${prompt}". Mode: ${isDetailedMode ? 'DETAILED' : 'FAST'}`);
-            
+
             let skeletonProcess: ProcessDefinition | null = null;
 
             // --- STRATEGY 1: ONE-SHOT (MONOLITHIC) ---
             if (!isDetailedMode) {
                 try {
                     const fullProcess = await generateMonolithicProcess(prompt);
-                    
+
                     // VALIDATION: Does it actually have fields?
                     // Sometimes models return stages with empty section arrays.
-                    const hasFields = fullProcess && fullProcess.stages.some(s => 
+                    const hasFields = fullProcess && fullProcess.stages.some(s =>
                         s.sections && s.sections.some(sec => sec.elements && sec.elements.length > 0)
                     );
 
@@ -73,8 +71,8 @@ export const useAiOperations = ({
                         setViewMode('editor');
                         setIsGenerating(false);
                         return;
-                    } 
-                    
+                    }
+
                     if (fullProcess && !hasFields) {
                         console.warn(`[AI Hook] ⚠️ One-Shot returned structure but no fields. Promoting result to Skeleton.`);
                         // We use the empty structure as the skeleton for the next step
@@ -92,15 +90,15 @@ export const useAiOperations = ({
 
             // --- STRATEGY 2: ITERATIVE (FALLBACK / DETAILED) ---
             console.log(`[AI Hook] 🔄 Executing Iterative Strategy (Skeleton + Flesh)...`);
-            
+
             // If we don't have a skeleton from a partial fast-mode, generate one now
             if (!skeletonProcess) {
-                 skeletonProcess = await generateProcessSkeleton(prompt);
+                skeletonProcess = await generateProcessSkeleton(prompt);
             }
-            
+
             if (skeletonProcess) {
                 console.log(`[AI Hook] ✅ SKELETON READY. Loading details for ${skeletonProcess.stages.length} stages...`);
-                
+
                 // Initialize Loading State for UI spinners
                 const newLoadingSet = new Set<string>();
                 skeletonProcess.stages.forEach(s => newLoadingSet.add(s.id));
@@ -119,9 +117,9 @@ export const useAiOperations = ({
 
                 for (let i = 0; i < stageIds.length; i++) {
                     const stageId = stageIds[i];
-                    
+
                     // RPM Throttling: Add delay between requests
-                    if (i > 0) await new Promise(r => setTimeout(r, 2000)); 
+                    if (i > 0) await new Promise(r => setTimeout(r, 2000));
 
                     try {
                         // We need to fetch the current stage object from state or skeleton
@@ -131,7 +129,7 @@ export const useAiOperations = ({
 
                         console.log(`[AI Hook] ⏳ Fetching details for Stage ${i + 1}: ${stageRef.title}`);
                         const sections = await generateStageDetails(stageRef, processDescription);
-                        
+
                         // Update State Functionally
                         setProcessDef(prev => {
                             if (!prev) return prev;
@@ -159,13 +157,11 @@ export const useAiOperations = ({
         } catch (e: any) {
             setIsGenerating(false);
             console.error("[AI Hook] ❌ GENERATION ERROR:", e);
-            
+
             if (e.message?.includes('quota') || e.message?.includes('limit exceeded') || e.status === 429) {
-                 if (confirm("API Quota Limit Reached. Would you like to load the Demo Process instead?")) {
-                    handleStartDemo(true);
-                 }
+                alert("API Quota Limit Reached. Please try again later.");
             } else {
-                 alert(e.message || "Generation error. Please try again.");
+                alert(e.message || "Generation error. Please try again.");
             }
         }
     };
@@ -185,21 +181,21 @@ export const useAiOperations = ({
                 setIsGenerating(false);
                 return;
             }
-            
+
             try {
                 const base64 = reader.result;
                 const data = base64.split(',')[1];
                 const result = await generateProcessFromImage(data, file.type);
-                
+
                 if (result) {
                     setProcessDef(result);
                     setSelectedStageId(result.stages[0]?.id || '');
                     setViewMode('editor');
                 } else {
-                   setProcessDef(demoDigitizedProcess);
-                   setSelectedStageId(demoDigitizedProcess.stages[0].id);
-                   setViewMode('editor');
-                   alert("AI extraction incomplete. Loaded backup demo.");
+                    setProcessDef(demoDigitizedProcess);
+                    setSelectedStageId(demoDigitizedProcess.stages[0].id);
+                    setViewMode('editor');
+                    alert("AI extraction incomplete. Loaded backup demo.");
                 }
             } catch (e) {
                 console.error(e);
