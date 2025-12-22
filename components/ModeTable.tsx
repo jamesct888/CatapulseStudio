@@ -37,16 +37,16 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
             stage.sections.forEach(section => {
                 section.elements.forEach(el => {
                     // Handle options array which might contain objects or strings
-                    const optionsStr = Array.isArray(el.options) 
+                    const optionsStr = Array.isArray(el.options)
                         ? el.options.map(opt => {
                             if (typeof opt === 'string') return opt;
                             if (typeof opt === 'number') return String(opt);
-                            return opt?.label || opt?.value || ''; 
-                        }).join(',') 
+                            return opt?.label || opt?.value || '';
+                        }).join(',')
                         : typeof el.options === 'string' ? el.options : '';
-                    
+
                     const visibilityStr = el.visibility ? JSON.stringify(el.visibility) : '';
-                    
+
                     const row = [
                         escapeCSV(stage.id),
                         escapeCSV(stage.title),
@@ -116,7 +116,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
 
             // Map header indices (Clean BOM and spaces)
             const header = rows[0].map(h => h.trim().toLowerCase().replace(/^[\uFEFF\u200B"']+|["']+$/g, ''));
-            
+
             const idx = {
                 stgId: header.indexOf('stageid'),
                 stgTitle: header.indexOf('stagetitle'),
@@ -155,10 +155,10 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                 const stgTitle = idx.stgTitle !== -1 ? row[idx.stgTitle] : null;
                 const secIdRaw = idx.secId !== -1 ? row[idx.secId] : null;
                 const secTitle = idx.secTitle !== -1 ? row[idx.secTitle] : null;
-                
+
                 // 1. Resolve Stage (Find or Create)
                 let stage: StageDefinition | undefined;
-                
+
                 if (stgIdRaw) {
                     stage = newDef.stages.find(s => s.id === stgIdRaw);
                     if (!stage) {
@@ -185,7 +185,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                     }
                 }
 
-                if (!stage) continue; 
+                if (!stage) continue;
 
                 // 2. Resolve Section (Find or Create)
                 let section: SectionDefinition | undefined;
@@ -227,7 +227,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                 if (isNew) {
                     // Create New Element
                     element = {
-                        id: elId || `el_${Date.now()}_${Math.random().toString(36).substr(2,5)}`,
+                        id: elId || `el_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                         label: (idx.label !== -1 ? row[idx.label] : 'New Field') || 'New Field',
                         type: 'text',
                         required: false
@@ -239,11 +239,11 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                 }
 
                 // Apply Updates to Element (element is now definitely defined)
-                if (idx.label !== -1 && row[idx.label]) element.label = row[idx.label];
-                if (idx.type !== -1 && row[idx.type]) element.type = row[idx.type] as any;
-                
+                if (element && idx.label !== -1 && row[idx.label]) element.label = row[idx.label];
+                if (element && idx.type !== -1 && row[idx.type]) element.type = row[idx.type] as any;
+
                 // Safe Options Update
-                if (idx.options !== -1) {
+                if (element && idx.options !== -1) {
                     const rawOptions = row[idx.options];
                     if (rawOptions && typeof rawOptions === 'string') {
                         element.options = rawOptions.split(',').filter(s => s.trim());
@@ -252,20 +252,20 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                     }
                 }
 
-                if (idx.req !== -1 && row[idx.req] !== undefined && row[idx.req] !== '') {
+                if (element && idx.req !== -1 && row[idx.req] !== undefined && row[idx.req] !== '') {
                     element.required = row[idx.req].toUpperCase() === 'TRUE';
                 }
-                
-                if (idx.val !== -1 && row[idx.val] !== undefined) {
+
+                if (element && idx.val !== -1 && row[idx.val] !== undefined) {
                     if (row[idx.val] !== 'none' && row[idx.val]) {
                         element.validation = { type: row[idx.val] as any };
                     } else if (row[idx.val] === 'none') {
                         element.validation = { type: 'none' };
                     }
                 }
-                
+
                 // Logic Import
-                if (idx.vis !== -1 && row[idx.vis] !== undefined) {
+                if (element && idx.vis !== -1 && row[idx.vis] !== undefined) {
                     const jsonStr = row[idx.vis];
                     if (jsonStr && jsonStr.trim() !== '') {
                         try {
@@ -277,13 +277,13 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                 }
 
                 // Static Text Config Import
-                if (idx.staticSrc !== -1 && row[idx.staticSrc] !== undefined) {
+                if (element && idx.staticSrc !== -1 && row[idx.staticSrc] !== undefined) {
                     element.staticDataSource = (row[idx.staticSrc] as any) || 'manual';
                 }
-                if (idx.srcField !== -1 && row[idx.srcField] !== undefined) {
+                if (element && idx.srcField !== -1 && row[idx.srcField] !== undefined) {
                     element.sourceFieldId = row[idx.srcField];
                 }
-                if (idx.desc !== -1 && row[idx.desc] !== undefined) {
+                if (element && idx.desc !== -1 && row[idx.desc] !== undefined) {
                     element.description = row[idx.desc];
                 }
             }
@@ -310,7 +310,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
         newDef.stages[stageIdx].sections[secIdx] = { ...newDef.stages[stageIdx].sections[secIdx] };
         newDef.stages[stageIdx].sections[secIdx].elements = [...newDef.stages[stageIdx].sections[secIdx].elements];
         const el = { ...newDef.stages[stageIdx].sections[secIdx].elements[elIdx] };
-        
+
         // Type specific cleanup
         if (field === 'type') {
             if (['select', 'radio', 'multiselect'].includes(value as string)) {
@@ -332,24 +332,36 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
 
         const val = value === undefined || value === null ? '' : String(value);
         el.options = val.split(',');
-        
+
         elements[elIdx] = el;
         sections[secIdx].elements = elements;
         stages[stageIdx].sections = sections;
         newDef.stages = stages;
-        
+
         setProcessDef(newDef);
     };
 
     const deleteElement = (stageIdx: number, secIdx: number, elIdx: number) => {
         if (!confirm('Are you sure you want to delete this field?')) return;
         const newDef = { ...processDef };
+        newDef.stages = [...newDef.stages];
+        newDef.stages[stageIdx] = { ...newDef.stages[stageIdx] };
+        newDef.stages[stageIdx].sections = [...newDef.stages[stageIdx].sections];
+        newDef.stages[stageIdx].sections[secIdx] = { ...newDef.stages[stageIdx].sections[secIdx] };
+        newDef.stages[stageIdx].sections[secIdx].elements = [...newDef.stages[stageIdx].sections[secIdx].elements];
+
         newDef.stages[stageIdx].sections[secIdx].elements.splice(elIdx, 1);
         setProcessDef(newDef);
     };
 
     const duplicateElement = (stageIdx: number, secIdx: number, elIdx: number) => {
         const newDef = { ...processDef };
+        newDef.stages = [...newDef.stages];
+        newDef.stages[stageIdx] = { ...newDef.stages[stageIdx] };
+        newDef.stages[stageIdx].sections = [...newDef.stages[stageIdx].sections];
+        newDef.stages[stageIdx].sections[secIdx] = { ...newDef.stages[stageIdx].sections[secIdx] };
+        newDef.stages[stageIdx].sections[secIdx].elements = [...newDef.stages[stageIdx].sections[secIdx].elements];
+
         const source = newDef.stages[stageIdx].sections[secIdx].elements[elIdx];
         const clone: ElementDefinition = {
             ...JSON.parse(JSON.stringify(source)),
@@ -362,6 +374,12 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
 
     const addElement = (stageIdx: number, secIdx: number) => {
         const newDef = { ...processDef };
+        newDef.stages = [...newDef.stages];
+        newDef.stages[stageIdx] = { ...newDef.stages[stageIdx] };
+        newDef.stages[stageIdx].sections = [...newDef.stages[stageIdx].sections];
+        newDef.stages[stageIdx].sections[secIdx] = { ...newDef.stages[stageIdx].sections[secIdx] };
+        newDef.stages[stageIdx].sections[secIdx].elements = [...newDef.stages[stageIdx].sections[secIdx].elements];
+
         const newEl: ElementDefinition = {
             id: `el_${Date.now()}`,
             label: 'New Field',
@@ -396,11 +414,11 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
         if (!clipboardLogic) return;
         const newDef = { ...processDef };
         const el = newDef.stages[stageIdx].sections[secIdx].elements[elIdx];
-        
+
         // Deep clone clipboard logic with new unique IDs to avoid conflict
         const clonedLogic = JSON.parse(JSON.stringify(clipboardLogic));
         clonedLogic.id = `logic_${Date.now()}`;
-        
+
         el.visibility = clonedLogic;
         setProcessDef(newDef);
     };
@@ -424,7 +442,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                 return opt?.label || opt?.value || opt?.text || '';
             }).join(','); // Removed .filter(Boolean) to allow typing commas (which create transient empty strings)
         }
-        if (typeof options === 'object' && options !== null) return ''; 
+        if (typeof options === 'object' && options !== null) return '';
         if (!options) return '';
         return String(options);
     };
@@ -442,28 +460,28 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                     {clipboardLogic && (
                         <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded text-xs font-bold mr-2 flex items-center gap-2 animate-in fade-in">
                             <ClipboardCopy size={14} /> Logic Copied
-                            <button onClick={() => setClipboardLogic(null)} className="hover:text-blue-900"><X size={12}/></button>
+                            <button onClick={() => setClipboardLogic(null)} className="hover:text-blue-900"><X size={12} /></button>
                         </div>
                     )}
-                    <button 
+                    <button
                         onClick={handleExportCSV}
                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:text-sw-teal hover:border-sw-teal transition-all shadow-sm"
                     >
                         <Download size={16} /> Export CSV
                     </button>
-                    <button 
+                    <button
                         onClick={() => fileInputRef.current?.click()}
                         className="flex items-center gap-2 px-4 py-2 bg-sw-teal text-white rounded-lg text-sm font-bold hover:bg-sw-tealHover transition-all shadow-sm"
                     >
                         <Upload size={16} /> Import CSV
                     </button>
                     {/* Hidden Input */}
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleImportCSV} 
-                        accept=".csv" 
-                        className="hidden" 
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImportCSV}
+                        accept=".csv"
+                        className="hidden"
                     />
                 </div>
             </div>
@@ -491,7 +509,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                             Stage {stageIdx + 1}: {stage.title}
                                         </td>
                                     </tr>
-                                    
+
                                     {stage.sections.map((section, secIdx) => (
                                         <React.Fragment key={section.id}>
                                             {/* Section Header Row */}
@@ -518,15 +536,15 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-2 align-middle">
-                                                            <input 
-                                                                type="text" 
-                                                                value={el.label} 
+                                                            <input
+                                                                type="text"
+                                                                value={el.label}
                                                                 onChange={(e) => updateField(stageIdx, secIdx, elIdx, 'label', e.target.value)}
                                                                 className="w-full px-2 py-1.5 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal text-gray-800 font-medium bg-white"
                                                             />
                                                         </td>
                                                         <td className="px-4 py-2 align-middle">
-                                                            <select 
+                                                            <select
                                                                 value={el.type}
                                                                 onChange={(e) => updateField(stageIdx, secIdx, elIdx, 'type', e.target.value)}
                                                                 className="w-full px-2 py-1.5 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal bg-white text-xs"
@@ -548,7 +566,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                         </td>
                                                         <td className="px-4 py-2 align-middle">
                                                             {['select', 'radio', 'multiselect'].includes(el.type) ? (
-                                                                <input 
+                                                                <input
                                                                     type="text"
                                                                     placeholder="Options (comma separated)"
                                                                     value={formatOptionsForInput(el.options)}
@@ -556,7 +574,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                                     className="w-full px-2 py-1.5 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal text-xs bg-white"
                                                                 />
                                                             ) : ['text', 'email'].includes(el.type) ? (
-                                                                <select 
+                                                                <select
                                                                     value={el.validation?.type || 'none'}
                                                                     onChange={(e) => {
                                                                         const val = e.target.value === 'none' ? { type: 'none' } : { type: e.target.value };
@@ -571,7 +589,7 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                                 </select>
                                                             ) : el.type === 'static' ? (
                                                                 <div className="flex flex-col gap-1 min-w-[160px]">
-                                                                     <div className="flex items-center gap-1">
+                                                                    <div className="flex items-center gap-1">
                                                                         <select
                                                                             value={el.staticDataSource || 'manual'}
                                                                             onChange={(e) => updateField(stageIdx, secIdx, elIdx, 'staticDataSource', e.target.value)}
@@ -580,9 +598,9 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                                             <option value="manual">Constant</option>
                                                                             <option value="field">Reference</option>
                                                                         </select>
-                                                                     </div>
-                                                                     
-                                                                     {el.staticDataSource === 'field' ? (
+                                                                    </div>
+
+                                                                    {el.staticDataSource === 'field' ? (
                                                                         <select
                                                                             value={el.sourceFieldId || ''}
                                                                             onChange={(e) => updateField(stageIdx, secIdx, elIdx, 'sourceFieldId', e.target.value)}
@@ -593,23 +611,23 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                                                 <option key={f.id} value={f.id}>{f.label}</option>
                                                                             ))}
                                                                         </select>
-                                                                     ) : (
-                                                                        <textarea 
+                                                                    ) : (
+                                                                        <textarea
                                                                             value={el.description || ''}
                                                                             onChange={(e) => updateField(stageIdx, secIdx, elIdx, 'description', e.target.value)}
                                                                             placeholder="Enter text to display..."
                                                                             rows={1}
                                                                             className="w-full text-xs py-1 px-2 border border-gray-200 rounded focus:border-sw-teal focus:ring-1 focus:ring-sw-teal bg-white resize-y min-h-[28px]"
                                                                         />
-                                                                     )}
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <span className="text-gray-300 text-xs">-</span>
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-2 text-center align-middle">
-                                                            <input 
-                                                                type="checkbox" 
+                                                            <input
+                                                                type="checkbox"
                                                                 checked={!!el.required}
                                                                 onChange={(e) => updateField(stageIdx, secIdx, elIdx, 'required', e.target.checked)}
                                                                 className="rounded border-gray-300 text-sw-teal focus:ring-sw-teal"
@@ -617,69 +635,68 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                         </td>
                                                         <td className="px-4 py-2 align-middle">
                                                             <div className="flex items-center gap-1">
-                                                                <button 
+                                                                <button
                                                                     onClick={() => openLogicModal(stageIdx, secIdx, elIdx)}
-                                                                    className={`flex-1 px-2 py-1.5 rounded text-xs font-bold border flex items-center justify-between transition-all ${
-                                                                        hasLogic 
-                                                                        ? 'bg-sw-purpleLight border-sw-teal text-sw-teal' 
+                                                                    className={`flex-1 px-2 py-1.5 rounded text-xs font-bold border flex items-center justify-between transition-all ${hasLogic
+                                                                        ? 'bg-sw-purpleLight border-sw-teal text-sw-teal'
                                                                         : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
-                                                                    }`}
+                                                                        }`}
                                                                 >
                                                                     <span className="flex items-center gap-1">
-                                                                        {hasLogic ? <Eye size={12}/> : <EyeOff size={12}/>}
+                                                                        {hasLogic ? <Eye size={12} /> : <EyeOff size={12} />}
                                                                         {hasLogic ? 'Conditional' : 'Always'}
                                                                     </span>
                                                                     {hasLogic && <span className="bg-white/50 px-1.5 rounded text-[9px]">{logicCount}</span>}
                                                                 </button>
-                                                                
+
                                                                 {/* Copy Logic Button */}
                                                                 {hasLogic && (
-                                                                    <button 
+                                                                    <button
                                                                         onClick={() => copyLogic(stageIdx, secIdx, elIdx)}
                                                                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
                                                                         title="Copy Logic Rule"
                                                                     >
-                                                                        <ClipboardCopy size={14}/>
+                                                                        <ClipboardCopy size={14} />
                                                                     </button>
                                                                 )}
 
                                                                 {/* Paste Logic Button */}
                                                                 {clipboardLogic && !hasLogic && (
-                                                                    <button 
+                                                                    <button
                                                                         onClick={() => pasteLogic(stageIdx, secIdx, elIdx)}
                                                                         className="p-1.5 text-blue-600 hover:bg-blue-50 rounded animate-pulse"
                                                                         title="Paste Logic"
                                                                     >
-                                                                        <ClipboardPaste size={14}/>
+                                                                        <ClipboardPaste size={14} />
                                                                     </button>
                                                                 )}
 
                                                                 {/* Clear Logic */}
                                                                 {hasLogic && (
-                                                                    <button 
+                                                                    <button
                                                                         onClick={() => clearLogic(stageIdx, secIdx, elIdx)}
                                                                         className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
                                                                         title="Clear Logic"
                                                                     >
-                                                                        <X size={14}/>
+                                                                        <X size={14} />
                                                                     </button>
                                                                 )}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-2 text-right align-middle">
                                                             <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={() => duplicateElement(stageIdx, secIdx, elIdx)} className="p-1.5 hover:bg-sw-lightGray rounded text-sw-teal" title="Duplicate"><Copy size={14}/></button>
-                                                                <button onClick={() => deleteElement(stageIdx, secIdx, elIdx)} className="p-1.5 hover:bg-red-50 rounded text-sw-red" title="Delete"><Trash2 size={14}/></button>
+                                                                <button onClick={() => duplicateElement(stageIdx, secIdx, elIdx)} className="p-1.5 hover:bg-sw-lightGray rounded text-sw-teal" title="Duplicate"><Copy size={14} /></button>
+                                                                <button onClick={() => deleteElement(stageIdx, secIdx, elIdx)} className="p-1.5 hover:bg-red-50 rounded text-sw-red" title="Delete"><Trash2 size={14} /></button>
                                                             </div>
                                                         </td>
                                                     </tr>
                                                 );
                                             })}
-                                            
+
                                             {/* Add Field Row */}
                                             <tr>
                                                 <td colSpan={7} className="px-4 py-2 border-b border-gray-100">
-                                                    <button 
+                                                    <button
                                                         onClick={() => addElement(stageIdx, secIdx)}
                                                         className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-sw-teal px-4 py-1.5 rounded hover:bg-gray-50 transition-colors w-full"
                                                     >
@@ -703,10 +720,10 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                     icon={Eye}
                     onClose={() => setLogicModalOpen(false)}
                     modalSize={{ width: 800, height: 600 }}
-                    onResizeStart={() => {}}
+                    onResizeStart={() => { }}
                 >
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-4">
-                        <LogicBuilder 
+                        <LogicBuilder
                             group={processDef.stages[activeLogicContext.stageIdx].sections[activeLogicContext.sectionIdx].elements[activeLogicContext.elementIdx].visibility || { id: 'root', operator: 'AND', conditions: [] }}
                             onChange={handleLogicSave}
                             availableTargets={allFields.filter(f => f.id !== processDef.stages[activeLogicContext.stageIdx].sections[activeLogicContext.sectionIdx].elements[activeLogicContext.elementIdx].id)}

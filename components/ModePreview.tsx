@@ -681,6 +681,9 @@ const SectionComponent: React.FC<SectionProps> = ({
                                 )}
                                 <RenderElement
                                     element={{ ...el, required: isElementRequired(el, formData) }}
+                                    hoveredFieldId={hoveredFieldId}
+                                    setHoveredFieldId={setHoveredFieldId}
+                                    allElements={allElements}
                                     value={elementValue}
                                     onChange={(val) => {
                                         if (isHiddenDebug) return; // Prevention

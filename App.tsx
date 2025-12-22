@@ -278,11 +278,8 @@ const App: React.FC = () => {
     };
 
     const handleStart = (useDemo = false) => {
-        if (useDemo) {
-            handleStartDemo(true);
-        } else {
-            handleStartGeneration(startPrompt);
-        }
+        // Legacy demo flag ignored, using unified generation
+        handleStartGeneration(startPrompt);
     };
 
     const onAiModification = () => {

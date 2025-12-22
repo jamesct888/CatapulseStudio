@@ -1,10 +1,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { ElementDefinition, SectionDefinition, StageDefinition, SkillRule, LogicGroup, RepeaterColumn, VisualTheme, CalculationPart } from '../types';
-import { Trash2, Info, Layout, Briefcase, ShieldCheck, GitMerge, Eye, X, Edit2, Plus, Palette, AlertTriangle, PanelBottom, Calculator, Hash, Type, FastForward, CheckCircle2, Copy, ClipboardPaste, Check } from 'lucide-react';
+import { X, Search, ChevronRight, Hash, Eye, Globe, ChevronDown, CheckCircle2, ShieldCheck, Calculator, AlertTriangle, FastForward, Trash2, ArrowRight, Layout, Type, Calendar, Copy, Clipboard, ClipboardPaste } from 'lucide-react';
 import { LogicBuilder } from './LogicBuilder';
 import { ModalWrapper } from './ModalWrapper';
 import { formatLogicSummary } from '../utils/logic';
+// Imported Sub-Components
+import { CalculationBuilder } from './properties/CalculationBuilder';
+import { ValidationRulesModal } from './properties/ValidationRulesModal';
+import { SkillLogicModal } from './properties/SkillLogicModal';
+import { VisibilityLogicModal } from './properties/VisibilityLogicModal';
+import { SkipLogicModal } from './properties/SkipLogicModal';
 
 interface PropertiesPanelProps {
     selectedElement: ElementDefinition | null;
@@ -13,16 +19,16 @@ interface PropertiesPanelProps {
     allElements: ElementDefinition[];
     activeTab: 'general' | 'logic';
     onTabChange: (tab: 'general' | 'logic') => void;
-    onUpdateElement: (updated: ElementDefinition) => void;
-    onUpdateSection: (updated: SectionDefinition) => void;
-    onUpdateStage: (updated: StageDefinition) => void;
+    onUpdateElement: (el: ElementDefinition) => void;
+    onUpdateSection: (sec: SectionDefinition) => void;
+    onUpdateStage: (stg: StageDefinition) => void;
     onDeleteElement: (id: string) => void;
     onDeleteSection: (id: string) => void;
     onDeleteStage: (id: string) => void;
     visualTheme?: VisualTheme;
     onOpenSettings: () => void;
     onClose: () => void;
-    // New Clipboard Props
+    // Clipboard Props
     clipboardStageLogic?: SkillRule[] | null;
     onCopyStageLogic?: (rules: SkillRule[]) => void;
     onPasteStageLogic?: (stageId: string) => void;
@@ -57,973 +63,604 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     onCopyStageLogic,
     onPasteStageLogic
 }) => {
+    // --- STATE ---
+    const [modals, setModals] = useState<{
+        skill: boolean;
+        visibility: boolean;
+        required: boolean;
+        validation: boolean;
+        skip: boolean;
+    }>({ skill: false, visibility: false, required: false, validation: false, skip: false });
 
-    const isEditingElement = !!selectedElement;
-    const isEditingSection = !selectedElement && !!selectedSection;
-    const isEditingStage = !selectedElement && !selectedSection && !!selectedStage;
-
-    const data = selectedElement || selectedSection || selectedStage;
-    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-    // Resizable sidebar state - Default to 480px
-    const [panelWidth, setPanelWidth] = useState(480);
-    const [isResizing, setIsResizing] = useState(false);
-
-    // Modal States
-    const [skillModalOpen, setSkillModalOpen] = useState(false);
+    // Specific modal state
     const [activeRuleIndex, setActiveRuleIndex] = useState<number | null>(null);
-
-    const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
-    const [skipLogicModalOpen, setSkipLogicModalOpen] = useState(false);
-    const [validationModalOpen, setValidationModalOpen] = useState(false);
-    const [requiredLogicModalOpen, setRequiredLogicModalOpen] = useState(false);
-
-    // Shared Modal Resize State (persists across modals for consistency)
-    const [modalSize, setModalSize] = useState({ width: 900, height: 700 });
+    const [modalSize, setModalSize] = useState({ width: 800, height: 600 });
     const [isResizingModal, setIsResizingModal] = useState(false);
 
-    // Copy Feedback State
-    const [copyFeedback, setCopyFeedback] = useState(false);
-
-    // Computed Variables
-    const availableTargets = data ? allElements.filter(e => e.id !== data.id) : [];
-
+    // --- EFFECT: Keyboard Shortcuts ---
     useEffect(() => {
-        setConfirmDeleteId(null);
-    }, [data?.id]);
-
-    // Sidebar Resizing
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isResizing) return;
-            const newWidth = document.body.clientWidth - e.clientX;
-            if (newWidth > 300 && newWidth < 1200) {
-                setPanelWidth(newWidth);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Delete' && activeTab === 'general' && !modals.skill && !modals.visibility) { // Prevent if modal open
+                // Safety check: Don't delete if focusing input
+                if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
+                handleDelete();
             }
         };
-        const handleMouseUp = () => setIsResizing(false);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedElement, selectedSection, selectedStage, activeTab, modals]);
 
-        if (isResizing) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isResizing]);
-
-    // Modal Resizing Logic
-    useEffect(() => {
-        const handleModalMouseMove = (e: MouseEvent) => {
-            if (!isResizingModal) return;
-            setModalSize(prev => ({
-                width: Math.max(600, prev.width + e.movementX * 2),
-                height: Math.max(400, prev.height + e.movementY * 2)
-            }));
-        };
-        const handleModalMouseUp = () => setIsResizingModal(false);
-
+    // --- MOUSE HANDLERS (Modal Resize) ---
+    const handleModalMouseMove = (e: React.MouseEvent) => {
         if (isResizingModal) {
-            window.addEventListener('mousemove', handleModalMouseMove);
-            window.addEventListener('mouseup', handleModalMouseUp);
+            setModalSize(prev => ({
+                width: Math.max(400, prev.width + e.movementX),
+                height: Math.max(300, prev.height + e.movementY)
+            }));
         }
-        return () => {
-            window.removeEventListener('mousemove', handleModalMouseMove);
-            window.removeEventListener('mouseup', handleModalMouseUp);
-        };
-    }, [isResizingModal]);
+    };
+    const handleModalMouseUp = () => setIsResizingModal(false);
 
+    // --- HELPER: Available Targets (for logic) ---
+    // Prevent cyclical logic (e.g. A depends on B, B depends on A)
+    // For now, just exclude self.
+    const getAvailableTargets = () => {
+        if (selectedElement) return allElements.filter(e => e.id !== selectedElement.id);
+        return allElements; // Sections/Stages can depend on any element
+    };
 
-    const inputClass = "w-full p-3 bg-white text-sw-text border border-gray-300 rounded-lg focus:outline-none focus:border-sw-teal focus:ring-1 focus:ring-sw-teal transition-all text-sm";
-    const labelClass = "block text-xs font-bold text-sw-teal uppercase mb-2 tracking-wide";
-
-    // --- HANDLERS ---
-
-    // Generic handler
+    // --- CHANGE HANDLERS ---
     const handleChange = (field: string, value: any) => {
-        if (isEditingElement && selectedElement) {
-            onUpdateElement({ ...selectedElement, [field]: value });
-        } else if (isEditingSection && selectedSection) {
-            onUpdateSection({ ...selectedSection, [field]: value });
-        } else if (isEditingStage && selectedStage) {
-            onUpdateStage({ ...selectedStage, [field]: value });
-        }
+        if (selectedElement) onUpdateElement({ ...selectedElement, [field]: value });
+        else if (selectedSection) onUpdateSection({ ...selectedSection, [field]: value });
+        else if (selectedStage) onUpdateStage({ ...selectedStage, [field]: value });
     };
 
-    // Repeater Column Handlers
     const handleRepeaterChange = (cols: RepeaterColumn[]) => {
-        handleChange('columns', cols);
-    };
-
-    const handleValidationChange = (field: string, value: any) => {
-        if (!isEditingElement || !selectedElement) return;
-        const currentValidation = selectedElement?.validation || { type: 'none' };
-        const updatedValidation = { ...currentValidation, [field]: value };
-        onUpdateElement({ ...selectedElement!, validation: updatedValidation });
+        if (selectedElement && selectedElement.type === 'repeater') {
+            onUpdateElement({ ...selectedElement, columns: cols });
+        }
     };
 
     const handleDelete = () => {
-        if (!data) return;
-        if (confirmDeleteId === data.id) {
-            if (isEditingElement) onDeleteElement(data.id);
-            else if (isEditingSection) onDeleteSection(data.id);
-            else if (isEditingStage) onDeleteStage(data.id);
-            setConfirmDeleteId(null);
-        } else {
-            setConfirmDeleteId(data.id);
-            setTimeout(() => {
-                setConfirmDeleteId(current => current === data.id ? null : current);
-            }, 3000);
-        }
-    }
+        if (selectedElement && confirm('Delete this field?')) onDeleteElement(selectedElement.id);
+        else if (selectedSection && confirm('Delete section and all its fields?')) onDeleteSection(selectedSection.id);
+        else if (selectedStage && confirm('Delete stage and all its content?')) onDeleteStage(selectedStage.id);
+    };
 
+    // --- LOGIC HELPERS ---
     const ensureLogicGroup = (field: 'visibility' | 'requiredLogic' | 'skipLogic') => {
-        const current = (data as any)[field];
-        if (!current) {
-            const newGroup: LogicGroup = { id: 'root', operator: 'AND', conditions: [] };
-            handleChange(field, newGroup);
+        // Initialize logic group if missing
+        if (selectedElement && field === 'visibility' && !selectedElement.visibility) {
+            onUpdateElement({ ...selectedElement, visibility: { id: 'root', operator: 'AND', conditions: [] } });
+        } else if (selectedElement && field === 'requiredLogic' && !selectedElement.requiredLogic) {
+            onUpdateElement({ ...selectedElement, requiredLogic: { id: 'root', operator: 'AND', conditions: [] } });
+        } else if (selectedSection && field === 'visibility' && !selectedSection.visibility) {
+            onUpdateSection({ ...selectedSection, visibility: { id: 'root', operator: 'AND', conditions: [] } });
+        } else if (selectedStage && field === 'skipLogic' && !selectedStage.skipLogic) {
+            onUpdateStage({ ...selectedStage, skipLogic: { id: 'root', operator: 'AND', conditions: [] } });
         }
     };
 
-    // Helper to safely stringify options for display in textarea
-    const getOptionsString = (opts: any) => {
-        if (!opts) return '';
-        if (Array.isArray(opts)) {
-            return opts.map(o => {
-                if (typeof o === 'object' && o !== null) return o.label || o.value || o.text || '';
-                return String(o);
-            }).join(','); // Removed .filter(Boolean) to allow typing commas
-        }
-        if (typeof opts === 'object') return ''; // Safety for stray objects
-        return String(opts);
-    };
-
-    // --- LOGIC HANDLING (Stage Copy/Paste) ---
     const handleCopyRules = () => {
-        if (isEditingStage && onCopyStageLogic && (data as StageDefinition).skillLogic) {
-            onCopyStageLogic((data as StageDefinition).skillLogic || []);
-            setCopyFeedback(true);
-            setTimeout(() => setCopyFeedback(false), 2000);
+        if (selectedStage && selectedStage.skillLogic && onCopyStageLogic) {
+            onCopyStageLogic(selectedStage.skillLogic);
+            // Visual feedback could be added here (toast)
         }
     };
 
     const handlePasteRules = () => {
-        if (isEditingStage && onPasteStageLogic) {
-            onPasteStageLogic(data.id);
+        if (selectedStage && onPasteStageLogic) {
+            onPasteStageLogic(selectedStage.id);
         }
     };
 
-    // --- SPECIFIC MODAL CONTENTS ---
-    const renderCalculationBuilder = () => {
-        if (!isEditingElement || (data as ElementDefinition).type !== 'calculated' || !data) return null;
-        const el = data as ElementDefinition;
-        const calcParts = el.calculation || [];
+    // --- RENDER HELPERS ---
+    const renderHeader = () => {
+        let title = "Properties";
+        let type = "";
+        let badge = null;
 
-        const addPart = (type: 'field' | 'constant' | 'operator', value: string) => {
-            const newPart: CalculationPart = { id: Date.now().toString(), type, value };
-            handleChange('calculation', [...calcParts, newPart]);
-        };
-
-        const removePart = (index: number) => {
-            const newParts = [...calcParts];
-            newParts.splice(index, 1);
-            handleChange('calculation', newParts);
-        };
+        if (selectedElement) {
+            title = "Element";
+            type = selectedElement.type;
+            badge = <span className="bg-sw-teal/10 text-sw-teal px-2 py-0.5 rounded text-[10px] font-bold uppercase">{selectedElement.type}</span>;
+        } else if (selectedSection) {
+            title = "Section";
+            type = selectedSection.layout || '1col';
+        } else if (selectedStage) {
+            title = "Stage";
+        }
 
         return (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4">
-                <div className="flex items-center gap-2 mb-3">
-                    <Calculator size={16} className="text-sw-teal" />
-                    <span className={labelClass.replace('mb-2', 'mb-0')}>Formula Builder</span>
-                </div>
-
-                <div className="bg-white p-3 rounded-lg border border-gray-300 min-h-[50px] mb-3 flex flex-wrap gap-2 items-center">
-                    {calcParts.length === 0 && <span className="text-gray-400 text-xs italic">Empty formula...</span>}
-                    {calcParts.map((part, idx) => {
-                        let display = part.value;
-                        let bg = 'bg-gray-100';
-                        let icon = null;
-
-                        if (part.type === 'field') {
-                            const field = allElements.find(e => e.id === part.value);
-                            display = field ? `[${field.label}]` : '[Unknown Field]';
-                            bg = 'bg-blue-100 text-blue-700 border-blue-200';
-                            icon = <Type size={10} />;
-                        } else if (part.type === 'operator') {
-                            bg = 'bg-orange-100 text-orange-700 border-orange-200 font-bold';
-                        } else {
-                            bg = 'bg-green-100 text-green-700 border-green-200 font-mono';
-                            icon = <Hash size={10} />;
-                        }
-
-                        return (
-                            <div key={idx} className={`flex items-center gap-1 px-2 py-1 rounded text-xs border ${bg} group relative cursor-pointer`}>
-                                {icon}
-                                <span>{display}</span>
-                                <button
-                                    onClick={() => removePart(idx)}
-                                    className="ml-1 p-0.5 rounded-full hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <X size={10} />
-                                </button>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2">
-                        <select
-                            className="w-full text-xs p-2 border rounded bg-white"
-                            onChange={(e) => {
-                                if (e.target.value) {
-                                    addPart('field', e.target.value);
-                                    e.target.value = '';
-                                }
-                            }}
-                        >
-                            <option value="">+ Add Field...</option>
-                            {availableTargets.map(t => (
-                                <option key={t.id} value={t.id}>{t.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="col-span-2">
-                        <select
-                            className="w-full text-xs p-2 border border-green-200 bg-green-50 rounded text-green-700 font-bold"
-                            onChange={(e) => {
-                                if (e.target.value) {
-                                    addPart('constant', e.target.value);
-                                    e.target.value = '';
-                                }
-                            }}
-                        >
-                            <option value="">+ Quick Add System Value...</option>
-                            <option value="TODAY">TODAY (Current Date)</option>
-                            <option value="NOW">NOW (Date & Time)</option>
-                        </select>
-                    </div>
-                    <div className="flex gap-1">
-                        {['+', '-', '*', '/'].map(op => (
-                            <button
-                                key={op}
-                                onClick={() => addPart('operator', op)}
-                                className="flex-1 bg-white border border-gray-300 rounded hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600 font-bold py-1"
-                            >
-                                {op}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="flex gap-1">
-                        <input
-                            type="text"
-                            placeholder="Value"
-                            className="w-20 text-xs p-1 border rounded"
-                            id="calc-const-input"
-                        />
-                        <button
-                            onClick={() => {
-                                const el = document.getElementById('calc-const-input') as HTMLInputElement;
-                                if (el.value) {
-                                    addPart('constant', el.value);
-                                    el.value = '';
-                                }
-                            }}
-                            className="flex-1 bg-white border border-gray-300 rounded hover:bg-green-50 hover:border-green-200 hover:text-green-600 text-xs font-bold"
-                        >
-                            Add Const
-                        </button>
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h2 className="text-xl font-serif text-sw-teal">{title}</h2>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                        <span>ID: {selectedElement?.id || selectedSection?.id || selectedStage?.id}</span>
+                        {badge}
                     </div>
                 </div>
+                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                    <X size={20} />
+                </button>
             </div>
         );
     };
 
-    const renderSkillModal = () => {
-        if (!skillModalOpen || activeRuleIndex === null || !selectedStage) return null;
-        const rule = selectedStage.skillLogic?.[activeRuleIndex];
-        if (!rule) return null;
+    // --- MAIN RENDER ---
+    const labelClass = "block text-xs font-bold text-sw-teal uppercase mb-2 tracking-wide";
+    const inputClass = "w-full p-2.5 bg-white text-sw-text border border-gray-200 rounded-lg focus:outline-none focus:border-sw-teal focus:ring-1 focus:ring-sw-teal transition-all text-sm";
 
-        const handleModalUpdate = (updatedRule: SkillRule) => {
-            const newList = [...selectedStage.skillLogic!];
-            newList[activeRuleIndex] = updatedRule;
-            onUpdateStage({ ...selectedStage, skillLogic: newList });
-        };
-
-        return (
-            <ModalWrapper
-                title={`Configure Routing Rule #${activeRuleIndex + 1}`}
-                icon={Briefcase}
-                onClose={() => setSkillModalOpen(false)}
-                modalSize={modalSize}
-                onResizeStart={() => setIsResizingModal(true)}
-            >
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-                    <div className="lg:col-span-2 space-y-4 flex flex-col">
-                        <div className="flex items-center gap-2 mb-2">
-                            <GitMerge className="text-sw-teal" size={20} />
-                            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-widest">When these conditions are met...</h4>
-                        </div>
-                        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex-1 overflow-y-auto">
-                            <LogicBuilder
-                                group={rule.logic}
-                                onChange={(g: LogicGroup) => handleModalUpdate({ ...rule, logic: g })}
-                                availableTargets={availableTargets}
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-4 flex flex-col">
-                        <div className="flex items-center gap-2 mb-2">
-                            <ShieldCheck className="text-sw-teal" size={20} />
-                            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-widest">Route to...</h4>
-                        </div>
-                        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
-                            <label className="block text-xs font-bold text-gray-400 mb-2">Required Skill / Work Queue</label>
-                            <input
-                                type="text"
-                                value={rule.requiredSkill}
-                                onChange={(e) => handleModalUpdate({ ...rule, requiredSkill: e.target.value })}
-                                className="w-full p-3 border border-sw-teal/30 rounded-lg font-bold text-sw-teal mb-4 focus:ring-2 focus:ring-sw-teal bg-white"
-                                placeholder="e.g. Senior Underwriter"
-                            />
-                            <div className="text-xs font-bold text-gray-400 mb-2">Quick Select:</div>
-                            <div className="flex flex-wrap gap-2 overflow-y-auto content-start">
-                                {COMMON_SKILLS.map(skill => (
-                                    <button
-                                        key={skill}
-                                        onClick={() => handleModalUpdate({ ...rule, requiredSkill: skill })}
-                                        className={`px-3 py-2 rounded-lg text-xs font-bold text-left transition-all ${rule.requiredSkill === skill ? 'bg-sw-teal text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-sw-teal/10'}`}
-                                    >
-                                        {skill}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </ModalWrapper>
-        );
-    };
-
-    const renderVisibilityModal = () => {
-        if (!visibilityModalOpen || !data) return null;
-        const logicGroup = (data as any).visibility;
-
-        return (
-            <ModalWrapper
-                title="Configure Visibility Logic"
-                icon={Eye}
-                onClose={() => setVisibilityModalOpen(false)}
-                modalSize={modalSize}
-                onResizeStart={() => setIsResizingModal(true)}
-            >
-                <div className="max-w-4xl mx-auto">
-                    <p className="text-gray-500 mb-6">Define the rules that determine when this {isEditingElement ? 'field' : 'section'} should be visible.</p>
-                    <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
-                        <LogicBuilder
-                            group={logicGroup}
-                            onChange={(g: LogicGroup) => handleChange('visibility', g)}
-                            availableTargets={availableTargets}
-                        />
-                    </div>
-                </div>
-            </ModalWrapper>
-        );
-    }
-
-    const renderSkipLogicModal = () => {
-        if (!skipLogicModalOpen || !isEditingStage) return null;
-        const logicGroup = (data as StageDefinition).skipLogic;
-
-        return (
-            <ModalWrapper
-                title="Configure Skip Conditions"
-                icon={FastForward}
-                onClose={() => setSkipLogicModalOpen(false)}
-                modalSize={modalSize}
-                onResizeStart={() => setIsResizingModal(true)}
-            >
-                <div className="max-w-4xl mx-auto">
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-6 text-sm text-amber-800 flex gap-2">
-                        <Info size={20} className="shrink-0" />
-                        <div>
-                            <p className="font-bold">Negative Logic Mode</p>
-                            <p>By default, all stages run in sequence. Define conditions below to <strong>SKIP</strong> this stage.</p>
-                        </div>
-                    </div>
-                    <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
-                        <LogicBuilder
-                            group={logicGroup}
-                            onChange={(g: LogicGroup) => handleChange('skipLogic', g)}
-                            availableTargets={availableTargets}
-                        />
-                    </div>
-                </div>
-            </ModalWrapper>
-        );
-    }
-
-    const renderRequiredLogicModal = () => {
-        if (!requiredLogicModalOpen || !isEditingElement) return null;
-        const logicGroup = (data as ElementDefinition).requiredLogic;
-
-        return (
-            <ModalWrapper
-                title="Configure Mandatory Logic"
-                icon={CheckCircle2}
-                onClose={() => setRequiredLogicModalOpen(false)}
-                modalSize={modalSize}
-                onResizeStart={() => setIsResizingModal(true)}
-            >
-                <div className="max-w-4xl mx-auto">
-                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-6 text-sm text-amber-800 flex gap-2">
-                        <Info size={20} className="shrink-0" />
-                        <div>
-                            <p className="font-bold">Conditional Requirement</p>
-                            <p>Define rules for when this field becomes mandatory. If rules are met, the user cannot proceed without filling it.</p>
-                        </div>
-                    </div>
-                    <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm">
-                        <LogicBuilder
-                            group={logicGroup}
-                            onChange={(g: LogicGroup) => handleChange('requiredLogic', g)}
-                            availableTargets={availableTargets}
-                        />
-                    </div>
-                </div>
-            </ModalWrapper>
-        );
-    }
-
-    const renderValidationModal = () => {
-        if (!validationModalOpen || !isEditingElement) return null;
-        const el = data as ElementDefinition;
-
-        return (
-            <ModalWrapper
-                title="Field Validation Rules"
-                icon={ShieldCheck}
-                onClose={() => setValidationModalOpen(false)}
-                modalSize={modalSize}
-                onResizeStart={() => setIsResizingModal(true)}
-            >
-                <div className="max-w-2xl mx-auto space-y-8">
-                    <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm space-y-6">
-                        <div>
-                            <label className={labelClass}>Validation Type</label>
-                            <select
-                                value={el.validation?.type || 'none'}
-                                onChange={(e) => handleValidationChange('type', e.target.value)}
-                                className={inputClass}
-                            >
-                                <option value="none">No Validation</option>
-                                <option value="email">Email Format</option>
-                                <option value="phone_uk">UK Mobile/Phone Number</option>
-                                <option value="nino_uk">UK National Insurance Number</option>
-                                <option value="date_future">Date must be in Future</option>
-                                <option value="date_past">Date must be in Past</option>
-                                <option value="custom">Custom Description</option>
-                            </select>
-                        </div>
-
-                        {el.validation?.type === 'custom' && (
-                            <div className="animate-in fade-in slide-in-from-top-2">
-                                <label className={labelClass}>Custom Rule Description</label>
-                                <textarea
-                                    value={el.validation?.customDescription || ''}
-                                    onChange={(e) => handleValidationChange('customDescription', e.target.value)}
-                                    className={inputClass}
-                                    rows={4}
-                                    placeholder="Describe the validation rule (e.g., 'Must start with 3 letters...')"
-                                />
-                                <p className="text-xs text-gray-400 mt-2">This description will be included in the generated user stories for developers.</p>
-                            </div>
-                        )}
-
-                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex gap-3">
-                            <Info className="text-blue-500 shrink-0" size={20} />
-                            <div className="text-sm text-blue-700">
-                                <p className="font-bold mb-1">Note:</p>
-                                <p>Standard validations (Email, Phone, NI) are automatically enforced in the Preview mode. Custom validations are documentation-only.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </ModalWrapper>
-        );
-    }
-
-    // --- Render ---
-
-    if (!data) {
-        return (
-            <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40 relative">
-                <div
-                    className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors"
-                    onMouseDown={() => setIsResizing(true)}
-                ></div>
-                <div className="p-8 border-b border-gray-100 flex justify-end">
-                    <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
-                        <X size={20} />
-                    </button>
-                </div>
-                <div className="p-8 text-center text-gray-400">
-                    <Info size={48} className="mb-4 opacity-20 mx-auto" />
-                    <p className="text-lg font-serif text-sw-teal mb-2">No Selection</p>
-                    <p className="text-sm">Select an element to edit properties.</p>
-                </div>
-            </div>
-        );
-    }
+    if (!selectedElement && !selectedSection && !selectedStage) return null;
 
     return (
-        <div id="panel" style={{ width: panelWidth }} className="h-full flex flex-col bg-white border-l border-gray-200 shadow-2xl z-40 relative">
-            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-sw-teal/20 cursor-col-resize z-50 transition-colors" onMouseDown={() => setIsResizing(true)}></div>
+        <div
+            className="h-full bg-white border-l border-gray-200 flex flex-col shadow-2xl relative"
+            style={{ width: '100%' }} // Controlled by parent container 
+            onMouseMove={handleModalMouseMove}
+            onMouseUp={handleModalMouseUp}
+        >
+            <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                {renderHeader()}
 
-            {renderSkillModal()}
-            {renderVisibilityModal()}
-            {renderSkipLogicModal()}
-            {renderRequiredLogicModal()}
-            {renderValidationModal()}
-
-            {/* Header */}
-            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
-                <div className="flex flex-col overflow-hidden max-w-[200px]">
-                    <h2 className="font-serif font-bold text-2xl text-sw-teal truncate">
-                        {isEditingElement ? 'Element' : isEditingSection ? 'Section' : 'Stage'}
-                    </h2>
-                    <span className="text-xs text-gray-400 font-mono truncate">{data.id}</span>
-                </div>
-                <div className="flex items-center gap-1">
+                {/* TABS */}
+                <div className="flex p-1 bg-gray-200/50 rounded-lg">
                     <button
-                        onClick={onOpenSettings}
-                        className="p-2 text-gray-400 hover:text-sw-teal rounded-full hover:bg-sw-lightGray transition-colors"
-                        title="Global Theme Settings"
+                        onClick={() => onTabChange('general')}
+                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'general' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        <Palette size={20} />
+                        General
                     </button>
-                    <button onClick={handleDelete} className={`p-2 rounded-full transition-all flex items-center gap-2 shrink-0 ${confirmDeleteId === data.id ? 'bg-sw-red text-white pr-4 shadow-md' : 'text-gray-400 hover:text-sw-red hover:bg-sw-lightGray'}`} title="Delete">
-                        <Trash2 size={20} />
-                        {confirmDeleteId === data.id && <span className="text-xs font-bold animate-in fade-in">Confirm?</span>}
-                    </button>
-                    <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-sw-lightGray transition-colors" title="Close Panel">
-                        <X size={20} />
+                    <button
+                        onClick={() => onTabChange('logic')}
+                        className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'logic' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Logic & Rules
                     </button>
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200 shrink-0">
-                <button
-                    id="tab-general"
-                    className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'general' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`}
-                    onClick={() => onTabChange('general')}
-                >
-                    General
-                </button>
-                <button
-                    id="tab-logic"
-                    className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest transition-colors ${activeTab === 'logic' ? 'text-sw-teal border-b-4 border-sw-teal bg-sw-lightGray/30' : 'text-gray-400 hover:text-sw-teal'}`}
-                    onClick={() => onTabChange('logic')}
-                >
-                    {isEditingStage ? 'Operations' : 'Logic'}
-                </button>
-            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
-            <div className="flex-1 overflow-y-auto p-8 space-y-8">
                 {/* --- GENERAL TAB --- */}
                 {activeTab === 'general' && (
-                    <>
-                        {isEditingStage && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        {/* Title/Label Input */}
+                        <div>
+                            <label className={labelClass}>{selectedStage ? 'Stage Title' : selectedSection ? 'Section Title' : 'Field Label'}</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={selectedElement?.label || selectedSection?.title || selectedStage?.title || ''}
+                                    onChange={(e) => handleChange(selectedElement ? 'label' : 'title', e.target.value)}
+                                    className={`${inputClass} pl-9 font-medium`}
+                                    placeholder="Enter title..."
+                                />
+                                <Type size={16} className="absolute left-3 top-3 text-gray-400" />
+                            </div>
+                        </div>
+
+                        {/* ID (Read-onlyish or editable) */}
+                        <div>
+                            <label className={labelClass}>System ID</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={selectedElement?.id || selectedSection?.id || selectedStage?.id || ''}
+                                    className={`${inputClass} pl-9 bg-gray-50 text-gray-500 font-mono text-xs`}
+                                    readOnly
+                                />
+                                <Hash size={16} className="absolute left-3 top-3 text-gray-400" />
+                            </div>
+                        </div>
+
+                        {/* --- ELEMENT SPECIFIC GENERAL --- */}
+                        {selectedElement && (
                             <>
-                                <div><label className={labelClass}>Stage Title</label><input type="text" value={(data as StageDefinition).title} onChange={(e) => handleChange('title', e.target.value)} className={inputClass} /></div>
-                                <div><label className={labelClass}>Description</label><textarea value={(data as StageDefinition).description || ''} onChange={(e) => handleChange('description', e.target.value)} className={inputClass} rows={3} /></div>
-                                <div><label className={labelClass}>Default Required Skill</label><input type="text" value={(data as StageDefinition).defaultSkill || ''} onChange={(e) => handleChange('defaultSkill', e.target.value)} className={inputClass} placeholder="e.g. Customer Service Rep" /></div>
-                            </>
-                        )}
-                        {isEditingSection && (
-                            <>
-                                <div><label className={labelClass}>Section Title</label><input type="text" value={(data as SectionDefinition).title} onChange={(e) => handleChange('title', e.target.value)} className={inputClass} /></div>
-
                                 <div>
-                                    <label className={labelClass}>Section Variant</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {[
-                                            { id: 'standard', label: 'Standard', icon: Layout },
-                                            { id: 'info', label: 'Info Card', icon: Info },
-                                            { id: 'warning', label: 'Warning', icon: AlertTriangle },
-                                            { id: 'summary', label: 'Summary', icon: PanelBottom },
-                                        ].map(v => (
-                                            <button
-                                                key={v.id}
-                                                onClick={() => handleChange('variant', v.id)}
-                                                className={`p-3 border rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${((data as SectionDefinition).variant || 'standard') === v.id
-                                                    ? 'border-sw-teal bg-sw-teal/5 text-sw-teal font-bold ring-1 ring-sw-teal'
-                                                    : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                <v.icon size={20} />
-                                                <span className="text-xs uppercase">{v.label}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div><label className={labelClass}>Layout Grid</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {['1col', '2col', '3col'].map(l => (
-                                            <button
-                                                key={l}
-                                                id={`btn-layout-${l}`}
-                                                onClick={() => handleChange('layout', l)}
-                                                className={`p-3 border rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${(data as SectionDefinition).layout === l ? 'border-sw-teal bg-sw-teal/5 text-sw-teal font-bold' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                                            >
-                                                <Layout size={20} /><span className="text-xs uppercase">{l.replace('col', ' Col')}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className={labelClass}>Section Description / Content</label>
-                                    <textarea
-                                        value={(data as SectionDefinition).description || ''}
-                                        onChange={(e) => handleChange('description', e.target.value)}
+                                    <label className={labelClass}>Field Type</label>
+                                    <select
+                                        value={selectedElement.type}
+                                        onChange={(e) => handleChange('type', e.target.value)}
                                         className={inputClass}
-                                        rows={3}
-                                        placeholder="Helper text or alert message content..."
-                                    />
-                                </div>
-                            </>
-                        )}
-                        {isEditingElement && (
-                            <>
-                                <div><label className={labelClass}>Field Label</label><input type="text" value={(data as ElementDefinition).label} onChange={(e) => handleChange('label', e.target.value)} className={inputClass} /></div>
-                                <div><label className={labelClass}>Field Type</label>
-                                    <select value={(data as ElementDefinition).type} onChange={(e) => handleChange('type', e.target.value)} className={inputClass}>
-                                        <option value="text">Single Line Text</option><option value="email">Email Address</option><option value="textarea">Multi-line Text</option><option value="number">Number</option><option value="date">Date</option><option value="currency">Currency</option><option value="select">Dropdown</option><option value="multiselect">Multi-Select Dropdown</option><option value="radio">Radio Buttons</option><option value="checkbox">Checkbox</option><option value="calculated">Calculated Field</option><option value="repeater">Repeater List</option><option value="static">Static Text</option>
+                                    >
+                                        <option value="text">Text Input</option>
+                                        <option value="textarea">Multi-line Text</option>
+                                        <option value="number">Number</option>
+                                        <option value="date">Date Picker</option>
+                                        <option value="select">Dropdown (Select)</option>
+                                        <option value="radio">Radio Buttons</option>
+                                        <option value="checkbox">Checkbox</option>
+                                        <option value="repeater">Data Table (Repeater)</option>
+                                        <option value="calculated">Calculated Formula</option>
+                                        <option value="static">Static Text / Display</option>
                                     </select>
                                 </div>
 
-                                {renderCalculationBuilder()}
+                                {/* Placeholder */}
+                                {['text', 'textarea', 'number', 'email'].includes(selectedElement.type) && (
+                                    <div>
+                                        <label className={labelClass}>Placeholder / Hint</label>
+                                        <input
+                                            type="text"
+                                            value={selectedElement.defaultValue || ''}
+                                            onChange={(e) => handleChange('defaultValue', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. Enter value..."
+                                        />
+                                    </div>
+                                )}
 
-                                {/* Static Text Specifics */}
-                                {(data as ElementDefinition).type === 'static' && (
-                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4 space-y-4">
-                                        <div>
-                                            <label className={labelClass}>Content Source</label>
-                                            <div className="flex bg-white rounded-lg p-1 border border-gray-200">
-                                                <button
-                                                    onClick={() => handleChange('staticDataSource', 'manual')}
-                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${((data as ElementDefinition).staticDataSource || 'manual') === 'manual' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                                                >
-                                                    Constant Text
-                                                </button>
-                                                <button
-                                                    onClick={() => handleChange('staticDataSource', 'field')}
-                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${((data as ElementDefinition).staticDataSource) === 'field' ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                                                >
-                                                    Field Reference
-                                                </button>
-                                            </div>
+                                {/* Options for Select/Radio */}
+                                {['select', 'radio', 'multiselect'].includes(selectedElement.type) && (
+                                    <div>
+                                        <label className={labelClass}>Options (Comma separated)</label>
+                                        <textarea
+                                            // Handle complex options object vs simple string array
+                                            value={Array.isArray(selectedElement.options)
+                                                ? selectedElement.options.map(o => typeof o === 'string' ? o : o.value).join(', ')
+                                                : ''}
+                                            onChange={(e) => {
+                                                // Convert back to simple string array for now
+                                                handleChange('options', e.target.value.split(',').map(s => s.trim()));
+                                            }}
+                                            className={inputClass}
+                                            rows={3}
+                                            placeholder="Option 1, Option 2, Option 3"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Static Data Source configuration */}
+                                {selectedElement.type === 'static' && (
+                                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Globe size={16} className="text-blue-500" />
+                                            <label className="text-xs font-bold text-blue-700 uppercase">Data Source</label>
                                         </div>
+                                        <select
+                                            value={selectedElement.staticDataSource || 'manual'}
+                                            onChange={(e) => handleChange('staticDataSource', e.target.value)}
+                                            className="w-full text-xs p-2 mb-2 rounded border border-blue-200"
+                                        >
+                                            <option value="manual">Manual Text</option>
+                                            <option value="field">Mirror Another Field</option>
+                                        </select>
 
-                                        {((data as ElementDefinition).staticDataSource === 'field') ? (
-                                            <div>
-                                                <label className={labelClass}>Source Field</label>
-                                                <select
-                                                    value={(data as ElementDefinition).sourceFieldId || ''}
-                                                    onChange={(e) => handleChange('sourceFieldId', e.target.value)}
-                                                    className={inputClass}
-                                                >
-                                                    <option value="">Select a field to mirror...</option>
-                                                    {availableTargets.map(t => (
-                                                        <option key={t.id} value={t.id}>{t.label}</option>
-                                                    ))}
-                                                </select>
-                                                <p className="text-[10px] text-gray-400 mt-1">
-                                                    This component will display the read-only value of the selected field.
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <label className={labelClass}>Text Content</label>
-                                                <textarea
-                                                    value={(data as ElementDefinition).description || ''}
-                                                    onChange={(e) => handleChange('description', e.target.value)}
-                                                    className={inputClass}
-                                                    rows={4}
-                                                    placeholder="Enter the static text to display..."
-                                                />
-                                            </div>
+                                        {selectedElement.staticDataSource === 'field' && (
+                                            <select
+                                                value={selectedElement.sourceFieldId || ''}
+                                                onChange={(e) => handleChange('sourceFieldId', e.target.value)}
+                                                className="w-full text-xs p-2 rounded border border-blue-200"
+                                            >
+                                                <option value="">Select Field...</option>
+                                                {allElements.filter(e => e.id !== selectedElement.id).map(e => (
+                                                    <option key={e.id} value={e.id}>{e.label}</option>
+                                                ))}
+                                            </select>
                                         )}
                                     </div>
                                 )}
 
-                                {/* Repeater Configuration */}
-                                {(data as ElementDefinition).type === 'repeater' && (
-                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                                        <label className={labelClass}>List Columns</label>
-                                        <div className="space-y-3 mb-3">
-                                            {((data as ElementDefinition).columns || []).map((col, idx) => (
-                                                <div key={col.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 flex flex-col gap-2">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-xs font-bold text-gray-400">Column {idx + 1}</span>
-                                                        <button
-                                                            onClick={() => {
-                                                                const newCols = [...((data as ElementDefinition).columns || [])];
-                                                                newCols.splice(idx, 1);
-                                                                handleRepeaterChange(newCols);
-                                                            }}
-                                                            className="text-gray-400 hover:text-sw-red"
-                                                        >
-                                                            <X size={14} />
-                                                        </button>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={col.label}
-                                                            onChange={(e) => {
-                                                                const newCols = [...((data as ElementDefinition).columns || [])];
-                                                                newCols[idx] = { ...newCols[idx], label: e.target.value };
-                                                                handleRepeaterChange(newCols);
-                                                            }}
-                                                            className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
-                                                            placeholder="Label"
-                                                        />
-                                                        <select
-                                                            value={col.type}
-                                                            onChange={(e) => {
-                                                                const newCols = [...((data as ElementDefinition).columns || [])];
-                                                                newCols[idx] = { ...newCols[idx], type: e.target.value as any };
-                                                                handleRepeaterChange(newCols);
-                                                            }}
-                                                            className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
-                                                        >
-                                                            <option value="text">Text</option>
-                                                            <option value="number">Number</option>
-                                                            <option value="date">Date</option>
-                                                            <option value="select">Select</option>
-                                                            <option value="checkbox">Checkbox</option>
-                                                        </select>
-                                                    </div>
-                                                    {col.type === 'select' && (
-                                                        <input
-                                                            type="text"
-                                                            value={getOptionsString(col.options)}
-                                                            onChange={(e) => {
-                                                                const newCols = [...((data as ElementDefinition).columns || [])];
-                                                                newCols[idx] = { ...newCols[idx], options: e.target.value.split(',') };
-                                                                handleRepeaterChange(newCols);
-                                                            }}
-                                                            className="w-full p-2 text-xs border border-gray-300 rounded bg-white text-sw-text focus:border-sw-teal focus:ring-1 focus:ring-sw-teal outline-none"
-                                                            placeholder="Options (comma separated)"
-                                                        />
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                const newCols = [...((data as ElementDefinition).columns || [])];
-                                                newCols.push({ id: `col_${Date.now()}`, label: 'New Column', type: 'text' });
-                                                handleRepeaterChange(newCols);
-                                            }}
-                                            className="w-full py-2 bg-white border border-sw-teal text-sw-teal text-xs font-bold rounded-lg hover:bg-sw-teal hover:text-white transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            <Plus size={14} /> Add Column
-                                        </button>
-                                    </div>
-                                )}
-
-                                {['select', 'radio', 'multiselect'].includes((data as ElementDefinition).type) && (
-                                    <div>
-                                        <label className={labelClass}>Options (comma separated)</label>
-                                        <textarea
-                                            value={getOptionsString((data as ElementDefinition).options)}
-                                            onChange={(e) => handleChange('options', e.target.value.split(','))}
-                                            className={inputClass}
-                                            rows={3}
-                                        />
-                                    </div>
-                                )}
-                                {(data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (data as ElementDefinition).type !== 'calculated' && (
-                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4">
-                                        <label className={labelClass}>Requirement Rules</label>
-                                        <div className="flex flex-col gap-3">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(data as ElementDefinition).required}
-                                                    onChange={(e) => handleChange('required', e.target.checked)}
-                                                    className="w-5 h-5 text-sw-teal rounded focus:ring-sw-teal"
-                                                />
-                                                <span className="text-sm font-bold text-gray-700">Always Mandatory</span>
-                                            </label>
-
-                                            {!(data as ElementDefinition).required && (
-                                                <div className="pl-8 animate-in slide-in-from-top-2 fade-in">
-                                                    <button
-                                                        onClick={() => { ensureLogicGroup('requiredLogic'); setRequiredLogicModalOpen(true); }}
-                                                        className={`text-xs w-full text-left border px-3 py-2 rounded-lg font-bold flex items-center justify-between transition-all ${((data as ElementDefinition).requiredLogic?.conditions?.length || 0) > 0 || ((data as ElementDefinition).requiredLogic?.groups?.length || 0) > 0
-                                                            ? 'bg-sw-teal text-white border-sw-teal'
-                                                            : 'bg-white text-gray-500 border-gray-300 hover:border-sw-teal hover:text-sw-teal'
-                                                            }`}
+                                {/* REPEATER CONFIG */}
+                                {selectedElement.type === 'repeater' && (
+                                    <div className="bg-gray-100 p-4 rounded-lg">
+                                        <label className={labelClass}>Table Columns</label>
+                                        <div className="space-y-2">
+                                            {(selectedElement.columns || []).map((col, idx) => (
+                                                <div key={col.id} className="flex gap-2">
+                                                    <input
+                                                        value={col.label}
+                                                        className="flex-1 text-xs p-1 rounded border"
+                                                        onChange={(e) => {
+                                                            const newCols = [...(selectedElement.columns || [])];
+                                                            newCols[idx] = { ...col, label: e.target.value };
+                                                            handleRepeaterChange(newCols);
+                                                        }}
+                                                    />
+                                                    <select
+                                                        value={col.type}
+                                                        className="w-20 text-xs p-1 rounded border"
+                                                        onChange={(e) => {
+                                                            const newCols = [...(selectedElement.columns || [])];
+                                                            newCols[idx] = { ...col, type: e.target.value as any };
+                                                            handleRepeaterChange(newCols);
+                                                        }}
                                                     >
-                                                        <div className="flex items-center gap-2">
-                                                            <CheckCircle2 size={14} />
-                                                            {((data as ElementDefinition).requiredLogic?.conditions?.length || 0) > 0 || ((data as ElementDefinition).requiredLogic?.groups?.length || 0) > 0
-                                                                ? 'Conditional Logic Active'
-                                                                : 'Set Conditional Logic'}
-                                                        </div>
-                                                        {((data as ElementDefinition).requiredLogic?.conditions?.length || 0) > 0 || ((data as ElementDefinition).requiredLogic?.groups?.length || 0) > 0 &&
-                                                            <div className="bg-white/20 px-2 py-0.5 rounded text-[10px]">
-                                                                {((data as ElementDefinition).requiredLogic?.conditions?.length || 0) + ((data as ElementDefinition).requiredLogic?.groups?.length || 0)} Rules
-                                                            </div>
-                                                        }
+                                                        <option value="text">Text</option>
+                                                        <option value="number">Num</option>
+                                                        <option value="date">Date</option>
+                                                        <option value="checkbox">Bool</option>
+                                                        <option value="select">Select</option>
+                                                    </select>
+                                                    <button
+                                                        onClick={() => {
+                                                            const newCols = [...(selectedElement.columns || [])];
+                                                            newCols.splice(idx, 1);
+                                                            handleRepeaterChange(newCols);
+                                                        }}
+                                                        className="text-red-500 hover:bg-red-50 rounded p-1"
+                                                    >
+                                                        <Trash2 size={14} />
                                                     </button>
                                                 </div>
-                                            )}
+                                            ))}
+                                            <button
+                                                onClick={() => {
+                                                    const newCols = [...(selectedElement.columns || [])];
+                                                    newCols.push({ id: `col_${Date.now()}`, label: 'New Column', type: 'text' });
+                                                    handleRepeaterChange(newCols);
+                                                }}
+                                                className="w-full py-1 text-xs bg-white border border-dashed border-gray-400 text-gray-500 rounded hover:border-sw-teal hover:text-sw-teal"
+                                            >
+                                                + Add Column
+                                            </button>
                                         </div>
                                     </div>
+                                )}
+
+                                {/* CALCULATION BUILDER (Extracted) */}
+                                {selectedElement.type === 'calculated' && (
+                                    <CalculationBuilder
+                                        element={selectedElement}
+                                        allElements={allElements}
+                                        onUpdateElement={onUpdateElement}
+                                    />
                                 )}
                             </>
                         )}
-                    </>
+
+                        {/* --- DELETE BUTTON --- */}
+                        <div className="pt-8 mt-auto">
+                            <button
+                                onClick={handleDelete}
+                                className="w-full py-3 bg-red-50 text-red-600 rounded-lg flex items-center justify-center gap-2 hover:bg-red-100 transition-colors text-sm font-bold"
+                            >
+                                <Trash2 size={16} />
+                                Delete {selectedElement ? 'Field' : selectedSection ? 'Section' : 'Stage'}
+                            </button>
+                        </div>
+                    </div>
                 )}
 
                 {/* --- LOGIC TAB --- */}
                 {activeTab === 'logic' && (
-                    <div className="space-y-6">
-
-                        {/* STAGE SKILLS */}
-                        {isEditingStage && (
-                            <>
-                                {/* SKIP LOGIC CARD */}
-                                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => { ensureLogicGroup('skipLogic'); setSkipLogicModalOpen(true); }}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="p-3 bg-amber-50 rounded-lg text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-                                            <FastForward size={24} />
-                                        </div>
-                                        <div className="text-right">
-                                            <span className={`text-xs font-bold px-2 py-1 rounded ${((data as StageDefinition).skipLogic?.conditions?.length > 0) ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>
-                                                {((data as StageDefinition).skipLogic?.conditions?.length || 0)} Rules
-                                            </span>
-                                        </div>
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        {/* 1. VISIBILITY LOGIC (Element & Section) */}
+                        {(selectedElement || selectedSection) && (
+                            <div className="bg-sw-teal/5 p-4 rounded-xl border border-sw-teal/10">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <Eye size={18} className="text-sw-teal" />
+                                        <span className={labelClass.replace('mb-2', 'mb-0')}>Visibility Rules</span>
                                     </div>
-                                    <h3 className="text-lg font-bold text-gray-800 mb-1">Skip Stage Logic</h3>
-                                    <p className="text-sm text-gray-500 mb-4">Define conditions when this entire stage should be skipped (Negative Logic).</p>
-                                    <button className="w-full py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-all">Configure Skip Rules</button>
+                                    <button
+                                        onClick={() => {
+                                            ensureLogicGroup('visibility');
+                                            setModals(m => ({ ...m, visibility: true }));
+                                        }}
+                                        className="text-xs bg-white border border-sw-teal text-sw-teal px-3 py-1 rounded-full hover:bg-sw-teal hover:text-white transition-colors"
+                                    >
+                                        Configure
+                                    </button>
                                 </div>
-
-                                <div className="space-y-4">
-                                    <div className="bg-sw-purpleLight/30 p-6 rounded-xl border border-sw-teal/10">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-sw-teal p-2 rounded-lg text-white"><Briefcase size={20} /></div>
-                                                <div>
-                                                    <h3 className="font-bold text-sw-teal">Skill Routing</h3>
-                                                    <p className="text-xs text-gray-500">{(data as StageDefinition).skillLogic?.length || 0} Rules Configured</p>
-                                                </div>
-                                            </div>
-                                            {/* NEW: Copy/Paste for Rules */}
-                                            <div className="flex gap-1">
-                                                <button
-                                                    onClick={handleCopyRules}
-                                                    className="p-1.5 rounded-lg text-sw-teal hover:bg-sw-teal/10 transition-colors relative"
-                                                    title="Copy All Routing Rules"
-                                                >
-                                                    {copyFeedback ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
-                                                </button>
-                                                {clipboardStageLogic && (
-                                                    <button
-                                                        onClick={handlePasteRules}
-                                                        className="p-1.5 rounded-lg text-sw-teal hover:bg-sw-teal/10 transition-colors animate-pulse"
-                                                        title="Paste Routing Rules"
-                                                    >
-                                                        <ClipboardPaste size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="mb-4">
-                                            <button onClick={() => {
-                                                const newRule: SkillRule = { logic: { id: Date.now().toString(), operator: 'AND', conditions: [] }, requiredSkill: '' };
-                                                const newIndex = (selectedStage.skillLogic?.length || 0);
-                                                onUpdateStage({ ...selectedStage!, skillLogic: [...(selectedStage?.skillLogic || []), newRule] });
-                                                setActiveRuleIndex(newIndex);
-                                                setSkillModalOpen(true);
-                                            }} className="w-full text-xs bg-white border border-sw-teal text-sw-teal px-3 py-2 rounded-lg font-bold hover:bg-sw-teal hover:text-white transition-colors">+ Add Routing Condition</button>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {(data as StageDefinition).skillLogic?.map((rule, idx) => {
-                                                const summary = formatLogicSummary(rule.logic, allElements);
-                                                return (
-                                                    <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center text-sm group">
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-mono text-xs text-gray-400">#{idx + 1}</span>
-                                                                <span className="font-bold text-gray-700">{rule.requiredSkill || 'Unassigned'}</span>
-                                                            </div>
-                                                            <div className="text-xs text-gray-400 ml-6 mt-1 font-mono bg-gray-50 p-1 rounded inline-block">
-                                                                If: {summary}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => { setActiveRuleIndex(idx); setSkillModalOpen(true); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-teal"><Edit2 size={14} /></button>
-                                                            <button onClick={() => { const nl = [...selectedStage!.skillLogic!]; nl.splice(idx, 1); onUpdateStage({ ...selectedStage!, skillLogic: nl }); }} className="p-1.5 hover:bg-gray-100 rounded text-sw-red"><Trash2 size={14} /></button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                <div className="text-xs text-gray-500 bg-white p-3 rounded border border-gray-200">
+                                    {formatLogicSummary((selectedElement || selectedSection)?.visibility, allElements)}
                                 </div>
-                            </>
-                        )}
-
-                        {/* VISIBILITY CARD */}
-                        {!isEditingStage && (
-                            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => { ensureLogicGroup('visibility'); setVisibilityModalOpen(true); }}>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-sw-purpleLight rounded-lg text-sw-teal group-hover:bg-sw-teal group-hover:text-white transition-colors">
-                                        <Eye size={24} />
-                                    </div>
-                                    <div className="text-right">
-                                        <span className={`text-xs font-bold px-2 py-1 rounded ${((data as any).visibility?.conditions?.length > 0 || (data as any).visibility?.groups?.length > 0) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                                            {((data as any).visibility?.conditions?.length || 0)} Conditions
-                                        </span>
-                                    </div>
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-800 mb-1">Visibility Logic</h3>
-                                <p className="text-sm text-gray-500 mb-4">Control when this component appears based on other field values.</p>
-                                <button className="w-full py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 group-hover:bg-sw-teal group-hover:text-white group-hover:border-sw-teal transition-all">Configure Rules</button>
                             </div>
                         )}
 
-                        {/* VALIDATION CARD */}
-                        {isEditingElement && (data as ElementDefinition).type !== 'static' && (data as ElementDefinition).type !== 'repeater' && (data as ElementDefinition).type !== 'calculated' && (
-                            <div id="card-validation" className="bg-white border border-gray-200 rounded-xl p-6 shadow-card hover:shadow-lg transition-all cursor-pointer group" onClick={() => setValidationModalOpen(true)}>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-red-50 rounded-lg text-sw-red group-hover:bg-sw-red group-hover:text-white transition-colors">
-                                        <ShieldCheck size={24} />
+                        {/* 2. REQUIRED LOGIC (Element Only) */}
+                        {selectedElement && (
+                            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle2 size={18} className="text-amber-600" />
+                                        <span className={`${labelClass.replace('mb-2', 'mb-0')} text-amber-700`}>Mandatory Rules</span>
                                     </div>
-                                    <div className="text-right">
-                                        <span className={`text-xs font-bold px-2 py-1 rounded ${(data as ElementDefinition).validation?.type !== 'none' && (data as ElementDefinition).validation ? 'bg-sw-teal text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                            {(data as ElementDefinition).validation?.type || 'None'}
-                                        </span>
-                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            ensureLogicGroup('requiredLogic');
+                                            setModals(m => ({ ...m, required: true }));
+                                        }}
+                                        className="text-xs bg-white border border-amber-500 text-amber-600 px-3 py-1 rounded-full hover:bg-amber-500 hover:text-white transition-colors"
+                                    >
+                                        Configure
+                                    </button>
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-800 mb-1">Data Validation</h3>
-                                <p className="text-sm text-gray-500 mb-4">Set format rules like Email, UK Phone, or custom logic checks.</p>
-                                <button className="w-full py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 group-hover:bg-sw-red group-hover:text-white group-hover:border-sw-red transition-all">Setup Validation</button>
+                                <div className="text-xs text-gray-500 bg-white p-3 rounded border border-gray-200">
+                                    {formatLogicSummary(selectedElement.requiredLogic || { id: 'dummy', operator: 'AND', conditions: [] }, allElements)}
+                                </div>
                             </div>
                         )}
+
+                        {/* 3. SKIP LOGIC (Stage Only) */}
+                        {selectedStage && (
+                            <div className="bg-gray-100 p-4 rounded-xl border border-gray-200">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <FastForward size={18} className="text-gray-600" />
+                                        <span className={`${labelClass.replace('mb-2', 'mb-0')} text-gray-700`}>Skip Conditions</span>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            ensureLogicGroup('skipLogic');
+                                            setModals(m => ({ ...m, skip: true }));
+                                        }}
+                                        className="text-xs bg-white border border-gray-400 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-600 hover:text-white transition-colors"
+                                    >
+                                        Configure
+                                    </button>
+                                </div>
+                                <div className="text-xs text-gray-500 bg-white p-3 rounded border border-gray-200">
+                                    {formatLogicSummary(selectedStage.skipLogic || { id: 'dummy', operator: 'AND', conditions: [] }, allElements)}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 4. VALIDATION (Element Only) */}
+                        {selectedElement && (
+                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <ShieldCheck size={18} className="text-blue-600" />
+                                        <span className={`${labelClass.replace('mb-2', 'mb-0')} text-blue-700`}>Validation</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setModals(m => ({ ...m, validation: true }))}
+                                        className="text-xs bg-white border border-blue-400 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-500 hover:text-white transition-colors"
+                                    >
+                                        Configure
+                                    </button>
+                                </div>
+                                <div className="text-xs text-gray-500 bg-white p-3 rounded border border-gray-200 font-mono">
+                                    {selectedElement.validation?.type || 'none'}
+                                    {selectedElement.validation?.type === 'custom' && ' (custom)'}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 5. SKILL ROUTING (Stage Only) */}
+                        {selectedStage && (
+                            <div className="border-t border-gray-200 pt-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <label className={labelClass}>
+                                        <ArrowRight className="inline mr-1" size={14} />
+                                        Routing & Assignments
+                                    </label>
+                                    <div className="flex gap-1" title="Copy/Paste Logic">
+                                        <button
+                                            onClick={handleCopyRules}
+                                            className="p-1.5 text-gray-400 hover:text-sw-teal hover:bg-sw-teal/10 rounded"
+                                        >
+                                            <Copy size={14} />
+                                        </button>
+                                        <button
+                                            onClick={handlePasteRules}
+                                            disabled={!clipboardStageLogic}
+                                            className={`p-1.5 rounded ${clipboardStageLogic ? 'text-gray-600 hover:text-sw-teal hover:bg-sw-teal/10' : 'text-gray-200'}`}
+                                        >
+                                            <ClipboardPaste size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {selectedStage.skillLogic?.map((rule, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="p-3 bg-white border border-gray-100 rounded-lg hover:border-sw-teal hover:shadow-sm cursor-pointer group transition-all"
+                                            onClick={() => {
+                                                setActiveRuleIndex(idx);
+                                                setModals(m => ({ ...m, skill: true }));
+                                            }}
+                                        >
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-xs font-bold text-gray-700">Rule #{idx + 1}</span>
+                                                <Trash2
+                                                    size={14}
+                                                    className="text-gray-300 hover:text-red-500"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (!selectedStage.skillLogic) return;
+                                                        const newRules = [...selectedStage.skillLogic];
+                                                        newRules.splice(idx, 1);
+                                                        onUpdateStage({ ...selectedStage, skillLogic: newRules });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 mb-1">{formatLogicSummary(rule.logic, allElements)}</div>
+                                            <div className="flex items-center gap-1 text-sw-teal text-xs font-bold">
+                                                <ArrowRight size={12} /> {rule.requiredSkill}
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <button
+                                        onClick={() => {
+                                            const newRule: SkillRule = {
+                                                logic: { id: `grp_${Date.now()}`, operator: 'AND', conditions: [] },
+                                                requiredSkill: COMMON_SKILLS[0]
+                                            };
+                                            const currentRules = selectedStage.skillLogic || [];
+                                            const newRules = [...currentRules, newRule];
+                                            onUpdateStage({ ...selectedStage, skillLogic: newRules });
+                                            // Auto-open
+                                            setActiveRuleIndex(newRules.length - 1);
+                                            setModals(m => ({ ...m, skill: true }));
+                                        }}
+                                        className="w-full py-2 border border-dashed border-gray-300 rounded text-xs text-gray-400 font-bold hover:border-sw-teal hover:text-sw-teal transition-colors"
+                                    >
+                                        + Add Routing Rule
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                     </div>
                 )}
             </div>
+
+            {/* --- MODALS --- */}
+
+            {/* 1. Skill Logic Modal */}
+            <SkillLogicModal
+                isOpen={modals.skill}
+                onClose={() => setModals(m => ({ ...m, skill: false }))}
+                stage={selectedStage}
+                onUpdateStage={onUpdateStage}
+                activeRuleIndex={activeRuleIndex}
+                modalSize={modalSize}
+                onResizeStart={() => setIsResizingModal(true)}
+                availableTargets={getAvailableTargets()}
+            />
+
+            {/* 2. Visibility Modal (Common) */}
+            <VisibilityLogicModal
+                isOpen={modals.visibility}
+                onClose={() => setModals(m => ({ ...m, visibility: false }))}
+                data={selectedElement || selectedSection}
+                type="visibility"
+                onUpdate={(updated) => selectedElement ? onUpdateElement(updated) : onUpdateSection(updated)}
+                modalSize={modalSize}
+                onResizeStart={() => setIsResizingModal(true)}
+                availableTargets={getAvailableTargets()}
+            />
+
+            {/* 3. Required Logic (Reuses Visibility Component) */}
+            <VisibilityLogicModal
+                isOpen={modals.required}
+                onClose={() => setModals(m => ({ ...m, required: false }))}
+                data={selectedElement}
+                type="required"
+                onUpdate={onUpdateElement}
+                modalSize={modalSize}
+                onResizeStart={() => setIsResizingModal(true)}
+                availableTargets={getAvailableTargets()}
+            />
+
+            {/* 4. Skip Logic Modal */}
+            <SkipLogicModal
+                isOpen={modals.skip}
+                onClose={() => setModals(m => ({ ...m, skip: false }))}
+                stage={selectedStage}
+                onUpdateStage={onUpdateStage}
+                modalSize={modalSize}
+                onResizeStart={() => setIsResizingModal(true)}
+                availableTargets={getAvailableTargets()}
+            />
+
+            {/* 5. Validation Modal */}
+            <ValidationRulesModal
+                isOpen={modals.validation}
+                onClose={() => setModals(m => ({ ...m, validation: false }))}
+                element={selectedElement}
+                onUpdateElement={onUpdateElement}
+                modalSize={modalSize}
+                onResizeStart={() => setIsResizingModal(true)}
+            />
+
         </div>
     );
-}
+};
