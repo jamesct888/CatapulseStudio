@@ -29,6 +29,7 @@ export interface Condition {
   targetElementId: string;
   operator: Operator;
   value: string | number | boolean;
+  valueSource?: 'value' | 'field'; // New: Compare against constant or another field
 }
 
 export type LogicOperator = 'AND' | 'OR';

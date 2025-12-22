@@ -1,0 +1,132 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e13]: Catapulse
+      - navigation [ref=e15]:
+        - button "Design" [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+          - text: Design
+        - button "Grid" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+          - text: Grid
+        - button "Flow" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+          - text: Flow
+        - button "Preview" [ref=e28] [cursor=pointer]:
+          - img [ref=e29]
+          - text: Preview
+        - button "Spec" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+          - text: Spec
+        - button "Stories & Test Cases" [ref=e35] [cursor=pointer]:
+          - img [ref=e36]
+          - text: Stories & Test Cases
+        - button "Pega" [ref=e39] [cursor=pointer]:
+          - img [ref=e40]
+          - text: Pega
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - button "Offline" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+          - text: Offline
+        - button "Save to Cloud (DB)" [ref=e50] [cursor=pointer]:
+          - img [ref=e51]
+        - button "Load from Cloud (DB)" [ref=e54] [cursor=pointer]:
+          - img [ref=e55]
+        - button "Time Machine (History)" [ref=e59] [cursor=pointer]:
+          - img [ref=e60]
+      - button "Workshop Review Mode" [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+      - generic [ref=e68]:
+        - button "New Project (Reset)" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "Import Legacy Schema (Text/JSON)" [ref=e74] [cursor=pointer]:
+          - img [ref=e75]
+        - button "Load Local File (JSON)" [ref=e80] [cursor=pointer]:
+          - img [ref=e81]
+        - button "Unified File has Unsaved Changes (Click to Download)" [ref=e84] [cursor=pointer]:
+          - img [ref=e85]
+        - button "Share Prototype" [ref=e90] [cursor=pointer]:
+          - img [ref=e91]
+          - text: Share Prototype
+      - generic:
+        - button "Click to rename process"
+        - paragraph
+      - button [ref=e95] [cursor=pointer]:
+        - img [ref=e96]
+  - generic [ref=e99]:
+    - main [ref=e100]:
+      - generic [ref=e101]:
+        - generic [ref=e102]:
+          - generic [ref=e103]:
+            - heading "Structure" [level=2] [ref=e104]
+            - button "Add Stage" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - text: Add Stage
+          - generic [ref=e108]:
+            - generic [ref=e109]:
+              - img [ref=e110]
+              - generic [ref=e113]: AI Copilot
+            - generic [ref=e114]:
+              - textbox "Describe a change (e.g. 'Add a comments field')..." [ref=e115]
+              - button [disabled] [ref=e116]:
+                - img [ref=e117]
+            - paragraph [ref=e119]: "Context: Stage: undefined"
+        - generic [ref=e121]:
+          - generic [ref=e122]:
+            - generic [ref=e123]: Stage 0
+            - heading [level=1]
+          - generic [ref=e125]:
+            - button "Text" [ref=e126] [cursor=pointer]:
+              - img [ref=e127]
+              - generic [ref=e130]: Text
+            - button "Number" [ref=e131] [cursor=pointer]:
+              - img [ref=e132]
+              - generic [ref=e135]: Number
+            - button "Date" [ref=e136] [cursor=pointer]:
+              - img [ref=e137]
+              - generic [ref=e139]: Date
+            - button "Select" [ref=e140] [cursor=pointer]:
+              - img [ref=e141]
+              - generic [ref=e142]: Select
+            - button "Radio" [ref=e143] [cursor=pointer]:
+              - img [ref=e144]
+              - generic [ref=e147]: Radio
+            - button "Check" [ref=e148] [cursor=pointer]:
+              - img [ref=e149]
+              - generic [ref=e152]: Check
+            - button "Calc" [ref=e153] [cursor=pointer]:
+              - img [ref=e154]
+              - generic [ref=e156]: Calc
+            - button "List" [ref=e157] [cursor=pointer]:
+              - img [ref=e158]
+              - generic [ref=e160]: List
+            - button "Static" [ref=e161] [cursor=pointer]:
+              - img [ref=e162]
+              - generic [ref=e164]: Static
+    - generic [ref=e166]:
+      - button [ref=e169] [cursor=pointer]:
+        - img [ref=e170]
+      - generic [ref=e173]:
+        - img [ref=e174]
+        - paragraph [ref=e176]: No Selection
+        - paragraph [ref=e177]: Select an element to edit properties.
+  - contentinfo [ref=e178]:
+    - generic [ref=e179]:
+      - generic [ref=e180]:
+        - strong [ref=e181]: Catapulse Studio
+        - text: v1.4.0
+      - generic [ref=e182]: "Build: 2025-12-22 21:55"
+    - generic [ref=e183]:
+      - generic [ref=e184]:
+        - text: "Environment:"
+        - strong [ref=e185]: Production
+      - generic [ref=e186]:
+        - text: "User:"
+        - strong [ref=e187]: Demo User
+```

@@ -240,10 +240,37 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                 </div>
 
                                 {/* Row 2: Value (Full Width) */}
+                                {/* Row 2: Value (Full Width) */}
                                 {cond.operator !== 'isEmpty' && cond.operator !== 'isNotEmpty' && (
                                     <div>
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Value</label>
-                                        {showValueDropdown ? (
+                                        <div className="flex justify-between items-end mb-1">
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase">Value</label>
+                                            <div className="flex bg-gray-100 rounded p-0.5 border border-gray-200">
+                                                <button
+                                                    onClick={() => updateCondition(idx, 'valueSource', 'value')}
+                                                    className={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${(!cond.valueSource || cond.valueSource === 'value') ? 'bg-white shadow-sm text-sw-teal' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    title="Compare against a fixed value"
+                                                >
+                                                    Fixed
+                                                </button>
+                                                <button
+                                                    onClick={() => updateCondition(idx, 'valueSource', 'field')}
+                                                    className={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${(cond.valueSource === 'field') ? 'bg-white shadow-sm text-sw-teal' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    title="Compare against another field"
+                                                >
+                                                    Field
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {cond.valueSource === 'field' ? (
+                                            <SearchableSelect
+                                                value={String(cond.value)}
+                                                onChange={(val) => updateCondition(idx, 'value', val)}
+                                                options={availableTargets.filter(t => t.id !== cond.targetElementId).map(t => ({ id: t.id, label: t.label }))}
+                                                placeholder="Select Field..."
+                                            />
+                                        ) : showValueDropdown ? (
                                             <select
                                                 className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm h-[34px]"
                                                 value={String(cond.value)}
@@ -260,7 +287,7 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                                 className="w-full p-2 rounded border border-gray-300 text-xs bg-white text-gray-900 placeholder-gray-400 focus:ring-1 focus:ring-sw-teal focus:border-sw-teal shadow-sm h-[34px]"
                                                 value={String(cond.value)}
                                                 onChange={(e) => updateCondition(idx, 'value', e.target.value)}
-                                                placeholder="Value to match..."
+                                                placeholder={cond.operator.includes('greater') || cond.operator.includes('less') ? "Number or Date (YYYY-MM-DD)" : "Value to match..."}
                                             />
                                         )}
                                     </div>

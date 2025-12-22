@@ -34,7 +34,7 @@ test.describe('Global Settings & Theming', () => {
 
     test('should toggle settings panel and change theme', async ({ page }) => {
         // Open Settings
-        await page.getByTitle('Global Settings').click();
+        await page.getByTitle('Global Theme Settings').click();
         await expect(page.getByRole('heading', { name: 'Visual Configuration' })).toBeVisible();
 
         // Change Theme to 'Glass'

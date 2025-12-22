@@ -39,9 +39,22 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
     return false;
   }
 
+  // Determine target value (Static or Dynamic Field)
+  let targetValRaw = condition.value;
+  if (condition.valueSource === 'field' && typeof condition.value === 'string') {
+    targetValRaw = formData[condition.value];
+  }
+
   // Robust string conversion for comparison (Handle numbers, booleans, and trimming)
   const valStr = String(value !== undefined && value !== null ? value : '').trim();
-  const targetStr = String(targetValue !== undefined && targetValue !== null ? targetValue : '').trim();
+  const targetStr = String(targetValRaw !== undefined && targetValRaw !== null ? targetValRaw : '').trim();
+
+  // Helper for Date Comparison
+  const tryGetDate = (v: any) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  };
 
   switch (condition.operator) {
     case 'equals':
@@ -53,9 +66,21 @@ export const evaluateCondition = (condition: Condition, formData: FormState): bo
     case 'doesNotContain':
       return !valStr.includes(targetStr);
     case 'greaterThan':
-      return Number(value) > Number(targetValue);
+      // Date Check
+      const d1 = tryGetDate(value);
+      const d2 = tryGetDate(targetValRaw);
+      if (d1 && d2 && String(value).includes('-') && String(targetValRaw).includes('-')) {
+        return d1.getTime() > d2.getTime();
+      }
+      return Number(value) > Number(targetValRaw);
     case 'lessThan':
-      return Number(value) < Number(targetValue);
+      // Date Check
+      const d3 = tryGetDate(value);
+      const d4 = tryGetDate(targetValRaw);
+      if (d3 && d4 && String(value).includes('-') && String(targetValRaw).includes('-')) {
+        return d3.getTime() < d4.getTime();
+      }
+      return Number(value) < Number(targetValRaw);
     case 'isEmpty':
       return value === undefined || value === '' || value === null || (Array.isArray(value) && value.length === 0);
     case 'isNotEmpty':
@@ -92,22 +117,27 @@ export const evaluateLogicGroup = (group: LogicGroup | undefined, formData: Form
 export const evaluateCalculation = (parts: CalculationPart[] | undefined, formData: FormState): string | number => {
   if (!parts || parts.length === 0) return '';
 
-  // Simplified evaluation: Treats the list as a sequence of operations
-  // e.g. [100] [+] [FieldA] [*] [2] -> ((100 + FieldA) * 2) 
-  // This ignores standard BODMAS for simplicity in this visual builder context, 
-  // treating it as a step-by-step accumulator.
+  let result: number | Date = 0;
+  let pendingOperator = '+';
 
-  let result = 0;
-  let pendingOperator = '+'; // Start by adding the first term to 0
-
-  // Helper to get numeric value
-  const getValue = (part: CalculationPart): number => {
+  // Helper to get value (Number or Date)
+  const getValue = (part: CalculationPart): number | Date => {
     if (part.type === 'constant') {
+      if (part.value === 'TODAY') return new Date();
       return parseFloat(part.value) || 0;
     } else if (part.type === 'field') {
+      if (part.value === 'TODAY') return new Date(); // Handle dynamic TODAY
+
       const raw = formData[part.value];
       if (raw === undefined || raw === null || raw === '') return 0;
-      // Handle currency strings like "£1,000"
+
+      // Check if it's a date string
+      const dateVal = new Date(String(raw));
+      if (!isNaN(dateVal.getTime()) && String(raw).includes('-')) {
+        return dateVal;
+      }
+
+      // Handle currency/numbers
       const clean = String(raw).replace(/[^0-9.-]+/g, "");
       return parseFloat(clean) || 0;
     }
@@ -122,17 +152,39 @@ export const evaluateCalculation = (parts: CalculationPart[] | undefined, formDa
     } else {
       const val = getValue(part);
 
-      switch (pendingOperator) {
-        case '+': result += val; break;
-        case '-': result -= val; break;
-        case '*': result *= val; break;
-        case '/': result = val !== 0 ? result / val : 0; break; // Avoid div by zero
+      // Initial Load Logic: 0 + X = X
+      if (result === 0 && pendingOperator === '+') {
+        result = val;
+        continue;
+      }
+
+      // Date Arithmetic
+      if (result instanceof Date && val instanceof Date) {
+        if (pendingOperator === '-') {
+          // Date - Date = Difference in Years (for Age)
+          const diffTime = Math.abs(result.getTime() - val.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          result = Math.floor(diffDays / 365.25); // Approximate Age
+        }
+        // Add other date ops here if needed (e.g. Date + Days)
+      } else if (typeof result === 'number' && typeof val === 'number') {
+        // Standard Math
+        switch (pendingOperator) {
+          case '+': result += val; break;
+          case '-': result -= val; break;
+          case '*': result *= val; break;
+          case '/': result = val !== 0 ? result / val : 0; break;
+        }
       }
     }
   }
 
-  // Round to 2 decimals for cleanliness
-  return Math.round(result * 100) / 100;
+  if (result instanceof Date) {
+    return result.toISOString().split('T')[0]; // Return YYYY-MM-DD if result is a date
+  }
+
+  // Round to 2 decimals
+  return Math.round((result as number) * 100) / 100;
 };
 
 export const isElementVisible = (element: ElementDefinition, formData: FormState): boolean => {

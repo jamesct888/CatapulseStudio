@@ -27,7 +27,21 @@ const CFG = {
 export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef }) => {
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
     const [showLogic, setShowLogic] = useState(true);
-    
+
+    const getOpSymbol = (op: string) => {
+        switch (op) {
+            case 'equals': return '=';
+            case 'notEquals': return '!=';
+            case 'contains': return 'has';
+            case 'doesNotContain': return '!has';
+            case 'greaterThan': return '>';
+            case 'lessThan': return '<';
+            case 'isEmpty': return 'is Empty';
+            case 'isNotEmpty': return 'not Empty';
+            default: return op;
+        }
+    };
+
     // Drag State for Skip Logic Lines
     const [isDraggingConnection, setIsDraggingConnection] = useState(false);
     const [connectionStart, setConnectionStart] = useState<{ x: number, y: number, stageId: string, stageIndex: number } | null>(null);
@@ -45,14 +59,14 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
     // --- 1. Layout Calculation ---
     const { nodes, edges, mapElIdToNode } = useMemo(() => {
         const nodes: any[] = [];
-        const mapElIdToNode: {[id: string]: any} = {};
+        const mapElIdToNode: { [id: string]: any } = {};
         const allElements = processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements);
-        
+
         let currentStageX = CFG.baseX;
 
         processDef.stages.forEach((stage, sIdx) => {
             let currentY = CFG.baseY + CFG.stageHeaderHeight;
-            
+
             // Render Stage Node (Container)
             const stageNode = {
                 id: stage.id,
@@ -117,19 +131,19 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
         // 2a. Sequence & Skip Flow
         for (let i = 0; i < processDef.stages.length - 1; i++) {
             const current = processDef.stages[i];
-            const next = processDef.stages[i+1];
-            
+            const next = processDef.stages[i + 1];
+
             const s1 = nodes.find(n => n.id === current.id);
             const s2 = nodes.find(n => n.id === next.id);
 
-            if(s1 && s2) {
+            if (s1 && s2) {
                 // Standard Sequence Flow
                 edges.push({
                     id: `flow_${s1.id}_${s2.id}`,
                     type: 'sequence',
                     startX: s1.x + s1.width,
                     startY: s1.y + (s1.height / 2),
-                    endX: s2.x,
+                    endX: s2.x - 10,
                     endY: s2.y + (s2.height / 2)
                 });
 
@@ -138,11 +152,11 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                 // Check if 'next' stage has skip logic? If so, we draw an arch over it.
                 // If Stage B (index i+1) has skip logic, it means we MIGHT skip B.
                 // Visually, this is a path from A (i) to C (i+2).
-                
+
                 if (next.skipLogic && (next.skipLogic.conditions.length > 0 || (next.skipLogic.groups && next.skipLogic.groups.length > 0))) {
-                    
-                    const skipTargetStage = processDef.stages[i+2];
-                    
+
+                    const skipTargetStage = processDef.stages[i + 2];
+
                     if (skipTargetStage) {
                         const sTarget = nodes.find(n => n.id === skipTargetStage.id);
                         if (sTarget) {
@@ -151,7 +165,7 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                                 type: 'skip',
                                 label: `Skip ${next.title} if: ${formatLogicSummary(next.skipLogic, allElements)}`,
                                 startX: s1.x + s1.width,
-                                startY: s1.y, 
+                                startY: s1.y,
                                 endX: sTarget.x,
                                 endY: sTarget.y,
                                 skippedStageIdx: i + 1
@@ -165,7 +179,7 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                             label: `Skip ${next.title} if: ${formatLogicSummary(next.skipLogic, allElements)}`,
                             startX: s1.x + s1.width,
                             startY: s1.y,
-                            endX: s2.x + s2.width + 100, 
+                            endX: s2.x + s2.width + 100,
                             endY: s2.y,
                             skippedStageIdx: i + 1
                         });
@@ -181,7 +195,9 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                 if (cond.targetElementId && mapElIdToNode[cond.targetElementId]) {
                     const sourceNode = mapElIdToNode[cond.targetElementId];
                     const targetNode = mapElIdToNode[targetId];
-                    
+
+                    const isSameColumn = Math.abs(sourceNode.x - targetNode.x) < 5;
+
                     edges.push({
                         id: `logic_${sourceNode.id}_${targetNode.id}`,
                         type: 'logic',
@@ -189,9 +205,11 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                         targetId: targetNode.id,
                         startX: sourceNode.x + sourceNode.width,
                         startY: sourceNode.y + (sourceNode.height / 2),
-                        endX: targetNode.x,
+                        endX: isSameColumn ? targetNode.x + targetNode.width : targetNode.x,
                         endY: targetNode.y + (targetNode.height / 2),
-                        operator: cond.operator
+                        operator: cond.operator,
+                        value: cond.value,
+                        isSameColumn // Flag for renderer
                     });
                 }
             });
@@ -216,11 +234,11 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
         const container = document.getElementById('flow-canvas');
         if (!container) return;
         const cRect = container.getBoundingClientRect();
-        
+
         setIsDraggingConnection(true);
-        setConnectionStart({ 
-            x: stageNode.x + stageNode.width, 
-            y: stageNode.y, 
+        setConnectionStart({
+            x: stageNode.x + stageNode.width,
+            y: stageNode.y,
             stageId: stageNode.id,
             stageIndex: stageNode.realIndex
         });
@@ -246,7 +264,7 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
             // We need to define logic for the stages IN BETWEEN to be skipped.
             // Simplified: If connecting A (0) to C (2), we skip B (1).
             // We will configure logic for Stage B.
-            
+
             // For now, support only skipping ONE stage at a time via UI for simplicity
             if (targetStageNode.realIndex === connectionStart.stageIndex + 2) {
                 setPendingSkipConfig({
@@ -267,14 +285,14 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
 
     const saveSkipLogic = () => {
         if (!pendingSkipConfig) return;
-        
+
         const newDef = { ...processDef };
         const skippedStageIdx = pendingSkipConfig.sourceStageIdx + 1;
         const skippedStage = newDef.stages[skippedStageIdx];
-        
+
         // Update the skipped stage with the logic
         skippedStage.skipLogic = tempLogicGroup;
-        
+
         setProcessDef(newDef);
         setIsConfigModalOpen(false);
         setPendingSkipConfig(null);
@@ -303,22 +321,48 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
     };
 
     // --- Helper for Bezier Curves ---
+    // --- Helper for Bezier Curves ---
     const getBezierPath = (edge: any) => {
-        const { startX, startY, endX, endY, type } = edge;
+        const { startX, startY, endX, endY, type, isSameColumn } = edge;
+
+        if (isSameColumn) {
+            // "Handle" curve: Out to right, down/up, back in from right
+            const offset = 80; // How far out to loop
+            const controlX1 = startX + offset;
+            const controlX2 = endX + offset;
+            return `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`;
+        }
+
         if (type === 'skip') {
             const controlY = Math.min(startY, endY) - 80;
             return `M ${startX} ${startY} Q ${(startX + endX) / 2} ${controlY} ${endX} ${endY}`;
         }
         // Temp line while dragging
         if (type === 'temp') {
-             const controlY = Math.min(startY, endY) - 50;
-             return `M ${startX} ${startY} Q ${(startX + endX) / 2} ${controlY} ${endX} ${endY}`;
+            const controlY = Math.min(startY, endY) - 50;
+            return `M ${startX} ${startY} Q ${(startX + endX) / 2} ${controlY} ${endX} ${endY}`;
         }
 
         const dist = Math.abs(endX - startX);
         const controlX1 = startX + dist * 0.5;
         const controlX2 = endX - dist * 0.5;
         return `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`;
+    };
+
+    // Calculate Label Position helper
+    const getLabelPos = (edge: any) => {
+        if (edge.isSameColumn) {
+            // Midpoint of the outer arc
+            const offset = 80;
+            const midY = (edge.startY + edge.endY) / 2;
+            // Approximate x pos at peak of curve (Bezier math simplified)
+            const midX = edge.startX + (offset * 0.75);
+            return { x: midX, y: midY };
+        }
+        return {
+            x: (edge.startX + edge.endX) / 2,
+            y: (edge.startY + edge.endY) / 2
+        };
     };
 
     // Calculate canvas size
@@ -338,16 +382,16 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                     Process Visualizer
                 </h3>
                 <div className="flex items-center gap-4">
-                     <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
+                    <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
                         <div className="flex items-center gap-1"><div className="w-4 h-0.5 bg-sw-teal/30"></div> Sequence</div>
                         <div className="flex items-center gap-1"><div className="w-4 h-0.5 bg-amber-500 border-b border-dashed border-amber-500"></div> Skip Logic</div>
                         <div className="flex items-center gap-1"><div className="w-4 h-0.5 bg-sw-purpleLight border-b border-dashed border-sw-purpleLight"></div> Visibility</div>
-                     </div>
-                    <button 
+                    </div>
+                    <button
                         onClick={() => setShowLogic(!showLogic)}
                         className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-2 ${showLogic ? 'bg-sw-purpleLight text-sw-teal border-sw-purpleLight' : 'bg-white text-gray-500 border-gray-200'}`}
                     >
-                        {showLogic ? <Eye size={14} /> : <EyeOff size={14} />} 
+                        {showLogic ? <Eye size={14} /> : <EyeOff size={14} />}
                         {showLogic ? 'Logic Visible' : 'Logic Hidden'}
                     </button>
                 </div>
@@ -355,10 +399,10 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
 
             <div id="flow-canvas" className="flex-1 overflow-auto bg-slate-50 relative cursor-default p-8">
                 <div style={{ width: canvasWidth, height: canvasHeight }} className="relative">
-                    
-                    <svg className="absolute inset-0 pointer-events-none z-10" width={canvasWidth} height={canvasHeight}>
+
+                    <svg className="absolute inset-0 pointer-events-none z-30" width={canvasWidth} height={canvasHeight}>
                         <defs>
-                            <marker id="arrowhead-seq" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <marker id="arrowhead-seq" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
                                 <polygon points="0 0, 10 3.5, 0 7" fill="#cbd5e1" />
                             </marker>
                             <marker id="arrowhead-skip" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -375,20 +419,30 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                         ))}
 
                         {/* Logic Edges */}
-                        {showLogic && edges.filter(e => e.type === 'logic').map(e => (
-                            <g key={e.id} className={`transition-opacity duration-300 ${hoveredNodeId && hoveredNodeId !== e.sourceId && hoveredNodeId !== e.targetId ? 'opacity-10' : 'opacity-100'}`}>
-                                <path d={getBezierPath(e)} fill="none" stroke="#a78bfa" strokeWidth="2" strokeDasharray="5,5" markerEnd="url(#arrowhead-logic)" />
-                            </g>
-                        ))}
+                        {showLogic && edges.filter(e => e.type === 'logic').map(e => {
+                            const labelPos = getLabelPos(e);
+                            return (
+                                <g key={e.id} className={`transition-opacity duration-300 ${hoveredNodeId && hoveredNodeId !== e.sourceId && hoveredNodeId !== e.targetId ? 'opacity-10' : 'opacity-100'}`}>
+                                    <path d={getBezierPath(e)} fill="none" stroke="#a78bfa" strokeWidth="2" strokeDasharray="5,5" markerEnd="url(#arrowhead-logic)" />
+                                    <foreignObject x={labelPos.x - 60} y={labelPos.y - 15} width="120" height="30">
+                                        <div className="flex justify-center items-center h-full">
+                                            <div className="bg-white border boundary-purple-400 shadow-md px-2 py-1 rounded text-[10px] text-purple-800 font-mono font-bold text-center border-purple-200">
+                                                {getOpSymbol(String(e.operator))} <span className="text-purple-600">{e.value !== undefined ? String(e.value) : ''}</span>
+                                            </div>
+                                        </div>
+                                    </foreignObject>
+                                </g>
+                            );
+                        })}
 
                         {/* Skip Logic Edges */}
                         {edges.filter(e => e.type === 'skip').map(e => (
                             <g key={e.id} className="group/skip pointer-events-auto">
                                 <path d={getBezierPath(e)} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="6,4" markerEnd="url(#arrowhead-skip)" className="transition-all" />
                                 {/* Label background pill */}
-                                <foreignObject x={(e.startX + e.endX) / 2 - 100} y={Math.min(e.startY, e.endY) - 50} width="200" height="40">
+                                <foreignObject x={(e.startX + e.endX) / 2 - 120} y={Math.min(e.startY, e.endY) - 60} width="240" height="60">
                                     <div className="flex justify-center">
-                                        <div className="bg-white border border-amber-200 shadow-sm px-2 py-1 rounded-full text-[10px] text-amber-700 font-bold text-center truncate max-w-full">
+                                        <div className="bg-white border border-amber-200 shadow-sm px-3 py-1.5 rounded-xl text-[10px] text-amber-700 font-bold text-center leading-tight whitespace-normal">
                                             {e.label}
                                         </div>
                                     </div>
@@ -398,12 +452,12 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
 
                         {/* Temporary Drag Line */}
                         {isDraggingConnection && connectionStart && (
-                            <path 
-                                d={getBezierPath({ type: 'temp', startX: connectionStart.x, startY: connectionStart.y, endX: mousePos.x, endY: mousePos.y })} 
-                                fill="none" 
-                                stroke="#f59e0b" 
-                                strokeWidth="3" 
-                                strokeDasharray="5,5" 
+                            <path
+                                d={getBezierPath({ type: 'temp', startX: connectionStart.x, startY: connectionStart.y, endX: mousePos.x, endY: mousePos.y })}
+                                fill="none"
+                                stroke="#f59e0b"
+                                strokeWidth="3"
+                                strokeDasharray="5,5"
                                 className="animate-pulse"
                             />
                         )}
@@ -414,9 +468,9 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                         if (node.type === 'stage') {
                             const hasSkipLogic = node.data.skipLogic && node.data.skipLogic.conditions.length > 0;
                             const isDragTarget = dragTargetId === node.id;
-                            
+
                             return (
-                                <div 
+                                <div
                                     key={node.id}
                                     style={{ left: node.x, top: node.y, width: node.width, height: node.height }}
                                     className={`absolute border-2 bg-white/50 rounded-2xl transition-all 
@@ -445,7 +499,7 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                                     </div>
 
                                     {/* Connection Output Handle */}
-                                    <div 
+                                    <div
                                         className="absolute -right-3 -top-3 w-6 h-6 bg-white border-2 border-amber-400 rounded-full flex items-center justify-center cursor-crosshair hover:scale-125 transition-transform z-30 shadow-sm group/handle"
                                         onMouseDown={(e) => handleConnectStart(e, node)}
                                         title="Drag to create Skip Logic"
@@ -468,7 +522,7 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                         );
 
                         if (node.type === 'element') return (
-                            <div key={node.id} style={{ left: node.x, top: node.y, width: node.width, height: node.height }} 
+                            <div key={node.id} style={{ left: node.x, top: node.y, width: node.width, height: node.height }}
                                 className={`absolute bg-white rounded-lg shadow-sm border border-gray-200 p-3 flex justify-between items-center cursor-pointer transition-all duration-300 z-20 hover:scale-105 ${hoveredNodeId === node.id ? 'ring-2 ring-sw-teal shadow-lg' : ''}`}
                                 onMouseEnter={() => setHoveredNodeId(node.id)} onMouseLeave={() => setHoveredNodeId(null)}
                             >
@@ -483,12 +537,12 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
 
             {/* Skip Logic Configuration Modal */}
             {isConfigModalOpen && (
-                <ModalWrapper 
-                    title="Configure Skip Logic" 
-                    icon={FastForward} 
+                <ModalWrapper
+                    title="Configure Skip Logic"
+                    icon={FastForward}
                     onClose={() => setIsConfigModalOpen(false)}
                     modalSize={{ width: 800, height: 600 }}
-                    onResizeStart={() => {}}
+                    onResizeStart={() => { }}
                 >
                     <div className="h-full flex flex-col">
                         <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-6 flex gap-3">
@@ -496,7 +550,7 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                             <div>
                                 <h4 className="font-bold text-amber-800 text-sm">Create Jump Rule</h4>
                                 <p className="text-xs text-amber-700 mt-1">
-                                    You are creating a path from Stage {pendingSkipConfig?.sourceStageIdx! + 1} to Stage {pendingSkipConfig?.targetStageIdx! + 1}. 
+                                    You are creating a path from Stage {pendingSkipConfig?.sourceStageIdx! + 1} to Stage {pendingSkipConfig?.targetStageIdx! + 1}.
                                     This effectively skips Stage {pendingSkipConfig?.sourceStageIdx! + 2}.
                                     Define the conditions under which this skip should happen.
                                 </p>
@@ -504,9 +558,9 @@ export const ModeFlow: React.FC<ModeFlowProps> = ({ processDef, setProcessDef })
                         </div>
 
                         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex-1 overflow-y-auto">
-                            <LogicBuilder 
-                                group={tempLogicGroup} 
-                                onChange={setTempLogicGroup} 
+                            <LogicBuilder
+                                group={tempLogicGroup}
+                                onChange={setTempLogicGroup}
                                 availableTargets={allFields}
                             />
                         </div>

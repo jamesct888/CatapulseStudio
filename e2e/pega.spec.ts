@@ -37,10 +37,15 @@ test.describe('Pega Mode', () => {
         await page.locator('#nav-pega').click();
 
         // Assert Dashboard Header
-        await expect(page.getByRole('heading', { name: 'Pega Blueprint Preview' })).toBeVisible();
+        // Switch to Blueprint Tab
+        await page.locator('#tab-pega-blueprint').click();
+
+        // Assert Dashboard Header
+        await expect(page.getByRole('heading', { name: 'Pega GenAI Blueprint™ Prompt' })).toBeVisible();
 
         // Check Design Tab
-        await expect(page.getByText('Case Lifecycle Design')).toBeVisible();
+        await page.locator('#tab-pega-design').click();
+        await expect(page.getByText('Primary Stage').first()).toBeVisible();
 
         // Switch to Data Tab
         await page.getByRole('button', { name: 'Data Model' }).click();

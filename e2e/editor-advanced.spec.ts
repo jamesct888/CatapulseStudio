@@ -52,14 +52,17 @@ test.describe('Advanced Editor Functions', () => {
         // Target the Node Wrapper explicitly to ensure click registration
         // Double click can sometimes bypass drag-initiation checks in canvas tests
         // Use getByText for robustness
-        const element = page.getByText('Element 1');
+        // Use ID selector for robustness (bypassing pointer-events-none issues on children)
+        const element = page.locator('#el_1');
         await expect(element).toBeVisible({ timeout: 20000 });
-        // Click to select (dblclick might be unnecessary or flaky with drag handlers)
+        // Click to select (add small wait for animation stability)
+        await page.waitForTimeout(500);
         await element.click({ force: true });
 
         // Wait for panel to open and show correct context
         const panel = page.locator('#panel');
         await expect(panel).toBeVisible();
+        // Check for either generic 'Element' header or specific label if updated
         await expect(panel.getByRole('heading', { name: "Element" })).toBeVisible({ timeout: 10000 });
 
         // 2. Change Type to Dropdown (Select)

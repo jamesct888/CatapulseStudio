@@ -37,14 +37,19 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
     const [skillReason, setSkillReason] = useState<string>('');
 
     const currentStage = processDef.stages[currentStageIdx];
-    const visibleSections = currentStage.sections.filter(sec => isSectionVisible(sec, formData));
+
 
     const isType2 = visualTheme.mode === 'type2';
     const isType3 = visualTheme.mode === 'type3';
 
+
+
+
     // Logic Debug State
     const [isLogicDebugEnabled, setIsLogicDebugEnabled] = useState(false);
     const [hoveredFieldId, setHoveredFieldId] = useState<string | null>(null);
+
+    const visibleSections = currentStage.sections.filter(sec => isLogicDebugEnabled || isSectionVisible(sec, formData));
 
     // 1. Calculate Active Skill (Runs on Data or Stage Change)
     useEffect(() => {
@@ -528,7 +533,7 @@ const SectionComponent: React.FC<SectionProps> = ({
     // ... Existing Warning/Info Block Logic ...
     if (section.variant === 'warning' || section.variant === 'info') {
         return (
-            <div className={`p-6 rounded-xl border shadow-sm relative ${isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'} ${isSectionDependent ? 'ring-4 ring-purple-400 ring-offset-2 transition-all' : ''} ${isHiddenDebug ? 'opacity-50 grayscale border-2 border-dashed border-gray-300' : ''}`}>
+            <div className={`p-6 rounded-xl border shadow-sm relative ${isHiddenDebug ? 'bg-gray-100 border-gray-300' : (isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200')} ${isSectionDependent ? 'ring-4 ring-purple-400 ring-offset-2 transition-all' : ''} ${isHiddenDebug ? 'opacity-60 grayscale border-2 border-dashed' : ''}`}>
                 {isSectionDependent && (
                     <div className="absolute -left-3 top-1/2 -translate-y-1/2 bg-purple-600 text-white p-1 rounded-full shadow-lg z-20 animate-in zoom-in">
                         <Link2 size={16} />
@@ -587,7 +592,7 @@ const SectionComponent: React.FC<SectionProps> = ({
 
     // Standard Rendering - Card Style
     return (
-        <div className={`${cardClass} relative ${isSectionDependent ? 'ring-4 ring-purple-400 ring-offset-2 transition-all' : ''} ${isHiddenDebug ? 'opacity-50 grayscale border-2 border-dashed border-gray-300' : ''}`}>
+        <div className={`${cardClass} relative ${isSectionDependent ? 'ring-4 ring-purple-400 ring-offset-2 transition-all' : ''} ${isHiddenDebug ? 'opacity-60 grayscale bg-gray-100 border-2 border-dashed border-gray-300' : ''}`}>
             {isSectionDependent && (
                 <div className="absolute -left-3 top-1/2 -translate-y-1/2 bg-purple-600 text-white p-1 rounded-full shadow-lg z-20 animate-in zoom-in">
                     <Link2 size={16} />
@@ -678,6 +683,7 @@ const SectionComponent: React.FC<SectionProps> = ({
                                     element={{ ...el, required: isElementRequired(el, formData) }}
                                     value={elementValue}
                                     onChange={(val) => {
+                                        if (isHiddenDebug) return; // Prevention
                                         setFormData(prev => ({ ...prev, [el.id]: val }));
                                         if (formErrors[el.id]) {
                                             setFormErrors(prev => { const n = { ...prev }; delete n[el.id]; return n; });
@@ -688,6 +694,7 @@ const SectionComponent: React.FC<SectionProps> = ({
                                         if (msg) setFormErrors(prev => ({ ...prev, [el.id]: msg }));
                                     }}
                                     error={formErrors[el.id]}
+                                    disabled={isHiddenDebug}
                                     theme={visualTheme}
                                     formData={formData}
                                 />

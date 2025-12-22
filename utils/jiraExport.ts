@@ -22,7 +22,7 @@ export const exportStoriesToJiraCsv = (stories: UserStory[], strategyName: strin
     // 2. Build Rows
     const rows = stories.map(story => {
         // Format Description to include AC and Data Elements
-        let description = `${story.description}\n\n*Acceptance Criteria:*\n`;
+        let description = `${story.narrative}\n\n*Acceptance Criteria:*\n`;
 
         if (Array.isArray(story.acceptanceCriteria)) {
             description += story.acceptanceCriteria.map(ac => `- ${ac}`).join('\n');

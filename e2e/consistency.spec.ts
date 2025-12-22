@@ -33,6 +33,7 @@ test.describe('Cross-View Consistency', () => {
     test('should sync elements between Editor, Table, and Spec views', async ({ page }) => {
         // 1. Add Element under 'Section 1' via Editor
         // Click section header to select it
+        await page.waitForTimeout(500);
         await page.getByText(/Section 1/i).click({ force: true });
         // Click Add Field
         await page.getByText('Add Field').click();
