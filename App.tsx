@@ -16,6 +16,7 @@ import { DemoManager } from './components/DemoManager';
 import { DemoFocusOverlay } from './components/DemoFocusOverlay';
 import { useProcessState } from './hooks/useProcessState';
 import { useAiOperations } from './hooks/useAiOperations';
+import { useAutoBackup } from './hooks/useAutoBackup'; // Import Backup Hook
 import {
     FormState, VisualTheme, UserStory, TestCase,
     ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy, SkillRule
@@ -66,6 +67,21 @@ const App: React.FC = () => {
     const {
         processDef, setProcessDef, updateElement, updateSection, updateStage, deleteElement, deleteSection, deleteStage
     } = useProcessState();
+
+    // Auto-Backup Hook
+    const { checkForBackup } = useAutoBackup(processDef, setProcessDef);
+
+    // Check for Backup on Mount
+    useEffect(() => {
+        const { hasBackup, timestamp, restore } = checkForBackup();
+        if (hasBackup && !processDef) {
+            const shouldRestore = window.confirm(`Found an unsaved session from ${new Date(timestamp!).toLocaleString()}. Restore it?`);
+            if (shouldRestore) {
+                restore();
+                setViewMode('editor');
+            }
+        }
+    }, [checkForBackup, processDef]); // Run once on mount or when processDef is initially null
 
     // UI State
     const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'table' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');

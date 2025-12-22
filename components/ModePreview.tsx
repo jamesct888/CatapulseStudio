@@ -331,88 +331,19 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
 
                 {/* Sections List - Separated Cards */}
                 <div className="flex flex-col gap-8">
-                    {visibleSections.map(section => {
-                        // Filter out 'Summary' sections from main flow - they belong in footer
-                        if (section.variant === 'summary') return null;
-
-                        // Check if this is a 'Warning' or 'Info' section
-                        const isWarning = section.variant === 'warning';
-                        const isInfo = section.variant === 'info';
-                        const isSpecial = isWarning || isInfo;
-
-                        if (isSpecial) {
-                            return (
-                                <div key={section.id} className={`p-6 rounded-xl border shadow-sm ${isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
-                                    }`}>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        {isWarning ? <AlertTriangle size={20} className="text-amber-600" /> : <Info size={20} className="text-blue-600" />}
-                                        <h4 className={`font-bold uppercase text-sm tracking-wide ${isWarning ? 'text-amber-700' : 'text-blue-700'}`}>{section.title}</h4>
-                                    </div>
-                                    <div className={`grid gap-x-8 gap-y-4 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                                        {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
-                                            // Handle Reflection Logic
-                                            let elementValue = formData[el.id];
-                                            if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
-                                                elementValue = formData[el.sourceFieldId];
-                                            }
-
-                                            return (
-                                                <RenderElement
-                                                    key={el.id}
-                                                    element={{ ...el, required: false }} // Force non-required as it's read-only
-                                                    value={elementValue}
-                                                    onChange={() => { }} // Read only
-                                                    disabled={true}
-                                                    theme={{ ...visualTheme, density: 'compact' }}
-                                                    formData={formData} // Pass form data for potential calculations
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        }
-
-                        // Standard Rendering - Card Style
-                        return (
-                            <div key={section.id} className={`${cardClass}`}>
-                                <div className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30 rounded-t-xl">
-                                    <h4 className={`font-bold uppercase text-sm tracking-wide ${sectionTitleColor}`}>{section.title}</h4>
-                                    {section.description && <span className="text-xs text-gray-400">{section.description}</span>}
-                                </div>
-                                <div className={`p-8 grid gap-x-8 gap-y-6 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                                    {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
-                                        // Logic for handling "Reflection" fields
-                                        let elementValue = formData[el.id];
-                                        if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
-                                            elementValue = formData[el.sourceFieldId];
-                                        }
-
-                                        return (
-                                            <RenderElement
-                                                key={el.id}
-                                                element={{ ...el, required: isElementRequired(el, formData) }}
-                                                value={elementValue}
-                                                onChange={(val) => {
-                                                    setFormData(prev => ({ ...prev, [el.id]: val }));
-                                                    if (formErrors[el.id]) {
-                                                        setFormErrors(prev => { const n = { ...prev }; delete n[el.id]; return n; });
-                                                    }
-                                                }}
-                                                onBlur={() => {
-                                                    const msg = validateValue(el, formData[el.id]);
-                                                    if (msg) setFormErrors(prev => ({ ...prev, [el.id]: msg }));
-                                                }}
-                                                error={formErrors[el.id]}
-                                                theme={visualTheme}
-                                                formData={formData} // Pass for calculations
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        );
-                    })}
+                    {visibleSections.map(section => (
+                        <MemoizedSection
+                            key={section.id}
+                            section={section}
+                            formData={formData}
+                            setFormData={setFormData}
+                            formErrors={formErrors}
+                            setFormErrors={setFormErrors}
+                            visualTheme={visualTheme}
+                            sectionTitleColor={sectionTitleColor}
+                            cardClass={cardClass}
+                        />
+                    ))}
                 </div>
 
                 {/* Footer Actions */}
@@ -490,8 +421,8 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
                                         <div className="flex justify-between items-start gap-2 mb-1">
                                             <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-1.5 rounded">{story.jiraId || story.id}</span>
                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${story.status === 'Done' ? 'bg-green-100 text-green-700' :
-                                                    story.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-gray-100 text-gray-500'
+                                                story.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                                                    'bg-gray-100 text-gray-500'
                                                 }`}>
                                                 {story.status || 'To Do'}
                                             </span>
@@ -506,3 +437,101 @@ export const ModePreview: React.FC<ModePreviewProps> = ({ processDef, formData, 
         </div>
     );
 };
+// --- Memoized Components ---
+
+interface SectionProps {
+    section: any; // Type accurately in real component
+    formData: FormState;
+    setFormData: React.Dispatch<React.SetStateAction<FormState>>;
+    formErrors: { [key: string]: string };
+    setFormErrors: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
+    visualTheme: VisualTheme;
+    sectionTitleColor: string;
+    cardClass: string;
+}
+
+const SectionComponent: React.FC<SectionProps> = ({
+    section, formData, setFormData, formErrors, setFormErrors, visualTheme, sectionTitleColor, cardClass
+}) => {
+    // Filter out 'Summary' sections from main flow - they belong in footer
+    if (section.variant === 'summary') return null;
+
+    // Check if this is a 'Warning' or 'Info' section
+    const isWarning = section.variant === 'warning';
+    const isInfo = section.variant === 'info';
+    const isSpecial = isWarning || isInfo;
+
+    if (isSpecial) {
+        return (
+            <div className={`p-6 rounded-xl border shadow-sm ${isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-center gap-2 mb-4">
+                    {isWarning ? <AlertTriangle size={20} className="text-amber-600" /> : <Info size={20} className="text-blue-600" />}
+                    <h4 className={`font-bold uppercase text-sm tracking-wide ${isWarning ? 'text-amber-700' : 'text-blue-700'}`}>{section.title}</h4>
+                </div>
+                <div className={`grid gap-x-8 gap-y-4 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                    {section.elements.filter((el: any) => isElementVisible(el, formData)).map((el: any) => {
+                        // Handle Reflection Logic
+                        let elementValue = formData[el.id];
+                        if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                            elementValue = formData[el.sourceFieldId];
+                        }
+
+                        return (
+                            <RenderElement
+                                key={el.id}
+                                element={{ ...el, required: false }} // Force non-required as it's read-only
+                                value={elementValue}
+                                onChange={() => { }} // Read only
+                                disabled={true}
+                                theme={{ ...visualTheme, density: 'compact' }}
+                                formData={formData} // Pass form data for potential calculations
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    }
+
+    // Standard Rendering - Card Style
+    return (
+        <div className={`${cardClass}`}>
+            <div className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30 rounded-t-xl">
+                <h4 className={`font-bold uppercase text-sm tracking-wide ${sectionTitleColor}`}>{section.title}</h4>
+                {section.description && <span className="text-xs text-gray-400">{section.description}</span>}
+            </div>
+            <div className={`p-8 grid gap-x-8 gap-y-6 ${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                {section.elements.filter((el: any) => isElementVisible(el, formData)).map((el: any) => {
+                    // Logic for handling "Reflection" fields
+                    let elementValue = formData[el.id];
+                    if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                        elementValue = formData[el.sourceFieldId];
+                    }
+
+                    return (
+                        <RenderElement
+                            key={el.id}
+                            element={{ ...el, required: isElementRequired(el, formData) }}
+                            value={elementValue}
+                            onChange={(val) => {
+                                setFormData(prev => ({ ...prev, [el.id]: val }));
+                                if (formErrors[el.id]) {
+                                    setFormErrors(prev => { const n = { ...prev }; delete n[el.id]; return n; });
+                                }
+                            }}
+                            onBlur={() => {
+                                const msg = validateValue(el, formData[el.id]);
+                                if (msg) setFormErrors(prev => ({ ...prev, [el.id]: msg }));
+                            }}
+                            error={formErrors[el.id]}
+                            theme={visualTheme}
+                            formData={formData} // Pass for calculations
+                        />
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const MemoizedSection = React.memo(SectionComponent);

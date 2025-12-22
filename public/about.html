@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catapulse Studio | Feature Showcase</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --sw-teal: #008080;
+            --sw-teal-hover: #006666;
+            --sw-amber: #f59e0b;
+            --sw-text: #1a1a1a;
+            --sw-bg: #f8fafc;
+            --sw-card: rgba(255, 255, 255, 0.85);
+            --sw-blur: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--sw-bg);
+            color: var(--sw-text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* --- Animations --- */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        .animate-slide {
+            animation: slideInRight 0.8s ease-out forwards;
+        }
+
+        /* --- Header --- */
+        header {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #008080 0%, #004d4d 100%);
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 10%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            filter: blur(60px);
+        }
+
+        .logo-container {
+            margin-bottom: 2rem;
+            z-index: 10;
+        }
+
+        .logo-c {
+            font-family: 'Outfit', sans-serif;
+            font-size: 5rem;
+            font-weight: 800;
+            background: white;
+            color: var(--sw-teal);
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 20px;
+            margin: 0 auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -2px;
+            z-index: 10;
+        }
+
+        header p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 2rem auto;
+            z-index: 10;
+        }
+
+        .hero-image {
+            width: 100%;
+            max-width: 900px;
+            border-radius: 20px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 2rem;
+            z-index: 10;
+        }
+
+        /* --- Sections --- */
+        section {
+            padding: 100px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .section-title h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.5rem;
+            color: var(--sw-teal);
+            margin-bottom: 1rem;
+        }
+
+        /* --- Grid Layouts --- */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            background: var(--sw-card);
+            backdrop-filter: blur(var(--sw-blur));
+            padding: 40px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--sw-teal);
+        }
+
+        .icon-box {
+            width: 50px;
+            height: 50px;
+            background: var(--sw-teal);
+            color: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        /* --- Image Sections --- */
+        .showcase-row {
+            display: flex;
+            align-items: center;
+            gap: 60px;
+            margin-bottom: 120px;
+        }
+
+        .showcase-row:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+
+        .showcase-text {
+            flex: 1;
+        }
+
+        .showcase-visual {
+            flex: 1.5;
+        }
+
+        .showcase-visual img {
+            width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        /* --- CTA --- */
+        .cta-section {
+            background: #1e293b;
+            color: white;
+            text-align: center;
+            padding: 100px 20px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 16px 32px;
+            background: var(--sw-teal);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            transition: background 0.3s ease;
+            margin-top: 2rem;
+        }
+
+        .btn:hover {
+            background: var(--sw-teal-hover);
+        }
+
+        /* --- Footer --- */
+        footer {
+            padding: 40px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .showcase-row {
+                flex-direction: column !important;
+                gap: 40px;
+            }
+
+            header {
+                height: auto;
+                padding: 100px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo-container animate-fade">
+            <div class="logo-c">C</div>
+        </div>
+        <h1 class="animate-fade">Catapulse Studio</h1>
+        <p class="animate-fade">The AI-Native Workspace for Business-First Process Design & Automation.</p>
+        <img src="promo/ai_process_generation_hero_1766360310330.png" alt="AI Core" class="hero-image animate-fade">
+    </header>
+
+    <section>
+        <div class="section-title">
+            <h2>The 7-View Design System</h2>
+            <p>Don't just build, visualize. Catapulse offers context-aware views for every stakeholder.</p>
+        </div>
+
+        <div class="showcase-row">
+            <div class="showcase-text animate-fade">
+                <h3 style="font-size: 2rem; margin-bottom: 1rem;">🎨 Design & Logic</h3>
+                <p>Build high-fidelity forms with our drag-and-drop canvas. Add complex visibility and validation logic
+                    without writing a single line of code.</p>
+                <p style="margin-top: 1rem; color: #64748b; font-weight: 600;">Perfect for: Business Analysts &
+                    Architects</p>
+            </div>
+            <div class="showcase-visual animate-slide">
+                <img src="promo/real_design.png" alt="Design Mode">
+            </div>
+        </div>
+
+        <div class="showcase-row">
+            <div class="showcase-text animate-fade">
+                <h3 style="font-size: 2rem; margin-bottom: 1rem;">🕸️ Process Flow</h3>
+                <p>Map your journey vertically and horizontally. Visualize 'Happy Paths' alongside automated 'Skip
+                    Logic' arcs that dynamically bypass stages based on data.</p>
+                <p style="margin-top: 1rem; color: #64748b; font-weight: 600;">Perfect for: Process Owners & Engineers
+                </p>
+            </div>
+            <div class="showcase-visual animate-slide">
+                <img src="promo/real_flow.png" alt="Flow View">
+            </div>
+        </div>
+    </section>
+
+    <section
+        style="background: white; max-width: 100%; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 100px 20px;">
+            <div class="section-title">
+                <h2>🤖 Gemini Intelligence</h2>
+                <p>Catapulse is powered by Gemini 3 Flash, providing built-in AI for every step of the lifecycle.</p>
+            </div>
+
+            <div class="showcase-row" style="margin-bottom: 0;">
+                <div class="showcase-text">
+                    <ul style="list-style: none; space-y: 20px;">
+                        <li style="margin-bottom: 30px;">
+                            <strong style="color: var(--sw-teal); display: block; font-size: 1.2rem;">⚡ Monolithic
+                                Generation</strong>
+                            Describe your process and watch the AI build stages, sections, and fields instantly.
+                        </li>
+                        <li style="margin-bottom: 30px;">
+                            <strong style="color: var(--sw-teal); display: block; font-size: 1.2rem;">🧠 Workshop
+                                Assistant</strong>
+                            Input transcripts and SMEs feedback; Catapulse suggests and applies design updates
+                            automatically.
+                        </li>
+                        <li style="margin-bottom: 30px;">
+                            <strong style="color: var(--sw-teal); display: block; font-size: 1.2rem;">✅ Automated
+                                QA</strong>
+                            Generate ISTQB-compliant User Stories and Manual Test Cases from your process rules with one
+                            click.
+                        </li>
+                    </ul>
+                </div>
+                <div class="showcase-visual">
+                    <img src="promo/real_qa.png" alt="QA Dashboard">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-title">
+            <h2>Elite Features</h2>
+        </div>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="icon-box">▶️</div>
+                <h3>Live Simulation</h3>
+                <p>Run your process instantly with persona-driven mock data. Test rules and routing in a high-fidelity
+                    preview.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">📊</div>
+                <h3>Grid Mode</h3>
+                <p>Manage hundreds of data elements with a high-performance spreadsheet interface. Bulk edit attributes
+                    effortlessly.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon-box">⚙️</div>
+                <h3>Pega Readiness</h3>
+                <p>Export your designs directly to Pega Systems Infinity. Clean mapping from BA intent to Dev execution.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <div class="cta-section">
+        <h2 style="font-family: 'Outfit'; font-size: 2.5rem; margin-bottom: 1rem;">Ready to build faster?</h2>
+        <p>Design smarter processes today with Catapulse Studio.</p>
+        <a href="../" class="btn">Launch Application</a>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Catapulse Studio. All rights reserved. Powered by Advanced Agentic Coding.</p>
+    </footer>
+
+</body>
+
+</html>
