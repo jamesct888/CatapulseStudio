@@ -152,15 +152,15 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                             }}
                         >
                             <div className={`p-4 border-b border-gray-50 flex justify-between items-center bg-gradient-to-r from-white to-gray-50/50 rounded-t-2xl ${section.variant === 'warning' ? 'from-amber-50 to-white border-amber-100' :
-                                    section.variant === 'info' ? 'from-blue-50 to-white border-blue-100' : ''
+                                section.variant === 'info' ? 'from-blue-50 to-white border-blue-100' : ''
                                 }`}>
                                 <div className="flex items-center gap-3">
                                     {section.variant === 'summary' && <PanelBottom size={16} className="text-gray-400" />}
                                     {section.variant === 'warning' && <AlertTriangle size={16} className="text-amber-500" />}
                                     {section.variant === 'info' && <Info size={16} className="text-blue-500" />}
                                     <h3 className={`font-bold text-sm uppercase tracking-wide ${section.variant === 'warning' ? 'text-amber-700' :
-                                            section.variant === 'info' ? 'text-blue-700' :
-                                                'text-sw-teal'
+                                        section.variant === 'info' ? 'text-blue-700' :
+                                            'text-sw-teal'
                                         }`}>{section.title}</h3>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -291,49 +291,73 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                     ))}
 
                     <div id="toolbox" className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 border border-gray-200 flex items-center gap-2 z-30 animate-in slide-in-from-bottom-4">
-                        {[
-                            { type: 'text', icon: FileText, label: 'Text' },
-                            { type: 'number', icon: Hash, label: 'Number' },
-                            { type: 'date', icon: Calendar, label: 'Date' },
-                            { type: 'select', icon: List, label: 'Select' },
-                            { type: 'radio', icon: CircleDot, label: 'Radio' },
-                            { type: 'checkbox', icon: CheckSquare, label: 'Check' },
-                            { type: 'calculated', icon: Calculator, label: 'Calc' },
-                            { type: 'repeater', icon: Table, label: 'List' },
-                            { type: 'static', icon: MessageSquare, label: 'Static' }
-                        ].map(tool => (
-                            <button
-                                key={tool.type}
-                                className="p-3 rounded-full hover:bg-sw-lightGray text-sw-teal transition-colors flex flex-col items-center gap-1 w-16 group"
-                                onClick={() => {
-                                    if (selectedSectionId) {
-                                        const newEl: ElementDefinition = {
-                                            id: `el_${Date.now()}`,
-                                            label: tool.type === 'repeater' ? 'New List' : tool.type === 'calculated' ? 'New Calc' : 'New Field',
-                                            type: tool.type as any,
-                                            required: false,
-                                            columns: tool.type === 'repeater' ? [{ id: 'col1', label: 'Item Name', type: 'text' }] : undefined,
-                                            calculation: tool.type === 'calculated' ? [] : undefined
-                                        };
-                                        const newDef = { ...processDef };
-                                        for (const stg of newDef.stages) {
-                                            const sec = stg.sections.find(s => s.id === selectedSectionId);
-                                            if (sec) {
-                                                sec.elements.push(newEl);
-                                                break;
+                        {(() => {
+                            // Enforce content rules
+                            const currentSection = processDef.stages
+                                .find(s => s.id === selectedStageId)
+                                ?.sections.find(s => s.id === selectedSectionId);
+
+                            const isRestricted = currentSection?.variant && ['info', 'warning', 'summary'].includes(currentSection.variant);
+
+                            return [
+                                { type: 'text', icon: FileText, label: 'Text', interactive: true },
+                                { type: 'number', icon: Hash, label: 'Number', interactive: true },
+                                { type: 'date', icon: Calendar, label: 'Date', interactive: true },
+                                { type: 'select', icon: List, label: 'Select', interactive: true },
+                                { type: 'radio', icon: CircleDot, label: 'Radio', interactive: true },
+                                { type: 'checkbox', icon: CheckSquare, label: 'Check', interactive: true },
+                                { type: 'calculated', icon: Calculator, label: 'Calc', interactive: false },
+                                { type: 'repeater', icon: Table, label: 'List', interactive: true },
+                                { type: 'static', icon: MessageSquare, label: 'Static', interactive: false }
+                            ].map(tool => {
+                                const isDisabled = isRestricted && tool.interactive;
+
+                                return (
+                                    <button
+                                        key={tool.type}
+                                        disabled={isDisabled}
+                                        className={`p-3 rounded-full transition-colors flex flex-col items-center gap-1 w-16 group relative
+                                            ${isDisabled
+                                                ? 'text-gray-300 cursor-not-allowed bg-gray-50'
+                                                : 'hover:bg-sw-lightGray text-sw-teal'
                                             }
-                                        }
-                                        setProcessDef(newDef);
-                                        setSelectedElementId(newEl.id);
-                                    } else {
-                                        alert("Select a section first!");
-                                    }
-                                }}
-                            >
-                                <tool.icon size={20} />
-                                <span className="text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-sw-teal text-white px-2 py-1 rounded shadow">{tool.label}</span>
-                            </button>
-                        ))}
+                                        `}
+                                        onClick={() => {
+                                            if (isDisabled) return;
+                                            if (selectedSectionId) {
+                                                const newEl: ElementDefinition = {
+                                                    id: `el_${Date.now()}`,
+                                                    label: tool.type === 'repeater' ? 'New List' : tool.type === 'calculated' ? 'New Calc' : 'New Field',
+                                                    type: tool.type as any,
+                                                    required: false,
+                                                    columns: tool.type === 'repeater' ? [{ id: 'col1', label: 'Item Name', type: 'text' }] : undefined,
+                                                    calculation: tool.type === 'calculated' ? [] : undefined
+                                                };
+                                                const newDef = { ...processDef };
+                                                for (const stg of newDef.stages) {
+                                                    const sec = stg.sections.find(s => s.id === selectedSectionId);
+                                                    if (sec) {
+                                                        sec.elements.push(newEl);
+                                                        break;
+                                                    }
+                                                }
+                                                setProcessDef(newDef);
+                                                setSelectedElementId(newEl.id);
+                                            } else {
+                                                alert("Select a section first!");
+                                            }
+                                        }}
+                                    >
+                                        <tool.icon size={20} />
+                                        <span className={`text-[10px] font-bold transition-opacity absolute -top-8 px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100
+                                            ${isDisabled ? 'bg-gray-800 text-white' : 'bg-sw-teal text-white'}
+                                        `}>
+                                            {isDisabled ? 'Static Only' : tool.label}
+                                        </span>
+                                    </button>
+                                );
+                            });
+                        })()}
                     </div>
                 </div>
             </div>

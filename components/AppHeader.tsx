@@ -47,6 +47,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
     if (!processDef) return null;
 
+    // Theme-aware coloring
+    const getThemeColorClass = () => {
+        switch (visualTheme?.mode) {
+            case 'type2': return 'text-sw-red'; // Red Mode
+            case 'type3': return 'text-sw-teal'; // Default/Fallback
+            default: return 'text-sw-teal'; // Standard Navy
+        }
+    };
+    const themeColor = getThemeColorClass();
+
     return (
         <header className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-4 z-50 shrink-0 sticky top-0">
             <div className="flex items-center gap-6">
@@ -66,7 +76,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                             key={mode.id}
                             id={`nav-${mode.id}`}
                             onClick={() => setViewMode(mode.id as any)}
-                            className={`px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${viewMode === mode.id ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                            className={`px-3 py-1.5 rounded-md text-sm font-sans font-medium flex items-center gap-2 transition-all ${viewMode === mode.id ? `bg-white ${themeColor} shadow-sm` : 'text-gray-500 hover:text-gray-900'}`}
                         >
                             <mode.icon size={14} />
                             {mode.label}
@@ -114,12 +124,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                                     setIsRenaming(false);
                                 }
                             }}
-                            className="text-xs font-bold text-gray-900 text-right border-b-2 border-sw-teal bg-transparent focus:outline-none w-48 px-1"
+                            className={`text-sm font-serif font-bold text-gray-900 text-right border-b-2 bg-transparent focus:outline-none w-56 px-1 ${visualTheme?.mode === 'type2' ? 'border-sw-red' : 'border-sw-teal'}`}
                         />
                     ) : (
                         <button
                             onClick={() => setIsRenaming(true)}
-                            className="text-xs font-bold text-gray-900 hover:text-sw-teal hover:underline decoration-dashed underline-offset-4 transition-all"
+                            className={`text-sm font-serif font-bold text-gray-900 hover:underline decoration-dashed underline-offset-4 transition-all ${visualTheme?.mode === 'type2' ? 'hover:text-sw-red' : 'hover:text-sw-teal'}`}
                             title="Click to rename process"
                         >
                             {processDef.name}
@@ -132,7 +142,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     <button
                         id="btn-settings"
                         onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                        className={`p-2 rounded-lg transition-colors ${isSettingsOpen ? 'bg-sw-lightGray text-sw-teal' : 'text-gray-400 hover:text-sw-teal'}`}
+                        className={`p-2 rounded-lg transition-colors ${isSettingsOpen ? `bg-sw-lightGray ${themeColor}` : `text-gray-400 hover:${themeColor}`}`}
                     >
                         <Settings2 size={20} />
                     </button>

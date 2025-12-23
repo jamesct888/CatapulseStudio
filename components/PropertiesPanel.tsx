@@ -205,7 +205,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 {renderHeader()}
 
                 {/* TABS */}
-                <div className="flex p-1 bg-gray-200/50 rounded-lg">
+                <div className="flex p-1 bg-gray-200/50 rounded-lg mt-4">
                     <button
                         onClick={() => onTabChange('general')}
                         className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'general' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -255,6 +255,64 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             </div>
                         </div>
 
+                        {/* --- SECTION SPECIFIC GENERAL --- */}
+                        {selectedSection && !selectedElement && (
+                            <>
+                                <div>
+                                    <label className={labelClass}>Layout Columns</label>
+                                    <div className="flex bg-gray-100 p-1 rounded-lg gap-1">
+                                        {[
+                                            { id: '1col', label: '1 Column', icon: <div className="w-full h-2 bg-current rounded-sm opacity-40"></div> },
+                                            { id: '2col', label: '2 Col', icon: <div className="flex gap-0.5"><div className="w-1/2 h-2 bg-current rounded-sm opacity-40"></div><div className="w-1/2 h-2 bg-current rounded-sm opacity-40"></div></div> },
+                                            { id: '3col', label: '3 Col', icon: <div className="flex gap-0.5"><div className="w-1/3 h-2 bg-current rounded-sm opacity-40"></div><div className="w-1/3 h-2 bg-current rounded-sm opacity-40"></div><div className="w-1/3 h-2 bg-current rounded-sm opacity-40"></div></div> }
+                                        ].map(layout => (
+                                            <button
+                                                key={layout.id}
+                                                onClick={() => handleChange('layout', layout.id)}
+                                                className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-md border text-xs font-bold transition-all
+                                                    ${(selectedSection.layout || '1col') === layout.id
+                                                        ? 'bg-white border-sw-teal text-sw-teal shadow-sm'
+                                                        : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-white'
+                                                    }
+                                                `}
+                                                title={layout.label}
+                                            >
+                                                {layout.icon}
+                                                <span className="scale-90">{layout.id.replace('col', '')}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className={labelClass}>Section Style</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {[
+                                            { id: 'default', label: 'Std', bg: 'bg-white', border: 'border-gray-200', text: 'text-gray-700' },
+                                            { id: 'info', label: 'Info', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+                                            { id: 'warning', label: 'Warn', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+                                            { id: 'summary', label: 'Sum', bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-700' }
+                                        ].map(style => (
+                                            <button
+                                                key={style.id}
+                                                onClick={() => handleChange('variant', style.id === 'default' ? undefined : style.id)}
+                                                className={`group relative h-12 rounded-lg border-2 transition-all flex items-center justify-center overflow-hidden
+                                                    ${(selectedSection.variant || 'default') === style.id
+                                                        ? `border-sw-teal ring-1 ring-sw-teal`
+                                                        : 'border-transparent hover:scale-105'
+                                                    }
+                                                `}
+                                                title={style.label}
+                                            >
+                                                <div className={`absolute inset-0 ${style.bg} ${style.border} border opacity-80`} />
+                                                <span className={`relative z-10 text-[10px] font-bold uppercase ${style.text}`}>{style.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
                         {/* --- ELEMENT SPECIFIC GENERAL --- */}
                         {selectedElement && (
                             <>
@@ -265,16 +323,31 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                         onChange={(e) => handleChange('type', e.target.value)}
                                         className={inputClass}
                                     >
-                                        <option value="text">Text Input</option>
-                                        <option value="textarea">Multi-line Text</option>
-                                        <option value="number">Number</option>
-                                        <option value="date">Date Picker</option>
-                                        <option value="select">Dropdown (Select)</option>
-                                        <option value="radio">Radio Buttons</option>
-                                        <option value="checkbox">Checkbox</option>
-                                        <option value="repeater">Data Table (Repeater)</option>
-                                        <option value="calculated">Calculated Formula</option>
-                                        <option value="static">Static Text / Display</option>
+                                        {(() => {
+                                            const isRestricted = selectedSection?.variant && ['info', 'warning', 'summary'].includes(selectedSection.variant);
+
+                                            // Define options
+                                            const interactiveOptions = [
+                                                { val: 'text', label: 'Text Input' },
+                                                { val: 'textarea', label: 'Multi-line Text' },
+                                                { val: 'number', label: 'Number' },
+                                                { val: 'date', label: 'Date Picker' },
+                                                { val: 'select', label: 'Dropdown (Select)' },
+                                                { val: 'radio', label: 'Radio Buttons' },
+                                                { val: 'checkbox', label: 'Checkbox' },
+                                                { val: 'repeater', label: 'Data Table (Repeater)' }
+                                            ];
+                                            const staticOptions = [
+                                                { val: 'calculated', label: 'Calculated Formula' },
+                                                { val: 'static', label: 'Static Text / Display' }
+                                            ];
+
+                                            if (isRestricted) {
+                                                return staticOptions.map(opt => <option key={opt.val} value={opt.val}>{opt.label}</option>);
+                                            } else {
+                                                return [...interactiveOptions, ...staticOptions].map(opt => <option key={opt.val} value={opt.val}>{opt.label}</option>);
+                                            }
+                                        })()}
                                     </select>
                                 </div>
 
@@ -661,6 +734,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 onResizeStart={() => setIsResizingModal(true)}
             />
 
-        </div>
+        </div >
     );
 };

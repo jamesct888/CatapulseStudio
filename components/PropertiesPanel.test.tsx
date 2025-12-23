@@ -99,4 +99,63 @@ describe('PropertiesPanel Component', () => {
         expect(window.confirm).toHaveBeenCalled();
         expect(onDeleteElement).toHaveBeenCalledWith('el_1');
     });
+
+    // --- REGRESSION TESTS ---
+
+    it('should NOT render Section Layout/Style controls when an element is selected', () => {
+        // Even if a section is passed as parent context
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedSection={{ id: 'sec_1', title: 'Parent Section', elements: [mockElement], variant: 'default' } as any}
+        />);
+
+        // Should see Element stuff
+        expect(screen.getByText('Field Type')).toBeDefined();
+
+        // Should NOT see Section stuff
+        expect(screen.queryByText('Layout Columns')).toBeNull();
+        expect(screen.queryByText('Section Style')).toBeNull();
+    });
+
+    it('should render Section Layout/Style controls when ONLY section is selected', () => {
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedElement={null}
+            selectedSection={{ id: 'sec_1', title: 'Parent Section', elements: [], variant: 'default' } as any}
+        />);
+
+        expect(screen.getByText('Layout Columns')).toBeDefined();
+        expect(screen.getByText('Section Style')).toBeDefined();
+    });
+
+    it('should filter Field Type options when Section Variant is INFO', () => {
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedSection={{ id: 'sec_1', title: 'Info Box', elements: [mockElement], variant: 'info' } as any}
+        />);
+
+        const select = screen.getByRole('combobox'); // The Field Type select
+        // In unit tests getting options can be done via checking children
+        const options = Array.from(select.querySelectorAll('option')).map(opt => opt.value);
+
+        // Should only have static/calculated
+        expect(options).toContain('static');
+        expect(options).toContain('calculated');
+        expect(options).not.toContain('text');
+        expect(options).not.toContain('number');
+    });
+
+    it('should SHOW all Field Type options when Section Variant is DEFAULT', () => {
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedSection={{ id: 'sec_1', title: 'Standard Box', elements: [mockElement], variant: 'default' } as any}
+        />);
+
+        const select = screen.getByRole('combobox');
+        const options = Array.from(select.querySelectorAll('option')).map(opt => opt.value);
+
+        expect(options).toContain('text');
+        expect(options).toContain('static');
+    });
+
 });

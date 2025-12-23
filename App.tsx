@@ -337,7 +337,18 @@ const App: React.FC = () => {
 
     return (
         <ErrorBoundary>
-            <div className="h-screen bg-white flex flex-col overflow-hidden font-sans text-sw-text relative">
+            <div
+                className={`h-screen bg-white flex flex-col overflow-hidden font-sans text-sw-text relative ${isResizingPanel ? 'cursor-ew-resize select-none' : ''}`}
+                onMouseMove={(e) => {
+                    if (isResizingPanel) {
+                        const newWidth = window.innerWidth - e.clientX;
+                        if (newWidth > 300 && newWidth < 800) {
+                            setPanelWidth(newWidth);
+                        }
+                    }
+                }}
+                onMouseUp={() => setIsResizingPanel(false)}
+            >
                 <AppHeader
                     processDef={processDef}
                     setProcessDef={(def) => { setProcessDef(def); setIsDirty(false); }} // Loading new def resets dirty
@@ -431,7 +442,18 @@ const App: React.FC = () => {
                     </main>
 
                     {viewMode === 'editor' && (
-                        <div className={`fixed right-0 top-16 bottom-0 z-40 transition-transform duration-300 ease-in-out ${activeSidePanel !== 'none' ? 'translate-x-0' : 'translate-x-full'}`}>
+                        <div
+                            className={`fixed right-0 top-16 bottom-0 z-40 bg-white shadow-2xl border-l border-gray-200 transition-transform duration-300 ease-in-out ${activeSidePanel !== 'none' ? 'translate-x-0' : 'translate-x-full'}`}
+                            style={{ width: activeSidePanel !== 'none' ? panelWidth : 0 }}
+                        >
+                            {/* Resize Handle */}
+                            <div
+                                className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-sw-teal z-50 transition-colors group"
+                                onMouseDown={() => setIsResizingPanel(true)}
+                            >
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gray-300 rounded group-hover:bg-sw-teal" />
+                            </div>
+
                             {activeSidePanel === 'properties' && (
                                 <PropertiesPanel
                                     selectedElement={selectedElement}
@@ -443,9 +465,9 @@ const App: React.FC = () => {
                                     onUpdateElement={safeUpdateElement}
                                     onUpdateSection={safeUpdateSection}
                                     onUpdateStage={safeUpdateStage}
-                                    onDeleteElement={safeDeleteElement} // Use safe delete
-                                    onDeleteSection={safeDeleteSection} // Use safe delete
-                                    onDeleteStage={safeDeleteStage}     // Use safe delete
+                                    onDeleteElement={safeDeleteElement}
+                                    onDeleteSection={safeDeleteSection}
+                                    onDeleteStage={safeDeleteStage}
                                     visualTheme={visualTheme}
                                     onOpenSettings={() => setActiveSidePanel('settings')}
                                     onClose={() => setActiveSidePanel('none')}
@@ -454,14 +476,11 @@ const App: React.FC = () => {
                                     clipboardStageLogic={clipboardStageLogic}
                                     onCopyStageLogic={(rules) => setClipboardStageLogic(rules)}
                                     onPasteStageLogic={(stageId) => {
-                                        // Paste Logic also modifies stage, check guard
                                         if (checkSafeModification(stageId)) {
                                             if (!clipboardStageLogic || !processDef) return;
-                                            // Append logic to the specific stage
                                             const newDef = { ...processDef };
                                             const stg = newDef.stages.find(s => s.id === stageId);
                                             if (stg) {
-                                                // Deep clone rules to avoid ref issues, giving new IDs
                                                 const newRules = clipboardStageLogic.map(r => ({
                                                     ...r,
                                                     logic: { ...r.logic, id: `grp_${Date.now()}_${Math.random()}` }
@@ -479,7 +498,7 @@ const App: React.FC = () => {
                                     onUpdateTheme={setVisualTheme}
                                     onClose={() => setActiveSidePanel('properties')}
                                     panelWidth={panelWidth}
-                                    onResizeStart={() => setIsResizingPanel(true)}
+                                    onResizeStart={() => setIsResizingPanel(true)} // Keep for internal usage if needed
                                 />
                             )}
                         </div>

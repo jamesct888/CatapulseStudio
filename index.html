@@ -1,70 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Catapulse - Process Studio</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            sw: {
-              teal: '#0b3239',
-              tealHover: '#062126',
-              red: '#e61126',
-              redHover: '#c40e20',
-              lightGray: '#eee',
-              lighterGray: '#fafafa',
-              purpleLight: '#ede9ff',
-              surface: '#ffffff',
-              text: '#0b3239',
-              error: '#db0f30'
-            }
-          },
-          fontFamily: {
-            sans: ['"GT Ultra Standard Regular"', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],
-            serif: ['"ABC Arizona Flare Medium"', 'Georgia', 'Times New Roman', 'serif'],
-          },
-          borderRadius: {
-            'xl': '12px',
-            '2xl': '16px',
-            'btn': '50px'
-          },
-          boxShadow: {
-            'card': '0 0 8px 0 rgba(11,50,57,.04), 0 2px 5px 0 rgba(11,50,57,.06)',
-            'input-focus': '0 0 0 2px #fff, 0 0 0 4px #0b3239'
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Catapulse - Process Studio</title>
+
+<!-- Scottish Widows Design Assets -->
+<style>
+  /* Local Font Definitions */
+  @font-face {
+    font-family: 'ABC Arizona Flare';
+    src: url('/fonts/ABCArizonaFlare-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'GT Ultra Standard';
+    src: url('/fonts/GT-Ultra-Standard-Lloyds-Light.woff2') format('woff2');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'GT Ultra Standard';
+    src: url('/fonts/GT-Ultra-Standard-Lloyds-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'GT Ultra Standard';
+    src: url('/fonts/GT-Ultra-Standard-Lloyds-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+</style>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          sw: {
+            teal: '#0b3239',       /* Primary Navy/Teal */
+            tealHover: '#062126',
+            red: '#e61126',        /* Primary Red */
+            redHover: '#c40e20',
+            gold: '#f5efe6',       /* Secondary Beige/Gold */
+            lightGray: '#eee',
+            lighterGray: '#fafafa',
+            purpleLight: '#ede9ff',
+            surface: '#ffffff',
+            text: '#0b3239',
+            error: '#db0f30'
           }
+        },
+        fontFamily: {
+          sans: ['"GT Ultra Standard"', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],
+          serif: ['"ABC Arizona Flare"', 'Georgia', 'Times New Roman', 'serif'],
+        },
+        borderRadius: {
+          'xl': '12px',
+          '2xl': '16px',
+          'btn': '50px'
+        },
+        boxShadow: {
+          'card': '0 0 8px 0 rgba(11,50,57,.04), 0 2px 5px 0 rgba(11,50,57,.06)',
+          'input-focus': '0 0 0 2px #fff, 0 0 0 4px #0b3239'
         }
       }
     }
-  </script>
-  <style>
-    @font-face {
-      font-family: 'GT Ultra Standard Regular';
-      src: local('Segoe UI'), local('Arial');
-      font-weight: 400;
-    }
-
-    @font-face {
-      font-family: 'GT Ultra Standard Bold';
-      src: local('Segoe UI Bold'), local('Arial Bold');
-      font-weight: 700;
-    }
-
-    @font-face {
-      font-family: 'ABC Arizona Flare Medium';
-      src: local('Georgia'), local('Times New Roman');
-      font-weight: 500;
-    }
-
-    body {
-      color: #0b3239;
-    }
-  </style>
-
+  }
+</script>
+<style>
+  /* Global Styles */
+  body {
+    color: #0b3239;
+    font-feature-settings: "cv11", "ss01";
+  }
+</style>
 </head>
 
 <body class="bg-sw-lighterGray text-sw-text">
