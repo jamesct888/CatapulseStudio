@@ -32,7 +32,24 @@ interface PropertiesPanelProps {
     clipboardStageLogic?: SkillRule[] | null;
     onCopyStageLogic?: (rules: SkillRule[]) => void;
     onPasteStageLogic?: (stageId: string) => void;
+    // Navigation Callbacks
+    onSelectStage?: (id: string) => void;
+    onSelectSection?: (id: string) => void;
+    onSelectElement?: (id: string) => void;
 }
+
+const generateIdFromLabel = (label: string): string => {
+    // CamelCase generator: "Member Details" -> "memberDetails"
+    return label
+        .replace(/[^a-zA-Z0-9 ]/g, '') // Remove special chars
+        .split(' ')
+        .map((word, index) =>
+            index === 0
+                ? word.toLowerCase()
+                : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join('');
+};
 
 const COMMON_SKILLS = [
     "Customer Service",
@@ -61,7 +78,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     onClose,
     clipboardStageLogic,
     onCopyStageLogic,
-    onPasteStageLogic
+    onPasteStageLogic,
+    onSelectStage,
+    onSelectSection,
+    onSelectElement
 }) => {
     // --- STATE ---
     const [modals, setModals] = useState<{
@@ -111,9 +131,38 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
     // --- CHANGE HANDLERS ---
     const handleChange = (field: string, value: any) => {
-        if (selectedElement) onUpdateElement({ ...selectedElement, [field]: value });
-        else if (selectedSection) onUpdateSection({ ...selectedSection, [field]: value });
-        else if (selectedStage) onUpdateStage({ ...selectedStage, [field]: value });
+        let updates: any = { [field]: value };
+
+        // Smart ID Generation for Elements
+        if (selectedElement && field === 'label' && typeof value === 'string') {
+            const currentId = selectedElement.id;
+            const oldSmartId = generateIdFromLabel(selectedElement.label || '');
+
+            // Allow update if:
+            // 1. ID is a default "el_..." ID
+            // 2. ID is the fallback "field"
+            // 3. ID matches what the previous label would generate (e.g. user is typing)
+            const isSyncing = currentId.startsWith('el_') || currentId === 'field' || currentId === oldSmartId;
+
+            if (isSyncing) {
+                let newId = generateIdFromLabel(value);
+                if (newId.length < 2) newId = 'field'; // Minimum length safety
+
+                // Ensure uniqueness
+                const isTaken = (id: string) => allElements.some(e => e.id === id && e.id !== currentId);
+                let uniqueId = newId;
+                let counter = 1;
+                while (isTaken(uniqueId)) {
+                    uniqueId = `${newId}${counter}`;
+                    counter++;
+                }
+                updates.id = uniqueId;
+            }
+        }
+
+        if (selectedElement) onUpdateElement({ ...selectedElement, ...updates });
+        else if (selectedSection) onUpdateSection({ ...selectedSection, ...updates });
+        else if (selectedStage) onUpdateStage({ ...selectedStage, ...updates });
     };
 
     const handleRepeaterChange = (cols: RepeaterColumn[]) => {
@@ -157,28 +206,56 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
     // --- RENDER HELPERS ---
     const renderHeader = () => {
-        let title = "Properties";
-        let type = "";
-        let badge = null;
-
-        if (selectedElement) {
-            title = "Element";
-            type = selectedElement.type;
-            badge = <span className="bg-sw-teal/10 text-sw-teal px-2 py-0.5 rounded text-[10px] font-bold uppercase">{selectedElement.type}</span>;
-        } else if (selectedSection) {
-            title = "Section";
-            type = selectedSection.layout || '1col';
-        } else if (selectedStage) {
-            title = "Stage";
-        }
-
+        // BREADCRUMBS
         return (
             <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h2 className="text-xl font-serif text-sw-teal">{title}</h2>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
-                        <span>ID: {selectedElement?.id || selectedSection?.id || selectedStage?.id}</span>
-                        {badge}
+                <div className="flex-1">
+                    <nav className="flex items-center text-xs text-gray-500 mb-1 space-x-1">
+                        {/* STAGE */}
+                        <button
+                            onClick={() => selectedStage && onSelectStage?.(selectedStage.id)}
+                            className="hover:text-sw-teal hover:underline transition-colors truncate max-w-[80px]"
+                            title={selectedStage?.title}
+                        >
+                            {selectedStage?.title || 'Stage'}
+                        </button>
+
+                        {(selectedSection || selectedElement) && <ChevronRight size={10} />}
+
+                        {/* SECTION */}
+                        {(selectedSection || selectedElement) && (
+                            <button
+                                onClick={() => selectedSection && onSelectSection?.(selectedSection.id)}
+                                className={`truncate max-w-[100px] transition-colors ${!selectedElement ? 'font-bold text-sw-teal' : 'hover:text-sw-teal hover:underline'}`}
+                                title={selectedSection?.title}
+                                disabled={!selectedElement} // If section is selected, meaningful to disable/highlight
+                            >
+                                {selectedSection?.title || 'Section'}
+                            </button>
+                        )}
+
+                        {selectedElement && <ChevronRight size={10} />}
+
+                        {/* ELEMENT */}
+                        {selectedElement && (
+                            <span className="font-bold text-sw-teal truncate max-w-[120px]" title={selectedElement.label}>
+                                {selectedElement.label || 'Element'}
+                            </span>
+                        )}
+                    </nav>
+
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-serif text-sw-teal truncate">
+                            {selectedElement ? 'Element' : selectedSection ? 'Section' : 'Stage'}
+                        </h2>
+                        {selectedElement && (
+                            <span className="bg-sw-teal/10 text-sw-teal px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                                {selectedElement.type}
+                            </span>
+                        )}
+                    </div>
+                    <div className="text-[10px] text-gray-300 font-mono mt-0.5">
+                        ID: {selectedElement?.id || selectedSection?.id || selectedStage?.id}
                     </div>
                 </div>
                 <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
@@ -228,11 +305,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         {/* Title/Label Input */}
                         <div>
-                            <label className={labelClass}>{selectedStage ? 'Stage Title' : selectedSection ? 'Section Title' : 'Field Label'}</label>
+                            <label className={labelClass}>{selectedElement ? 'Field Label' : selectedSection ? 'Section Title' : 'Stage Title'}</label>
                             <div className="relative">
                                 <input
                                     type="text"
-                                    value={selectedElement?.label || selectedSection?.title || selectedStage?.title || ''}
+                                    value={selectedElement ? selectedElement.label : selectedSection ? selectedSection.title : selectedStage ? selectedStage.title : ''}
                                     onChange={(e) => handleChange(selectedElement ? 'label' : 'title', e.target.value)}
                                     className={`${inputClass} pl-9 font-medium`}
                                     placeholder="Enter title..."
@@ -674,6 +751,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     </div>
                 )}
             </div>
+
 
             {/* --- MODALS --- */}
 

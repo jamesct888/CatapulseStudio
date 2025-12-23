@@ -158,4 +158,114 @@ describe('PropertiesPanel Component', () => {
         expect(options).toContain('static');
     });
 
+    it('should generate SMART ID when label is changed for an element with default ID', () => {
+        const onUpdate = vi.fn();
+        const elementWithDefaultId = { ...mockElement, id: 'el_12345', label: '' };
+
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedElement={elementWithDefaultId}
+            onUpdateElement={onUpdate}
+        />);
+
+        const labelInput = screen.getByPlaceholderText('Enter title...');
+        fireEvent.change(labelInput, { target: { value: 'Member Details' } });
+
+        // Should be called with new label AND new ID "memberDetails" (because id started with el_)
+        expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            label: 'Member Details',
+            id: 'memberDetails'
+        }));
+    });
+
+    it('should NOT change ID if it is already custom', () => {
+        const onUpdate = vi.fn();
+        const elementWithCustomId = { ...mockElement, id: 'customId', label: '' };
+
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedElement={elementWithCustomId}
+            onUpdateElement={onUpdate}
+        />);
+
+        const labelInput = screen.getByPlaceholderText('Enter title...');
+        fireEvent.change(labelInput, { target: { value: 'New Label' } });
+
+        // Should update Label but ID should remain 'customId'
+        expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            label: 'New Label',
+            id: 'customId'
+        }));
+    });
+
+    it('should display Breadcrumbs in header', () => {
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedStage={{ id: 'stg_1', title: 'My Stage' } as any}
+            selectedSection={{ id: 'sec_1', title: 'My Section' } as any}
+            selectedElement={mockElement}
+        />);
+
+        expect(screen.getByText('My Stage')).toBeDefined();
+        expect(screen.getByText('My Section')).toBeDefined();
+        expect(screen.getByText('Element')).toBeDefined(); // Current element label
+    });
+
+    it('should allow clearing the element label without falling back to section title', () => {
+        const onUpdate = vi.fn();
+        const element = { ...mockElement, label: '' }; // Empty label
+        const section = { id: 'sec_1', title: 'Start Section', elements: [element], variant: 'default' };
+
+        render(<PropertiesPanel
+            {...defaultProps}
+            selectedElement={element}
+            // @ts-ignore
+            selectedSection={section}
+            onUpdateElement={onUpdate}
+        />);
+
+        const input = screen.getByPlaceholderText('Enter title...') as HTMLInputElement;
+        // If the bug exists, this might be 'Start Section' instead of ''
+        expect(input.value).toBe('');
+    });
+
+    it('should continuously update ID as user types (Smart ID Continuity)', () => {
+        const onUpdate = vi.fn();
+        // Start with default ID
+        let currentElement = { ...mockElement, id: 'el_default', label: '' };
+
+        const { rerender } = render(<PropertiesPanel
+            {...defaultProps}
+            selectedElement={currentElement}
+            onUpdateElement={(updated) => {
+                onUpdate(updated);
+                // Simulate parent state update
+                currentElement = updated;
+            }}
+        />);
+
+        const labelInput = screen.getByPlaceholderText('Enter title...');
+
+        // 1. Type "O"
+        fireEvent.change(labelInput, { target: { value: 'O' } });
+        // ID is "o", which is < 2 chars, so it defaults to "field"
+        expect(onUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'field' }));
+
+        // Manually update prop for next render (simulating app state update)
+        // Note: The app would have saved "field" as the ID
+        currentElement = { ...currentElement, id: 'field', label: 'O' };
+        rerender(<PropertiesPanel
+            {...defaultProps}
+            selectedElement={currentElement}
+            onUpdateElement={(updated) => {
+                onUpdate(updated);
+                currentElement = updated;
+            }}
+        />);
+
+        // 2. Type "Or"
+        // Now currentElement.id is 'field'. The new logic should allow syncing because id === 'field'
+        fireEvent.change(labelInput, { target: { value: 'Or' } });
+        expect(onUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'or' }));
+    });
 });

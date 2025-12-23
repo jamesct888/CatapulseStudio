@@ -220,7 +220,7 @@ const App: React.FC = () => {
 
     // Safe Wrappers
     const safeUpdateElement = (el: ElementDefinition) => {
-        const { stg } = getSelectedObjects(); // Uses selectedStageId from state
+        const { stg, el: currentEl } = getSelectedObjects(); // Uses selectedStageId from state
         // If we are editing an element, we should know its stage.
         // Fallback: search for stage if current selection is not matching (rare but safer)
         let relevantStageId = stg?.id;
@@ -230,7 +230,14 @@ const App: React.FC = () => {
         }
 
         if (checkSafeModification(relevantStageId)) {
-            updateElement(el);
+            // Check if ID changed (Renaming)
+            if (currentEl && currentEl.id !== el.id) {
+                // Pass old ID to finder, and update selection to new ID
+                updateElement(el, currentEl.id);
+                setSelectedElementId(el.id);
+            } else {
+                updateElement(el);
+            }
         }
     };
 
@@ -489,6 +496,19 @@ const App: React.FC = () => {
                                                 setProcessDef(newDef);
                                             }
                                         }
+                                    }}
+                                    // Navigation for Breadcrumbs
+                                    onSelectStage={(id) => {
+                                        setSelectedElementId(null);
+                                        setSelectedSectionId(null);
+                                        setSelectedStageId(id);
+                                    }}
+                                    onSelectSection={(id) => {
+                                        setSelectedElementId(null);
+                                        setSelectedSectionId(id);
+                                    }}
+                                    onSelectElement={(id) => {
+                                        setSelectedElementId(id);
                                     }}
                                 />
                             )}

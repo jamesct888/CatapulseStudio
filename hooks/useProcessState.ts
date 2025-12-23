@@ -25,12 +25,14 @@ export const useProcessState = () => {
     setProcessDef(newDef);
   };
 
-  const updateElement = (updated: ElementDefinition) => {
+  const updateElement = (updated: ElementDefinition, oldId?: string) => {
     if (!processDef) return;
     const newDef = { ...processDef };
+    const targetId = oldId || updated.id;
+
     newDef.stages.forEach(stg => {
       stg.sections.forEach(sec => {
-        const idx = sec.elements.findIndex(e => e.id === updated.id);
+        const idx = sec.elements.findIndex(e => e.id === targetId);
         if (idx !== -1) sec.elements[idx] = updated;
       });
     });
