@@ -625,8 +625,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             </div>
                         )}
 
-                        {/* 3. SKIP LOGIC (Stage Only) */}
-                        {selectedStage && (
+                        {/* 3. SKIP LOGIC (Stage Only - Strict) */}
+                        {selectedStage && !selectedSection && !selectedElement && (
                             <div className="bg-gray-100 p-4 rounded-xl border border-gray-200">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
@@ -671,8 +671,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             </div>
                         )}
 
-                        {/* 5. SKILL ROUTING (Stage Only) */}
-                        {selectedStage && (
+                        {/* 5. SKILL ROUTING (Stage Only - Strict) */}
+                        {selectedStage && !selectedSection && !selectedElement && (
                             <div className="border-t border-gray-200 pt-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <label className={labelClass}>

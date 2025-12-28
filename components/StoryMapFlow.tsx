@@ -104,7 +104,7 @@ const StageNode = ({ data }: NodeProps) => {
                 backgroundColor: '#f8fafc',
                 borderTopLeftRadius: '12px', borderTopRightRadius: '12px'
             }}>
-                {data.label}
+                {data.label as React.ReactNode}
             </div>
 
             {/* Handles for routing flexibility */}
@@ -127,7 +127,7 @@ const StoryNode = ({ data }: NodeProps) => {
             title={`${data.fullTitle}\n\n${description}`} // Native tooltip
             className="px-3 py-1 bg-sw-teal border border-sw-teal rounded-full text-xs font-bold text-white shadow-sm cursor-help whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] text-center hover:bg-sw-tealHover transition-colors font-sans"
         >
-            {data.label}
+            {data.label as React.ReactNode}
         </div>
     );
 };

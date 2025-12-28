@@ -23,11 +23,9 @@ describe('ModeTable', () => {
     const mockSetProcessDef = vi.fn();
 
     const mockTheme: VisualTheme = {
-        font: 'inter',
-        primaryColor: '#008080',
-        backgroundColor: '#ffffff',
-        textColor: '#333333',
-        borderRadius: 8,
+        mode: 'type1', // Valid mode (type1 | type2 | type3)
+        density: 'default', // Valid density
+        radius: 'medium', // Valid radius
     };
 
     let initialProcessDef: ProcessDefinition;
@@ -42,6 +40,7 @@ describe('ModeTable', () => {
         initialProcessDef = {
             id: 'proc_1',
             name: 'Test Process',
+            description: 'Mock Description',
             stages: [
                 {
                     id: 'stage_1',
