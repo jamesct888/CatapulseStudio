@@ -206,6 +206,8 @@ export const generateMonolithicProcess = async (description: string): Promise<Pr
     
     Field Types: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static', 'repeater', 'calculated'.
     
+    IMPORTANT: For 'select', 'multiselect', or 'radio' types, you MUST include a 'options' array with 3-5 realistic values based on the process context (e.g., ["High", "Medium", "Low"] or ["Pension", "ISA", "GIA"]).
+    
     JSON Structure:
     {
         "id": "proc_auto",
@@ -215,7 +217,7 @@ export const generateMonolithicProcess = async (description: string): Promise<Pr
                         {
                             "id": "stg_1", "title": "Stage 1",
                             "sections": [
-                                { "id": "sec_1", "title": "Section 1", "layout": "2col", "elements": [{ "id": "el_1", "label": "Name", "type": "text" }] }
+                                { "id": "sec_1", "title": "Section 1", "layout": "2col", "elements": [{ "id": "el_1", "label": "Account Type", "type": "select", "options": ["Savings", "Checking"] }] }
                             ]
                         }
                     ]
@@ -310,6 +312,7 @@ export const generateProcessFlesh = async (skeleton: ProcessDefinition): Promise
         2. Each Section must have 3 - 6 Data Elements(Fields).
         3. Include 'visibility' logic where appropriate.
         4. STRICTLY USE ONLY THESE FIELD TYPES: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'multiselect', 'radio', 'checkbox', 'static', 'repeater', 'calculated'.
+        5. **OPTIONS**: For 'select', 'radio', or 'multiselect', providing an 'options' array is MANDATORY. Populate it with 3-5 realistic business values.
         
         OUTPUT FORMAT:
         Return a JSON Object where Keys are the 'id' of the Stage, and Values are arrays of SectionDefinition.
@@ -363,6 +366,7 @@ export const generateStageDetails = async (stage: StageDefinition, processDescri
         3. INCLUDE LOGIC:
     - Add 'visibility' logic to fields.
         4. Types: 'text', 'email', 'textarea', 'number', 'date', 'currency', 'select', 'radio', 'checkbox', 'static', 'repeater', 'calculated'.
+        5. For 'select'/'radio' fields: You MUST include an 'options' array with realistic values (e.g. options: ["Yes", "No"] or ["Email", "Post"]).
         5. IDs: Use unique IDs(e.g., 'sec_${stage.id}_1', 'el_${stage.id}_dob').
 
         Return ONLY a JSON Array of SectionDefinition objects:
@@ -448,7 +452,8 @@ export const modifyProcess = async (currentProcess: ProcessDefinition, instructi
     - "Email" -> 'email'
     - "Date of Birth" -> 'date'
     - "Salary" -> 'currency'
-    3. ** Structure Integrity **: Do NOT delete existing fields unless explicitly asked.APPEND new fields to the selected section(or the first section of the selected stage if no section is selected).
+    3. ** Options **: If adding a 'select' or 'radio' field, ALWAYS generate an 'options' array with relevant choices.
+    4. ** Structure Integrity **: Do NOT delete existing fields unless explicitly asked.APPEND new fields to the selected section(or the first section of the selected stage if no section is selected).
     4. ** JSON Only **: Return ONLY the full, valid, modified ProcessDefinition JSON.No markdown, no chat.
 
     Execute the instruction now.
