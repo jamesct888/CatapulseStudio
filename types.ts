@@ -202,6 +202,7 @@ export interface UserStory {
   jiraId?: string; // Optional external ID
   status?: 'To Do' | 'In Progress' | 'Done';
   title: string;
+  description?: string; // Legacy/Optional
   narrative: string; // Added narrative
   acceptanceCriteria: string;
   dependencies: string[];

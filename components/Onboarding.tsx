@@ -27,6 +27,8 @@ export const Onboarding: React.FC<OnboardingProps> = ({
   setIsDetailedMode
 }) => {
   const legacyInputRef = useRef<HTMLInputElement>(null);
+  // UI-only state for now, as requested
+  const [targetTech, setTargetTech] = React.useState<'pega' | 'other'>('pega');
 
   return (
     <div className="min-h-screen bg-sw-lighterGray flex flex-col justify-center items-center p-8 relative overflow-hidden">
@@ -55,6 +57,25 @@ export const Onboarding: React.FC<OnboardingProps> = ({
             `}</style>
         </div>
       )}
+
+      {/* --- Tech Stack Toggle (Visual Only) --- */}
+      <div className="absolute top-8 right-8 z-50">
+        <div className="flex bg-white/50 backdrop-blur-sm p-1 rounded-xl border border-white/40 shadow-sm">
+          <button
+            onClick={() => setTargetTech('pega')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${targetTech === 'pega' ? 'bg-sw-teal text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}
+          >
+            <div className={`w-2 h-2 rounded-full ${targetTech === 'pega' ? 'bg-white' : 'bg-sw-teal'}`}></div>
+            Pega Infinity™
+          </button>
+          <button
+            onClick={() => setTargetTech('other')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${targetTech === 'other' ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}
+          >
+            Other
+          </button>
+        </div>
+      </div>
 
       <div className="max-w-4xl w-full z-10 text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
         <div className="flex justify-center mb-2">
