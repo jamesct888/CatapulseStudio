@@ -26,6 +26,7 @@ describe('AppHeader', () => {
     const sampleProcess: ProcessDefinition = {
         id: 'proc_123',
         name: 'My Process',
+        description: '', // Added missing required property
         stages: []
     };
 

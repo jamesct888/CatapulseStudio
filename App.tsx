@@ -63,8 +63,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 const App: React.FC = () => {
     // Use Custom Hook for Logic
     const {
-        processDef, setProcessDef, updateElement, updateSection, updateStage, deleteElement, deleteSection, deleteStage
+        processDef, setProcessDef: hookSetProcessDef, updateElement, updateSection, updateStage, deleteElement, deleteSection, deleteStage
     } = useProcessState();
+
+    // Cast hook setter to match expected React.Dispatch signature where necessary
+    const setProcessDef = hookSetProcessDef as React.Dispatch<React.SetStateAction<ProcessDefinition | null>>;
 
     // Auto-Backup Hook
     const { checkForBackup } = useAutoBackup(processDef, setProcessDef);

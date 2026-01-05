@@ -15,9 +15,9 @@ const initSupabase = () => {
         } catch (e) {
             console.error("Failed to init Supabase from local storage", e);
         }
-    } else if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_KEY) {
+    } else if ((import.meta as any).env.VITE_SUPABASE_URL && (import.meta as any).env.VITE_SUPABASE_KEY) {
         try {
-            supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
+            supabase = createClient((import.meta as any).env.VITE_SUPABASE_URL, (import.meta as any).env.VITE_SUPABASE_KEY);
         } catch (e) {
             console.error("Failed to init Supabase from env", e);
         }
