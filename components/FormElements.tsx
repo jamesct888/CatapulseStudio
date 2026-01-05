@@ -14,7 +14,19 @@ interface FormElementProps {
   theme?: VisualTheme;
   // We need the full formData context to calculate values
   formData?: any;
+  // Props passed by ModePreview for debug/logic features
+  hoveredFieldId?: string | null;
+  setHoveredFieldId?: (id: string | null) => void;
+  allElements?: ElementDefinition[];
 }
+
+const getOptionLabel = (opt: any): string => {
+  if (typeof opt === 'string') return opt;
+  if (typeof opt === 'object' && opt !== null) {
+    return opt.label || opt.value || JSON.stringify(opt);
+  }
+  return String(opt);
+};
 
 export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' }, formData }) => {
   // --- RUNTIME SELF-HEALING ---
@@ -262,6 +274,26 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       </div>
     );
   }
+
+  // --- Shared List Styles ---
+  const listContainerClass = isType2 || isType3 ? 'border-gray-300 bg-white' : 'border-sw-teal/30 bg-white';
+  const listHeaderClass = isType2
+    ? 'bg-[#ffe2e8] border-gray-200'
+    : isType3
+      ? 'bg-[#f1f1f1] border-gray-200'
+      : 'bg-sw-lightGray border-gray-200';
+
+  const listHeaderLabelClass = isType2
+    ? 'text-[#e61126]'
+    : isType3
+      ? 'text-[#006a4d]'
+      : 'text-gray-500';
+
+  const listInputClass = isType2
+    ? 'bg-white border-gray-300 focus:border-[#e61126] text-[#0b3239]'
+    : isType3
+      ? 'bg-white border-gray-300 focus:border-[#006a4d] text-[#323233]'
+      : 'bg-white border-gray-200 focus:border-sw-teal text-sw-text';
 
   // --- Standard Inputs ---
   switch (effectiveType) {
@@ -553,24 +585,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
         onChange(newRows);
       };
 
-      const listContainerClass = isType2 || isType3 ? 'border-gray-300 bg-white' : 'border-sw-teal/30 bg-white';
-      const listHeaderClass = isType2
-        ? 'bg-[#ffe2e8] border-gray-200'
-        : isType3
-          ? 'bg-[#f1f1f1] border-gray-200'
-          : 'bg-sw-lightGray border-gray-200';
 
-      const listHeaderLabelClass = isType2
-        ? 'text-[#e61126]'
-        : isType3
-          ? 'text-[#006a4d]'
-          : 'text-gray-500';
-
-      const listInputClass = isType2
-        ? 'bg-white border-gray-300 focus:border-[#e61126] text-[#0b3239]'
-        : isType3
-          ? 'bg-white border-gray-300 focus:border-[#006a4d] text-[#323233]'
-          : 'bg-white border-gray-200 focus:border-sw-teal text-sw-text';
 
       return (
         <div className={`${d.wrapper} group`}>
@@ -654,6 +669,159 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                   }`}
               >
                 <Plus size={14} /> Add {element.label || 'Item'}
+              </button>
+            </div>
+          </div>
+          <ErrorMsg />
+        </div>
+      );
+
+    case 'manage_requirements':
+
+      const mrDocs = element.options ? (Array.isArray(element.options) ? element.options : String(element.options).split(',')) : [];
+      const mrRows = Array.isArray(value) ? value : [];
+      const mrColumns = [
+        { id: 'docName', label: 'Document Name' },
+        { id: 'party', label: 'Party' },
+        { id: 'method', label: 'Request Method' },
+        { id: 'status', label: 'Status' },
+        { id: 'targetDate', label: 'Target Date' }
+      ];
+
+      const handleAddMrRow = () => {
+        onChange([...mrRows, {}]);
+      };
+
+      const handleRemoveMrRow = (index: number) => {
+        const newRows = [...mrRows];
+        newRows.splice(index, 1);
+        onChange(newRows);
+      };
+
+      const handleMrRowChange = (index: number, field: string, val: any) => {
+        const newRows = [...mrRows];
+        newRows[index] = { ...newRows[index], [field]: val };
+        onChange(newRows);
+      };
+
+      return (
+        <div className={`${d.wrapper} group`}>
+          <Label />
+          <div className={`border rounded-lg overflow-hidden shadow-sm ${listContainerClass}`}>
+            {/* Header */}
+            <div className={`border-b grid gap-2 px-4 py-2 ${listHeaderClass}`} style={{ gridTemplateColumns: `3fr 2fr 1.5fr 2fr 1.5fr 40px` }}>
+              {mrColumns.map(col => (
+                <div key={col.id} className={`text-xs font-bold uppercase tracking-wide ${listHeaderLabelClass}`}>
+                  {col.label}
+                </div>
+              ))}
+              <div className={`text-xs font-bold uppercase ${listHeaderLabelClass}`}></div>
+            </div>
+
+            {/* Rows */}
+            <div className={`divide-y divide-gray-100`}>
+              {mrRows.map((row: any, rowIdx: number) => (
+                <div key={rowIdx} className="grid gap-2 px-4 py-2 items-start" style={{ gridTemplateColumns: `3fr 2fr 1.5fr 2fr 1.5fr 40px` }}>
+                  {/* Document Name */}
+                  <div>
+                    <select
+                      disabled={disabled}
+                      className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
+                      value={row.docName || ''}
+                      onChange={(e) => handleMrRowChange(rowIdx, 'docName', e.target.value)}
+                    >
+                      <option value="">Select Document...</option>
+                      {mrDocs.map((opt: any, i: number) => {
+                        const label = getOptionLabel(opt);
+                        return <option key={i} value={label} className="text-gray-900">{label}</option>;
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Party */}
+                  <div>
+                    <input
+                      type="text"
+                      disabled={disabled}
+                      className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
+                      value={row.party || ''}
+                      onChange={(e) => handleMrRowChange(rowIdx, 'party', e.target.value)}
+                      placeholder="Party Name"
+                    />
+                  </div>
+
+                  {/* Method */}
+                  <div>
+                    <select
+                      disabled={disabled}
+                      className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
+                      value={row.method || ''}
+                      onChange={(e) => handleMrRowChange(rowIdx, 'method', e.target.value)}
+                    >
+                      <option value="">Method...</option>
+                      <option value="Email">Email</option>
+                      <option value="Post">Post</option>
+                      <option value="Telephone">Telephone</option>
+                    </select>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <select
+                      disabled={disabled}
+                      className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
+                      value={row.status || ''}
+                      onChange={(e) => handleMrRowChange(rowIdx, 'status', e.target.value)}
+                    >
+                      <option value="">Status...</option>
+                      <option value="Awaiting send">Awaiting send</option>
+                      <option value="Sent - Awaiting response">Sent - Awaiting response</option>
+                      <option value="Received">Received</option>
+                    </select>
+                  </div>
+
+                  {/* Target Date */}
+                  <div>
+                    <input
+                      type="date"
+                      disabled={disabled}
+                      className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
+                      value={row.targetDate || ''}
+                      onChange={(e) => handleMrRowChange(rowIdx, 'targetDate', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Delete */}
+                  <button
+                    onClick={() => handleRemoveMrRow(rowIdx)}
+                    disabled={disabled}
+                    className="text-gray-400 hover:text-sw-red p-2 transition-colors flex justify-center"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              {mrRows.length === 0 && (
+                <div className={`p-8 text-center text-sm italic text-gray-400 bg-gray-50/50`}>
+                  No requirements added yet.
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className={`border-t p-2 ${isType2 ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-gray-200'}`}>
+              <button
+                onClick={handleAddMrRow}
+                disabled={disabled}
+                className={`w-full py-2 border border-dashed rounded text-xs font-bold transition-all flex items-center justify-center gap-2 
+                                ${isType2
+                    ? 'border-gray-300 text-gray-500 hover:border-[#e61126] hover:text-[#e61126] hover:bg-white'
+                    : isType3
+                      ? 'border-gray-300 text-gray-500 hover:border-[#006a4d] hover:text-[#006a4d] hover:bg-white'
+                      : 'border-gray-300 text-gray-500 hover:border-sw-teal hover:text-sw-teal hover:bg-white'
+                  }`}
+              >
+                <Plus size={14} /> Add Requirement
               </button>
             </div>
           </div>

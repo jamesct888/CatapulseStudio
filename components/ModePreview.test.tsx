@@ -23,6 +23,7 @@ describe('ModePreview', () => {
     const sampleProcess: ProcessDefinition = {
         id: 'proc_1',
         name: 'Test Process',
+        description: 'Test Description',
         stages: [
             {
                 id: 'stage_1',
@@ -32,7 +33,7 @@ describe('ModePreview', () => {
                         id: 'sec_1',
                         title: 'Section One',
                         elements: [
-                            { id: 'el_1', type: 'text', label: 'Required Field', required: true, visibility: { conditions: [], groups: [] } }
+                            { id: 'el_1', type: 'text', label: 'Required Field', required: true, visibility: { id: 'root', operator: 'AND', conditions: [], groups: [] } }
                         ]
                     }
                 ]

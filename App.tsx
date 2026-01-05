@@ -293,6 +293,29 @@ const App: React.FC = () => {
         handleAiModification(aiPrompt, { selectedStageId, selectedSectionId }, () => setAiPrompt(''));
     };
 
+    // --- GLOBAL OPTION SYNC ---
+    const handleSyncGlobalOptions = (elementType: string, options: any[]) => {
+        if (!processDef) return;
+        const newDef = { ...processDef };
+
+        let updateCount = 0;
+        newDef.stages.forEach(stage => {
+            stage.sections.forEach(section => {
+                section.elements.forEach(element => {
+                    if (element.type === elementType) {
+                        element.options = options;
+                        updateCount++;
+                    }
+                });
+            });
+        });
+
+        if (updateCount > 0) {
+            console.log(`Synced options for ${elementType} to ${updateCount} elements.`);
+            setProcessDef(newDef);
+        }
+    };
+
     // Helper to resolve selection objects
     const getSelectedObjects = () => {
         if (!processDef) return { el: null, sec: null, stg: null };
@@ -510,6 +533,7 @@ const App: React.FC = () => {
                                     onSelectElement={(id) => {
                                         setSelectedElementId(id);
                                     }}
+                                    onSyncGlobalOptions={handleSyncGlobalOptions}
                                 />
                             )}
                             {activeSidePanel === 'settings' && (

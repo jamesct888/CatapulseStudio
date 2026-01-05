@@ -35,8 +35,12 @@ interface PropertiesPanelProps {
     // Navigation Callbacks
     onSelectStage?: (id: string) => void;
     onSelectSection?: (id: string) => void;
+
     onSelectElement?: (id: string) => void;
+    // Global Option Sync
+    onSyncGlobalOptions?: (elementType: string, options: any[]) => void;
 }
+
 
 const generateIdFromLabel = (label: string): string => {
     // CamelCase generator: "Member Details" -> "memberDetails"
@@ -81,7 +85,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     onPasteStageLogic,
     onSelectStage,
     onSelectSection,
-    onSelectElement
+    onSelectElement,
+    onSyncGlobalOptions
 }) => {
     // --- STATE ---
     const [modals, setModals] = useState<{
@@ -158,6 +163,20 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 }
                 updates.id = uniqueId;
             }
+        }
+
+        // --- PRE-FILL: Auto-populate options for 'manage_requirements' ---
+        // If user switches type to 'manage_requirements', try to find an existing one to copy options from.
+        if (selectedElement && field === 'type' && value === 'manage_requirements') {
+            const existingMR = allElements.find(e => e.type === 'manage_requirements' && e.id !== selectedElement.id);
+            if (existingMR && existingMR.options && existingMR.options.length > 0) {
+                updates.options = existingMR.options;
+            }
+        }
+
+        // --- GLOBAL SYNC: If updating options for 'manage_requirements', trigger sync ---
+        if (selectedElement && field === 'options' && selectedElement.type === 'manage_requirements' && onSyncGlobalOptions) {
+            onSyncGlobalOptions('manage_requirements', value);
         }
 
         if (selectedElement) onUpdateElement({ ...selectedElement, ...updates });
@@ -412,7 +431,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                 { val: 'select', label: 'Dropdown (Select)' },
                                                 { val: 'radio', label: 'Radio Buttons' },
                                                 { val: 'checkbox', label: 'Checkbox' },
-                                                { val: 'repeater', label: 'Data Table (Repeater)' }
+                                                { val: 'repeater', label: 'Data Table (Repeater)' },
+                                                { val: 'manage_requirements', label: 'Manage Requirements' }
                                             ];
                                             const staticOptions = [
                                                 { val: 'calculated', label: 'Calculated Formula' },
@@ -443,9 +463,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                 )}
 
                                 {/* Options for Select/Radio */}
-                                {['select', 'radio', 'multiselect'].includes(selectedElement.type) && (
+                                {/* Options for Select/Radio/ManageRequirements */}
+                                {['select', 'radio', 'multiselect', 'manage_requirements'].includes(selectedElement.type) && (
                                     <div>
-                                        <label className={labelClass}>Options (Comma separated)</label>
+                                        <label className={labelClass}>
+                                            {selectedElement.type === 'manage_requirements' ? 'Appropriate Documents (Comma separated)' : 'Options (Comma separated)'}
+                                        </label>
                                         <textarea
                                             // Handle complex options object vs simple string array
                                             value={Array.isArray(selectedElement.options)
@@ -457,7 +480,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                             }}
                                             className={inputClass}
                                             rows={3}
-                                            placeholder="Option 1, Option 2, Option 3"
+                                            placeholder={selectedElement.type === 'manage_requirements' ? "Passport, Utility Bill, Bank Statement" : "Option 1, Option 2, Option 3"}
                                         />
                                     </div>
                                 )}

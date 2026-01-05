@@ -13,7 +13,8 @@ export type ElementType =
   | 'checkbox'
   | 'static'
   | 'repeater'
-  | 'calculated';
+  | 'calculated'
+  | 'manage_requirements';
 
 export type Operator = 'equals' | 'notEquals' | 'contains' | 'doesNotContain' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 

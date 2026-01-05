@@ -364,6 +364,8 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                             cardClass={cardClass}
                             isLogicDebugEnabled={isLogicDebugEnabled}
                             allElements={processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements)}
+                            hoveredFieldId={hoveredFieldId}
+                            setHoveredFieldId={setHoveredFieldId}
                         />
                     ))}
                 </div>
@@ -444,6 +446,10 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                                                 let elementValue = formData[el.id];
                                                 if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
                                                     elementValue = formData[el.sourceFieldId];
+                                                }
+                                                // Shared Data Logic
+                                                if (el.type === 'manage_requirements') {
+                                                    elementValue = formData['_global_requirements'];
                                                 }
                                                 return (
                                                     <RenderElement key={el.id} element={el} value={elementValue} onChange={() => { }} disabled theme={{ ...visualTheme, density: 'compact', radius: 'small' }} />
@@ -652,6 +658,11 @@ const SectionComponent: React.FC<SectionProps> = ({
                             elementValue = formData[el.sourceFieldId];
                         }
 
+                        // Shared Data Logic (Global Requirements)
+                        if (el.type === 'manage_requirements') {
+                            elementValue = formData['_global_requirements'];
+                        }
+
                         return (
                             <div
                                 key={el.id}
@@ -687,6 +698,13 @@ const SectionComponent: React.FC<SectionProps> = ({
                                     value={elementValue}
                                     onChange={(val) => {
                                         if (isHiddenDebug) return; // Prevention
+
+                                        // Shared Data Write
+                                        if (el.type === 'manage_requirements') {
+                                            setFormData(prev => ({ ...prev, ['_global_requirements']: val }));
+                                            return;
+                                        }
+
                                         setFormData(prev => ({ ...prev, [el.id]: val }));
                                         if (formErrors[el.id]) {
                                             setFormErrors(prev => { const n = { ...prev }; delete n[el.id]; return n; });
