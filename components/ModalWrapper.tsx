@@ -3,20 +3,20 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalWrapperProps {
-  title: string;
-  icon: any;
-  children: React.ReactNode;
-  onClose: () => void;
-  modalSize: { width: number; height: number };
-  onResizeStart: () => void;
+    title: string;
+    icon: any;
+    children: React.ReactNode;
+    onClose: () => void;
+    modalSize: { width: number; height: number | string };
+    onResizeStart: () => void;
 }
 
 export const ModalWrapper: React.FC<ModalWrapperProps> = ({ title, icon: Icon, children, onClose, modalSize, onResizeStart }) => {
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div 
-              className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative border border-gray-200"
-              style={{ width: modalSize.width, height: modalSize.height, maxWidth: '95vw', maxHeight: '95vh' }}
+            <div
+                className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative border border-gray-200"
+                style={{ width: modalSize.width, height: modalSize.height, maxWidth: '95vw', maxHeight: '95vh' }}
             >
                 {/* Modal Header */}
                 <div className="bg-sw-teal p-6 flex justify-between items-center text-white shrink-0">
@@ -42,9 +42,9 @@ export const ModalWrapper: React.FC<ModalWrapperProps> = ({ title, icon: Icon, c
                         Done
                     </button>
                     {/* Resize Handle */}
-                    <div 
-                      className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize flex items-end justify-end p-1 text-gray-300 hover:text-sw-teal"
-                      onMouseDown={onResizeStart}
+                    <div
+                        className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize flex items-end justify-end p-1 text-gray-300 hover:text-sw-teal"
+                        onMouseDown={onResizeStart}
                     >
                         <svg viewBox="0 0 10 10" className="w-3 h-3 fill-current">
                             <path d="M10 10 L10 0 L0 10 Z" />

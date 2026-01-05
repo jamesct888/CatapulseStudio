@@ -43,10 +43,11 @@ export interface ProcessHistoryEntry {
 
 export const isSupabaseConfigured = () => !!supabase;
 
-export const configureSupabase = (url: string, key: string) => {
+export const configureSupabase = (url: string, key: string): boolean => {
     localStorage.setItem('sb_url', url);
     localStorage.setItem('sb_key', key);
     initSupabase();
+    return isSupabaseConfigured();
 };
 
 export const disconnectSupabase = () => {

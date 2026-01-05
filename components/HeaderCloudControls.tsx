@@ -108,7 +108,7 @@ export const HeaderCloudControls: React.FC<HeaderCloudControlsProps> = ({
 
     const handleLoadProcess = async (id: string) => {
         try {
-            const def = await loadProcessFromCloud(id);
+            const { data: def } = await loadProcessFromCloud(id);
             if (def) {
                 setProcessDef(def);
                 setShowLoadModal(false);

@@ -16,7 +16,7 @@ import { useProcessState } from './hooks/useProcessState';
 import { useAiOperations } from './hooks/useAiOperations';
 import { useAutoBackup } from './hooks/useAutoBackup'; // Import Backup Hook
 import {
-    FormState, VisualTheme, UserStory, TestCase,
+    FormState, VisualTheme, UserStory, TestCase, ProcessDefinition,
     ElementDefinition, SectionDefinition, StageDefinition, StoryStrategy, SkillRule
 } from './types';
 
@@ -401,7 +401,7 @@ const App: React.FC = () => {
                             <div className="flex-1 flex overflow-hidden">
                                 <ModeEditor
                                     processDef={processDef}
-                                    setProcessDef={setProcessDef}
+                                    setProcessDef={setProcessDef as React.Dispatch<React.SetStateAction<ProcessDefinition>>}
                                     selectedStageId={selectedStageId}
                                     setSelectedStageId={setSelectedStageId}
                                     selectedSectionId={selectedSectionId}
@@ -426,7 +426,7 @@ const App: React.FC = () => {
                             <div className="flex-1 overflow-hidden bg-gray-50">
                                 <ModeTable
                                     processDef={processDef}
-                                    setProcessDef={setProcessDef}
+                                    setProcessDef={(def) => setProcessDef(def)}
                                     visualTheme={visualTheme}
                                 />
                             </div>
@@ -434,7 +434,7 @@ const App: React.FC = () => {
 
                         {viewMode === 'flow' && (
                             <div className="flex-1 overflow-hidden bg-gray-50">
-                                <ModeFlow processDef={processDef} setProcessDef={setProcessDef} />
+                                <ModeFlow processDef={processDef} setProcessDef={(def) => setProcessDef(def)} />
                             </div>
                         )}
 

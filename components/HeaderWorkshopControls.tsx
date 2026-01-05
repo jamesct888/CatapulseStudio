@@ -31,7 +31,7 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
         setDismissedIds([]);
 
         try {
-            const suggestions = await analyzeTranscript(transcript, processDef);
+            const suggestions = await analyzeTranscript(processDef, transcript);
             setDiscoverySuggestions(suggestions);
         } catch (error) {
             console.error(error);
