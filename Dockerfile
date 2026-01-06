@@ -10,6 +10,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Run tests before building. If tests fail, the build fails.
+RUN npm test
+
 # Build the project
 # Note: In a real CI/CD pipeline, secrets like API keys should be passed as build args or injected at runtime.
 # For this setup, we assume the environment variables are handled or specific build args are passed.

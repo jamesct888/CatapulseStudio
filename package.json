@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:watch": "playwright test --ui",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
