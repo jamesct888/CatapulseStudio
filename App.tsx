@@ -1,4 +1,4 @@
-import React, { Component, useState, useEffect, ErrorInfo, ReactNode } from 'react';
+import React, { Component, useState, useEffect, ErrorInfo, ReactNode, useRef } from 'react';
 import { Onboarding } from './components/Onboarding';
 import { ModeEditor } from './components/ModeEditor';
 import { ModePreview } from './components/ModePreview';
@@ -72,15 +72,28 @@ const App: React.FC = () => {
     // Auto-Backup Hook
     const { checkForBackup } = useAutoBackup(processDef, setProcessDef);
 
+    // Guard against double firing in strict mode
+    const restorePromptShown = useRef(false);
+
     // Check for Backup on Mount
     useEffect(() => {
+        if (restorePromptShown.current) return;
+
         const { hasBackup, timestamp, restore } = checkForBackup();
         if (hasBackup && !processDef) {
-            const shouldRestore = window.confirm(`Found an unsaved session from ${new Date(timestamp!).toLocaleString()}. Restore it?`);
-            if (shouldRestore) {
-                restore();
-                setViewMode('editor');
-            }
+            restorePromptShown.current = true; // Mark as shown immediately
+
+            // Small timeout to allow UI to settle before blocking alert
+            setTimeout(() => {
+                const shouldRestore = window.confirm(`Found an unsaved session from ${new Date(timestamp!).toLocaleString()}. Restore it?`);
+                if (shouldRestore) {
+                    restore();
+                    setViewMode('editor');
+                } else {
+                    // User explicitly cancelled, ensure we don't prompt again this session for this specific backup state
+                    // logic here is fine as is, effect won't re-run significantly if deps are stable
+                }
+            }, 100);
         }
     }, [checkForBackup, processDef]); // Run once on mount or when processDef is initially null
 

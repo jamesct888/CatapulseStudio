@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ProcessDefinition, ElementDefinition, SectionDefinition, StageDefinition } from '../types';
 
 export const useProcessState = () => {
@@ -88,45 +88,15 @@ export const useProcessState = () => {
   };
 
   // --- Sanitization Helper ---
-  const sanitizeProcessDef = (def: ProcessDefinition): ProcessDefinition => {
-    // 1. Ensure basics exist
-    const clean = { ...def };
-    if (!clean.stages) clean.stages = [];
+  // Moved implementation outside hook to avoid re-creation
 
-    // 2. Deep Clean Stages
-    clean.stages = clean.stages.map(stg => {
-      const cleanStage = { ...stg };
-      if (!cleanStage.sections) cleanStage.sections = [];
-
-      // Clean Sections
-      cleanStage.sections = cleanStage.sections.map(sec => {
-        const cleanSection = { ...sec };
-        if (!cleanSection.elements) cleanSection.elements = [];
-
-        // Clean Elements
-        cleanSection.elements = cleanSection.elements.map(el => {
-          const cleanEl = { ...el };
-          // Ensure properties that might be undefined in older versions
-          if (!cleanEl.options) cleanEl.options = [];
-          return cleanEl;
-        });
-
-        return cleanSection;
-      });
-
-      return cleanStage;
-    });
-
-    return clean;
-  };
-
-  const setProcessDefSafe = (def: ProcessDefinition | null) => {
+  const setProcessDefSafe = useCallback((def: ProcessDefinition | null) => {
     if (def) {
       setProcessDef(sanitizeProcessDef(def));
     } else {
       setProcessDef(null);
     }
-  };
+  }, []);
 
   return {
     processDef,
@@ -138,4 +108,37 @@ export const useProcessState = () => {
     deleteSection,
     deleteElement
   };
+};
+
+// Moved outside to be stable
+const sanitizeProcessDef = (def: ProcessDefinition): ProcessDefinition => {
+  // 1. Ensure basics exist
+  const clean = { ...def };
+  if (!clean.stages) clean.stages = [];
+
+  // 2. Deep Clean Stages
+  clean.stages = clean.stages.map(stg => {
+    const cleanStage = { ...stg };
+    if (!cleanStage.sections) cleanStage.sections = [];
+
+    // Clean Sections
+    cleanStage.sections = cleanStage.sections.map(sec => {
+      const cleanSection = { ...sec };
+      if (!cleanSection.elements) cleanSection.elements = [];
+
+      // Clean Elements
+      cleanSection.elements = cleanSection.elements.map(el => {
+        const cleanEl = { ...el };
+        // Ensure properties that might be undefined in older versions
+        if (!cleanEl.options) cleanEl.options = [];
+        return cleanEl;
+      });
+
+      return cleanSection;
+    });
+
+    return cleanStage;
+  });
+
+  return clean;
 };
