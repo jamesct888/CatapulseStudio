@@ -11,9 +11,11 @@ import { UserStory } from "../types";
  */
 export const exportStoriesToJiraCsv = (stories: UserStory[], strategyName: string): string => {
     // 1. Define CSV Headers (Standard Jira headers)
+    // 1. Define CSV Headers (Standard Jira headers + Custom AC)
     const headers = [
         "Summary",
         "Description",
+        "Acceptance Criteria",
         "Issue Type",
         "Priority",
         "Labels"
@@ -21,23 +23,24 @@ export const exportStoriesToJiraCsv = (stories: UserStory[], strategyName: strin
 
     // 2. Build Rows
     const rows = stories.map(story => {
-        // Format Description to include AC and Data Elements
-        let description = `${story.narrative}\n\n*Acceptance Criteria:*\n`;
+        // Description is now just the narrative
+        const description = story.narrative || "";
 
+        // Format Acceptance Criteria
+        let acText = "";
         if (Array.isArray(story.acceptanceCriteria)) {
-            description += story.acceptanceCriteria.map(ac => `- ${ac}`).join('\n');
+            acText = story.acceptanceCriteria.map(ac => `- ${ac}`).join('\n');
         } else {
-            description += story.acceptanceCriteria;
+            acText = story.acceptanceCriteria || "";
         }
 
-        // Add Data Elements content if present
-        if (story.dataElements && story.dataElements.length > 0) {
-            description += `\n\n*Data Elements:*\n`;
-            description += `||Label||Type||Req||Logic||\n`; // Jira Wiki Markup Table Header
-            story.dataElements.forEach(el => {
-                description += `|${el.label}|${el.type}|${el.required ? 'Yes' : 'No'}|${el.visibility}|\n`;
-            });
-        }
+        // Bold Gherkin Keywords (Jira Syntax: *Word*)
+        // We look for these keywords at the start of lines or sentences for safety
+        acText = acText
+            .replace(/\b(GIVEN|Given)\b/g, "*Given*")
+            .replace(/\b(WHEN|When)\b/g, "*When*")
+            .replace(/\b(THEN|Then)\b/g, "*Then*")
+            .replace(/\b(AND|And)\b/g, "*And*"); // 'And' is common enough to be risky, but usually fine in this context
 
         // Escape fields for CSV (wrap in quotes, escape internal quotes)
         const safe = (text: string) => {
@@ -48,6 +51,7 @@ export const exportStoriesToJiraCsv = (stories: UserStory[], strategyName: strin
         return [
             safe(story.title),
             safe(description),
+            safe(acText),
             safe("Story"),
             safe("Medium"), // Default priority
             safe(`GenAI,Catapulse,${strategyName}`)
