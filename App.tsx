@@ -117,26 +117,8 @@ const App: React.FC = () => {
     const [isDirty, setIsDirty] = useState(false);
 
     // --- AUTO-SAVE & RESTORE ---
-    useEffect(() => {
-        // 1. Restore on Mount
-        const saved = localStorage.getItem('catapulse_autosave');
-        if (saved && !processDef) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (parsed && parsed.stages) {
-                    console.log("Restoring autosaved session...");
-                    setProcessDef(parsed);
-                    setIsDirty(false); // Restored state is technically "saved" in local storage, but usually we consider file usage. 
-                    // However, if we just restored, let's treat it as clean RELATIVE TO THE RESTORE.
-                    if (!viewMode || viewMode === 'onboarding') {
-                        setViewMode('editor');
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to restore autosave", e);
-            }
-        }
-    }, []); // Run once on mount
+    // --- AUTO-SAVE & RESTORE ---
+    // (Restoration is now handled by the useAutoBackup hook's checkForBackup on mount)
 
     // --- RESET HANDLER ---
     // If processDef is null (Reset), ensure all run-time state is cleared
