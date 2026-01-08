@@ -2,6 +2,8 @@
 import { mortgageProcess } from './mortgage-process';
 import { coffeeShopProcess } from './coffee-shop';
 import { comprehensiveProcess } from './comprehensive-showcase';
+import { innovationDayProcess } from './innovation-day-visa';
+import { innovationDayComplexProcess } from './innovation-day-complex';
 import { ProcessDefinition } from '../types';
 
 export interface TemplateCard {
@@ -14,6 +16,22 @@ export interface TemplateCard {
 }
 
 export const GALLERY_TEMPLATES: TemplateCard[] = [
+    {
+        id: 'tmpl-innovation-day',
+        title: 'Interstellar Visitor Visa (Workshop)',
+        description: 'Standard starting point for the Innovation Day workshop. Pre-configured with basic intake and security stages.',
+        tags: ['Workshop', 'Start Here'],
+        processDef: innovationDayProcess,
+        color: 'bg-purple-600'
+    },
+    {
+        id: 'tmpl-innovation-day-complex',
+        title: 'Interstellar Visitor Visa (Completed Reference)',
+        description: 'The "Answer Key" version. Includes Calculations, Repeaters, and complex Visibility Logic.',
+        tags: ['Reference', 'Workshop', 'Answer Key'],
+        processDef: innovationDayComplexProcess,
+        color: 'bg-pink-600'
+    },
     {
         id: 'tmpl-kitchen-sink',
         title: 'Mars Colony Application',
