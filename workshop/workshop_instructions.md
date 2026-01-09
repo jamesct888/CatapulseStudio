@@ -42,23 +42,24 @@
 
 ### Task Checklist
 1.  **Add Silicon Tracking** (Stage 1)
-    - Add a New Field: `Stay Duration (Earth Cycles)` (Number).
-    - **Visibility Rule**: Show ONLY if `Species Classification` equals `Silicon-based`.
+    -   Locate the **"Travel Logistics"** assignment (or "Travel Details" section).
+    -   Add a New Field: `Stay Duration (Earth Cycles)` (Number).
+    -   **Visibility Rule**: Show ONLY if `Species Classification` equals `Silicon-based`.
 
 2.  **Refine Assessment Logic** (Stage 2)
-    - Add a New Field: `Offense Explanation` (Text Area) under Risk Assessment.
-    - **Conditional Mandatory**: Make it **Required**, but...
-    - **Visibility Rule**: Show ONLY if `Risk Assessment` equals `Minor Offense`.
+    -   Add a New Field: `Offense Explanation` (Text Area) under Risk Assessment.
+    -   **Conditional Mandatory**: Make it **Required**, but...
+    -   **Visibility Rule**: Show ONLY if `Risk Assessment` equals `Minor Offense`.
     *(Note: This creates a 'Conditional Mandatory' effect—it's only required when visible).*
 
 3.  **Hide Classified Protocols** (Stage 2)
-    - Select the `Analyst Protocols` section.
-    - **Visibility Rule**: Show ONLY if `Species Classification` equals `Ethereal Energy`.
+    -   Select the `Analyst Protocols` section.
+    -   **Visibility Rule**: Show ONLY if `Species Classification` equals `Ethereal Energy`.
 
 4.  **Implement Fee Structure** (Stage 1)
-    - Add a New Section: `Processing Fees` (Summary Variant).
-    - Add Field: `Total Processing Fee` (Calculated).
-    - **Calculation**: `(Number of Primary Appendages * 10) + 100`.
+    -   Add a New Section: `Processing Fees` (Summary Variant).
+    -   Add Field: `Total Processing Fee` (Calculated).
+    -   **Calculation**: `Number of Primary Appendages * 10 + 100` (Enter without brackets).
 
 </details>
 
@@ -72,30 +73,33 @@
 
 ### Task Checklist
 1.  **Detailed Cargo Manifest** (Stage 1)
-    - Add a New Section: `Customs Declaration`.
-    - Add Field: `Declared Cargo` (Repeater).
-    - **Columns**:
-        1. `Item Description` (Dropdown: `Personal Effects`, `Scientific Sample`, `Cultural Artifact`, `Exotic Flora`).
-        2. `Quantity` (Number).
-        3. `Commercial Sample?` (Checkbox).
+    -   Add a New Section: `Customs Declaration`.
+    -   Add Field: `Declared Cargo` (Repeater).
+    -   **Columns**:
+        1.  `Item Description` (Text). *(Note: Repeater currently does not support Select/Dropdown).*
+        2.  `Quantity` (Number).
+        3.  `Commercial Sample?` (Bool).
 
 2.  **The Trigger** (Stage 1)
-    - Add Field: `CONFIRM BIO-HAZARD PRESENCE?` (Checkbox).
-    - Place it below the repeater.
+    -   Add Field: `CONFIRM BIO-HAZARD PRESENCE?` (**Select/Dropdown**).
+    -   **Options**: `Yes`, `No`.
+    *(Using a Dropdown ensures the logic builder can select a specific value).*
 
 3.  **The Quarantine Stage** (New Stage)
-    - Create Stage 3: `Bio-Hazard Quarantine`.
-    - Add Section: `Decontamination Logs` (Warning Variant).
-    - Add Field: `Decontamination Complete` (Checkbox, Required).
+    -   Add a **New Stage** and name it `Bio-Hazard Quarantine`.
+    -   **Reorder**: Drag this new stage **above** "Final Adjudication" so it becomes Stage 3 (making Adjudication Stage 4).
+    -   Add Section: `Decontamination Logs` (**Standard Section**). *(Warning sections are read-only).*
+    -   Add Field: `Decontamination Complete` (Checkbox, Required).
 
-4.  **The Routing Logic** (Stage 3 Settings)
-    - Go to Stage 3 Settings.
-    - **Skip Logic**: Skip this stage IF `CONFIRM BIO-HAZARD PRESENCE?` is **Not Equal** to `True`.
-    *(Logic: Default is to skip, unless the hazard flag catches it).*
+4.  **The Routing Logic** (Stage 3 Logic & Rules)
+    -   Select Stage 3 (`Bio-Hazard Quarantine`).
+    -   Open the **"Logic & Rules"** tab (right panel).
+    -   **Skip Logic**: Skip this stage IF `CONFIRM BIO-HAZARD PRESENCE?` equals `No`.
 
-5.  **Audit Trail** (Stage 2)
-    - Add a `Case Summary (Read Only)` section.
-    - Use **Mirror Fields** to display `Applicant Name`, `Species`, and `Risk Level` from previous sections.
+5.  **Audit Trail** (Stage 4: Final Adjudication)
+    -   Select **Stage 4**.
+    -   Add a `Case Summary (Read Only)` section.
+    -   Use **Mirror Fields** to display `Applicant Name`, `Species`, and `Risk Assessment` from previous sections.
 
 </details>
 
