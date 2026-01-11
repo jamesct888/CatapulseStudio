@@ -24,6 +24,7 @@ export const GALLERY_TEMPLATES: TemplateCard[] = [
         processDef: innovationDayProcess,
         color: 'bg-purple-600'
     },
+    /*
     {
         id: 'tmpl-innovation-day-complex',
         title: 'Interstellar Visitor Visa (Completed Reference)',
@@ -32,6 +33,7 @@ export const GALLERY_TEMPLATES: TemplateCard[] = [
         processDef: innovationDayComplexProcess,
         color: 'bg-pink-600'
     },
+    */
     {
         id: 'tmpl-kitchen-sink',
         title: 'Mars Colony Application',

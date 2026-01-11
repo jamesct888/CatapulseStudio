@@ -1,5 +1,5 @@
 import React from 'react';
-import { TableProperties } from 'lucide-react';
+import { TableProperties, Download } from 'lucide-react';
 import { UserStory } from '../types';
 
 interface DataDictionaryViewProps {
@@ -29,12 +29,60 @@ export const DataDictionaryView: React.FC<DataDictionaryViewProps> = ({ userStor
         return Object.values(dict).sort((a, b) => a.element.label.localeCompare(b.element.label));
     }, [userStories]);
 
+    const handleExportCsv = () => {
+        if (dataDictionary.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+
+        // 1. Headers
+        const headers = ["Label", "Type", "Required", "Visibility Logic", "Validation", "Options", "Referenced By Stories"];
+
+        // 2. Rows
+        const rows = dataDictionary.map(item => {
+            const el = item.element;
+            return [
+                `"${el.label.replace(/"/g, '""')}"`, // Escape quotes
+                el.type,
+                el.required ? "Yes" : "No",
+                `"${(el.visibility || "").replace(/"/g, '""')}"`,
+                `"${(el.validation || "").replace(/"/g, '""')}"`,
+                `"${(Array.isArray(el.options) ? el.options.join(', ') : (el.options || "")).replace(/"/g, '""')}"`,
+                `"${item.stories.join(', ')}"`
+            ].join(",");
+        });
+
+        // 3. Combine
+        const csvContent = [headers.join(","), ...rows].join("\n");
+
+        // 4. Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `data_dictionary_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                    <TableProperties className="text-sw-teal" />
-                    <h3 className="text-xl font-bold text-gray-800">Global Data Dictionary</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2">
+                        <TableProperties className="text-sw-teal" />
+                        <h3 className="text-xl font-bold text-gray-800">Global Data Dictionary</h3>
+                    </div>
+                    <button
+                        onClick={handleExportCsv}
+                        disabled={dataDictionary.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-sw-teal text-white rounded-lg font-bold text-sm hover:bg-sw-tealHover disabled:opacity-50 transition-colors shadow-sm"
+                    >
+                        <Download size={16} />
+                        Export to Excel (CSV)
+                    </button>
                 </div>
                 <p className="text-gray-500 text-sm mb-6">Aggregate view of all data elements defined across all user stories.</p>
 

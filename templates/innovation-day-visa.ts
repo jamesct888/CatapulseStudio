@@ -8,7 +8,7 @@ export const innovationDayProcess: ProcessDefinition = {
     stages: [
         {
             id: "stg-intake",
-            title: "1. Application Intake",
+            title: "Application Intake",
             description: "Capture core biological and travel details",
             sections: [
                 {
@@ -61,7 +61,7 @@ export const innovationDayProcess: ProcessDefinition = {
         },
         {
             id: "stg-vetting",
-            title: "2. Background & Security Vetting",
+            title: "Background & Security Vetting",
             description: "Security assessment and protocol verification",
             sections: [
                 {
@@ -115,7 +115,7 @@ export const innovationDayProcess: ProcessDefinition = {
         },
         {
             id: "stg-approval",
-            title: "3. Final Adjudication",
+            title: "Final Adjudication",
             description: "Final visa grant/deny decision",
             sections: [
                 {
