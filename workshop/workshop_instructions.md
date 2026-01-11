@@ -8,6 +8,31 @@
 ---
 
 <details open>
+<summary><h2>🔊 Opening Transmission: "Operation Ironclad" (5 Mins)</h2></summary>
+
+**Facilitator Action:**
+Display the **High Chancellor** image on the big screen and play the recorded "Voice Message".
+
+**Audio Script (Read by Facilitator or AI Voice):**
+> "Attention. This is High Chancellor Valerian of the United Earth Council.
+>
+> The year is 3024. For two centuries, Earth has been a sanctuary. We welcomed the galaxy with open arms. But our kindness... has been exploited.
+>
+> Intelligence reports confirm that Class-A contraband—unstable plasma weaponry, dark matter explosives, and mimetic bio-agents—is slipping through our borders. The catastrophic breach on Luna Base 7 three days ago was a warning we cannot ignore.
+>
+> Our current manual checks are... insufficient. They are slow. They are biased. They are leaving us exposed to annihilation.
+>
+> We cannot close the skies, but we *must* secure them. We need a new Visa Application System immediately. One that is rigorous. Intelligent. Uncompromising.
+>
+> You have been assembled because you are the finest prototypers in the sector. But time is not on our side. We have less than one hour before the Galatic Transport Fleet arrives.
+>
+> Your orders are clear: Prototype the ultimate vetting system. Find the threats before they land. Save our world.
+>
+> Valerian out."
+
+</details>
+
+<details open>
 <summary><h2>📧 Inject 1: "The Data Cleanup" (15 Mins)</h2></summary>
 
 **Sender:** Director of Interplanetary Bureaucracy
@@ -112,9 +137,9 @@
 > "I don't have time to fill out change request forms. Just read the transcript of our meeting and fix the app. IMMEDIATELY."
 
 ### Task: The AI Power Move
-1.  **Open the AI Copilot**: Click the "AI Copilot" bar at the bottom of the screen.
+1.  **Open Workshop Review Mode**: Click the **Message Icon** (Workshop Review Mode) in the top header.
 2.  **Copy the Transcript**: Open the `director_transcript.md` file (provided separately).
-3.  **Paste & Execute**: Copy the **entire dialogue** and paste it into the Copilot chat.
+3.  **Paste & Analyze**: Paste the **entire dialogue** into the "Paste Transcript" area and click **Analyze**.
 4.  **Watch the Magic**:
     - The AI should parse Zorg's natural language demands.
     - **Expected Changes**:

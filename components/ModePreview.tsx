@@ -452,7 +452,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                                                     elementValue = formData['_global_requirements'];
                                                 }
                                                 return (
-                                                    <RenderElement key={el.id} element={el} value={elementValue} onChange={() => { }} disabled theme={{ ...visualTheme, density: 'compact', radius: 'small' }} />
+                                                    <RenderElement key={el.id} element={el} value={elementValue} onChange={() => { }} disabled theme={{ ...visualTheme, density: 'compact', radius: 'small' }} formData={formData} />
                                                 );
                                             })}
                                         </div>

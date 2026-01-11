@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ElementDefinition, VisualTheme } from '../types';
 import { Plus, Trash2, X, ChevronDown, Check, Calculator } from 'lucide-react';
 import { evaluateCalculation } from '../utils/logic';
@@ -220,6 +220,14 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
       }
     }, [formData, element.calculation]); // Re-run when dependencies change
 
+    // Calculate value for display (Independent of onChange for read-only modes)
+    const displayValue = useMemo(() => {
+      if (formData && element.calculation) {
+        return evaluateCalculation(element.calculation, formData);
+      }
+      return value;
+    }, [formData, element.calculation, value]);
+
     return (
       <div className={`${d.wrapper} group`}>
         <Label />
@@ -231,7 +239,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
             type="text"
             readOnly
             className={`w-full ${d.inputHeight} ${d.padding} ${d.fontSize} pl-8 bg-transparent ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'} font-mono font-bold border-none focus:ring-0 cursor-default`}
-            value={value !== undefined && value !== '' ? value : ''}
+            value={displayValue !== undefined && displayValue !== '' ? displayValue : ''}
             placeholder="0.00"
           />
         </div>
@@ -326,6 +334,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
             <input
               type="number"
               disabled={disabled}
+              step={effectiveType === 'currency' ? "0.01" : undefined}
               className={`${baseClasses} ${errorClasses} ${effectiveType === 'currency' ? (theme.density === 'dense' ? 'pl-5' : 'pl-8') : ''}`}
               value={value || ''}
               onChange={handleChange}

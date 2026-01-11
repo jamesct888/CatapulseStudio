@@ -14,7 +14,8 @@ export type ElementType =
   | 'static'
   | 'repeater'
   | 'calculated'
-  | 'manage_requirements';
+  | 'manage_requirements'
+  | 'mirror';
 
 export type Operator = 'equals' | 'notEquals' | 'contains' | 'doesNotContain' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 

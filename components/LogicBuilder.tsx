@@ -193,7 +193,8 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                         }
                     }
 
-                    const showValueDropdown = isSelectOrRadio && valueOptions.length > 0;
+                    const isCheckbox = targetEl && targetEl.type === 'checkbox';
+                    const showValueDropdown = (isSelectOrRadio && valueOptions.length > 0) || isCheckbox;
 
                     return (
                         <div key={cond.id || idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm relative group">
@@ -276,10 +277,20 @@ export const LogicBuilder: React.FC<LogicBuilderProps> = ({ group, onChange, ava
                                                 value={String(cond.value)}
                                                 onChange={(e) => updateCondition(idx, 'value', e.target.value)}
                                             >
-                                                <option value="">Select Value...</option>
-                                                {valueOptions.map((opt: string, i: number) => (
-                                                    <option key={i} value={opt}>{opt}</option>
-                                                ))}
+                                                {isCheckbox ? (
+                                                    <>
+                                                        <option value="">Select...</option>
+                                                        <option value="true">True</option>
+                                                        <option value="false">False</option>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="">Select Value...</option>
+                                                        {valueOptions.map((opt: string, i: number) => (
+                                                            <option key={i} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </>
+                                                )}
                                             </select>
                                         ) : (
                                             <input

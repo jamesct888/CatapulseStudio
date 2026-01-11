@@ -427,6 +427,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                 { val: 'text', label: 'Text Input' },
                                                 { val: 'textarea', label: 'Multi-line Text' },
                                                 { val: 'number', label: 'Number' },
+                                                { val: 'currency', label: 'Currency (GBP)' },
                                                 { val: 'date', label: 'Date Picker' },
                                                 { val: 'select', label: 'Dropdown (Select)' },
                                                 { val: 'radio', label: 'Radio Buttons' },
@@ -544,9 +545,21 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                         <option value="text">Text</option>
                                                         <option value="number">Num</option>
                                                         <option value="date">Date</option>
-                                                        <option value="checkbox">Bool</option>
+                                                        <option value="checkbox">Checkbox</option>
                                                         <option value="select">Select</option>
                                                     </select>
+                                                    {col.type === 'select' && (
+                                                        <input
+                                                            value={col.options?.join(', ') || ''}
+                                                            placeholder="Opt1, Opt2..."
+                                                            className="flex-1 text-xs p-1 rounded border min-w-[80px]"
+                                                            onChange={(e) => {
+                                                                const newCols = [...(selectedElement.columns || [])];
+                                                                newCols[idx] = { ...col, options: e.target.value.split(',').map(s => s.trim()) };
+                                                                handleRepeaterChange(newCols);
+                                                            }}
+                                                        />
+                                                    )}
                                                     <button
                                                         onClick={() => {
                                                             const newCols = [...(selectedElement.columns || [])];

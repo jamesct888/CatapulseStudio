@@ -115,15 +115,19 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
         }
     };
 
+    // ... (existing code for Discovery Mode) ...
+
     return (
         <>
-            <button
-                onClick={() => setShowDiscovery(true)}
-                className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
-                title="Workshop Review Mode"
-            >
-                <MessageSquare size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+                <button
+                    onClick={() => setShowDiscovery(true)}
+                    className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Workshop Review Mode"
+                >
+                    <MessageSquare size={18} />
+                </button>
+            </div>
 
             {showDiscovery && (
                 <ModalWrapper
@@ -133,6 +137,7 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
                     modalSize={{ width: 1000, height: 700 }}
                     onResizeStart={() => { }}
                 >
+                    {/* ... (existing modal content) ... */}
                     <div className="mb-4">
                         <p className="text-gray-500 text-sm">Upload meeting transcripts to analyze discrepancies and improvements.</p>
                     </div>
@@ -141,17 +146,19 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
                         <div className="col-span-4 flex flex-col gap-6 border-r border-gray-200 pr-6">
 
                             {/* Upload / Input Area */}
-                            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors group relative">
-                                <UploadCloud size={40} className="text-gray-300 group-hover:text-sw-teal mb-3" />
-                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Upload Transcript</span>
-                                <span className="text-[10px] text-gray-400">txt, docx, pdf supported</span>
-                                <textarea
-                                    value={transcript}
-                                    onChange={(e) => setTranscript(e.target.value)}
-                                    className={`absolute inset-0 w-full h-full p-6 text-xs text-gray-700 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-sw-teal rounded-xl transition-all ${transcript ? 'opacity-100 bg-white z-10' : 'opacity-0 cursor-pointer z-20'}`}
-                                    placeholder="Paste transcript here..."
-                                    title="Paste transcript here or drag file"
-                                />
+                            {/* Paste / Input Area */}
+                            <div className="flex flex-col gap-2 h-64">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                                    Paste Transcript
+                                </label>
+                                <div className="relative flex-1 border border-gray-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-sw-teal transition-all shadow-inner bg-white">
+                                    <textarea
+                                        value={transcript}
+                                        onChange={(e) => setTranscript(e.target.value)}
+                                        className="w-full h-full p-4 text-xs text-gray-700 font-mono resize-none focus:outline-none bg-transparent"
+                                        placeholder="Paste workshop transcript or meeting notes here..."
+                                    />
+                                </div>
                             </div>
 
                             <button

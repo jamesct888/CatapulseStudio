@@ -117,16 +117,13 @@ export const evaluateLogicGroup = (group: LogicGroup | undefined, formData: Form
 export const evaluateCalculation = (parts: CalculationPart[] | undefined, formData: FormState): string | number => {
   if (!parts || parts.length === 0) return '';
 
-  let result: number | Date = 0;
-  let pendingOperator = '+';
-
-  // Helper to get value (Number or Date)
+  // 1. Helper to get numeric/date value from a part
   const getValue = (part: CalculationPart): number | Date => {
     if (part.type === 'constant') {
       if (part.value === 'TODAY') return new Date();
       return parseFloat(part.value) || 0;
     } else if (part.type === 'field') {
-      if (part.value === 'TODAY') return new Date(); // Handle dynamic TODAY
+      if (part.value === 'TODAY') return new Date();
 
       const raw = formData[part.value];
       if (raw === undefined || raw === null || raw === '') return 0;
@@ -144,46 +141,88 @@ export const evaluateCalculation = (parts: CalculationPart[] | undefined, formDa
     return 0;
   };
 
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
+  // 2. Apply Operator Function
+  const applyOp = (op: string, b: number | Date, a: number | Date): number | Date => {
+    // Date Arithmetic
+    if (a instanceof Date && b instanceof Date) {
+      if (op === '-') {
+        // Age Calculation: Date - Date = Years
+        const diffTime = Math.abs(a.getTime() - b.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return Math.floor(diffDays / 365.25);
+      }
+    }
 
+    // Treat Dates as 0 if mixed (fallback) or ensure they are numbers
+    const numA = (a instanceof Date) ? 0 : a;
+    const numB = (b instanceof Date) ? 0 : b;
+
+    switch (op) {
+      case '+': return numA + numB;
+      case '-': return numA - numB;
+      case '*': return numA * numB;
+      case '/': return numB !== 0 ? numA / numB : 0;
+      default: return 0;
+    }
+  };
+
+  // 3. Shunting-yard Algorithm (Infix -> Postfix)
+  const precedence: Record<string, number> = {
+    '*': 2, '/': 2,
+    '+': 1, '-': 1,
+    '(': 0
+  };
+
+  const outputQueue: (CalculationPart | string)[] = [];
+  const opStack: string[] = [];
+
+  for (const part of parts) {
     if (part.type === 'operator') {
-      pendingOperator = part.value;
+      const op = part.value;
+      if (op === '(') {
+        opStack.push(op);
+      } else if (op === ')') {
+        while (opStack.length > 0 && opStack[opStack.length - 1] !== '(') {
+          outputQueue.push(opStack.pop()!);
+        }
+        opStack.pop(); // Pop '('
+      } else {
+        while (
+          opStack.length > 0 &&
+          precedence[opStack[opStack.length - 1]] >= precedence[op]
+        ) {
+          outputQueue.push(opStack.pop()!);
+        }
+        opStack.push(op);
+      }
     } else {
-      const val = getValue(part);
+      outputQueue.push(part);
+    }
+  }
+  while (opStack.length > 0) {
+    outputQueue.push(opStack.pop()!);
+  }
 
-      // Initial Load Logic: 0 + X = X
-      if (result === 0 && pendingOperator === '+') {
-        result = val;
-        continue;
-      }
+  // 4. Evaluate Postfix (RPN)
+  const evalStack: (number | Date)[] = [];
 
-      // Date Arithmetic
-      if (result instanceof Date && val instanceof Date) {
-        if (pendingOperator === '-') {
-          // Date - Date = Difference in Years (for Age)
-          const diffTime = Math.abs(result.getTime() - val.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          result = Math.floor(diffDays / 365.25); // Approximate Age
-        }
-        // Add other date ops here if needed (e.g. Date + Days)
-      } else if (typeof result === 'number' && typeof val === 'number') {
-        // Standard Math
-        switch (pendingOperator) {
-          case '+': result += val; break;
-          case '-': result -= val; break;
-          case '*': result *= val; break;
-          case '/': result = val !== 0 ? result / val : 0; break;
-        }
-      }
+  for (const item of outputQueue) {
+    if (typeof item === 'string') { // Operator
+      if (evalStack.length < 2) continue; // Should not happen in valid formula
+      const b = evalStack.pop()!;
+      const a = evalStack.pop()!;
+      evalStack.push(applyOp(item, b, a));
+    } else { // Operand (CalculationPart)
+      evalStack.push(getValue(item));
     }
   }
 
+  let result = evalStack.length > 0 ? evalStack[0] : 0;
+
   if (result instanceof Date) {
-    return result.toISOString().split('T')[0]; // Return YYYY-MM-DD if result is a date
+    return result.toISOString().split('T')[0];
   }
 
-  // Round to 2 decimals
   return Math.round((result as number) * 100) / 100;
 };
 
