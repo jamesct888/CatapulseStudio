@@ -263,11 +263,7 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
 
     return (
       <div className={`prose max-w-none ${d.wrapper}`}>
-        {element.label && element.label !== 'New Field' && (
-          <label className={`block font-bold ${labelTextClass} ${d.labelSize} ${d.labelMb}`}>
-            {element.label}
-          </label>
-        )}
+        {/* Label header removed for static text to prevent duplication */}
         {isReflection ? (
           <div className={`w-full px-0 ${d.fontSize} ${staticTextClass} ${r} min-h-[${theme.density === 'dense' ? '30px' : '50px'}] flex items-center`}>
             {displayContent ? (

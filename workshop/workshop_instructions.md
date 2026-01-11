@@ -32,32 +32,33 @@ Display the **High Chancellor** image on the big screen and play the recorded "V
 
 </details>
 
-<details open>
-<summary><h2>📧 Inject 1: "The Data Cleanup" (15 Mins)</h2></summary>
+## 🛸 Pilot's Guide (Quick Controls)
+*   **Select**: Click any field on the screen to open its settings in the **Right Panel**.
+*   **Add Field**: Use the **"Add Field"** box at the bottom of any section, or the floating toolbox.
+*   **Add Section**: Use the **"Add Section"** button in both the **Left Sidebar** (under the active stage).
+*   **Logic**: To make fields hidden or mandatory, switch to the **"Logic & Rules"** tab in the **Right Panel**.
 
-**Sender:** Director of Interplanetary Bureaucracy
-**Subject:** URGENT: Data Quality Audit
+## 📝 Workshop Injects
 
-> "Team, our data is a mess. Agents are typing 'Mars' as 'M4rs', and we have no standardization. We need to lock down our inputs immediately."
+<details>
+<summary>Inject 1: Standardization Standards</summary>
 
-### Task Checklist
-1.  **Standardize Home Planet** (Stage 1)
-    - Find the `Home Planet / Star System` field.
-    - Change Type from **Text** to **Dropdown** (Select).
-    - **Options**: `Mars`, `Venus`, `Proxima Centauri b`, `Kepler-186f`, `Trappist-1e`, `Gallifrey`.
+**Message from Grand Director Zorg:**
+*"Reviewing your 'Application' stage. It's a mess. Standardize the data inputs immediately. Free text is the enemy of order."*
+
+### Task Checklist:
+1.  **Refine 'Home Planet'**
+    -   Click the `Home Planet` field to select it.
+    -   In the **Right Panel**, change Type to `Dropdown` (Select).
+    -   **Options**: `Earth`, `Mars`, `Venus`, `Jupiter`, `Saturn`, `Proxima Centauri Bb`., `Kepler-186f`, `Trappist-1e`, `Gallifrey`.
 
 2.  **Enforce Destination Cities** (Stage 1)
     - Find `Primary Destination City`.
     - Update the **Options** list to strictly include: `London`, `Bristol`, `Edinburgh`, `Manchester`, `Glasgow`, `Cardiff`.
 
-3.  **Improve Risk UX** (Stage 2)
-    - Navigate to **Background & Security Vetting**.
-    - Find `Risk Assessment`.
-    - Change Type from **Dropdown** to **Radio Buttons** for faster analyst clicking.
-
 </details>
 
-<details>
+<details open>
 <summary><h2>📧 Inject 2: "The Security Patch" (20 Mins)</h2></summary>
 
 **Sender:** Legal & Compliance Division
@@ -77,14 +78,22 @@ Display the **High Chancellor** image on the big screen and play the recorded "V
     -   **Visibility Rule**: Show ONLY if `Risk Assessment` equals `Minor Offense`.
     *(Note: This creates a 'Conditional Mandatory' effect—it's only required when visible).*
 
-3.  **Hide Classified Protocols** (Stage 2)
+3.  **Hide irrelevant data**
     -   Select the `Analyst Protocols` section.
-    -   **Visibility Rule**: Show ONLY if `Species Classification` equals `Ethereal Energy`.
+    -   Switch to the **"Logic & Rules"** tab in the Right Panel.
+    -   Add a **Visibility Rule**:
+        -   Show If `Species Classification` equals `Unknown` OR `Xenomorph`.
 
 4.  **Implement Fee Structure** (Stage 1)
+    -   **Tip**: Look at the **Left Sidebar** to add a new section.
     -   Add a New Section: `Processing Fees` (Summary Variant).
     -   Add Field: `Total Processing Fee` (Calculated).
-    -   **Calculation**: `Number of Primary Appendages * 10 + 100` (Enter without brackets).
+    - **Calculation**: Use the **Formula Builder**.
+        - Add **Field** -> `Number of Primary Appendages`
+        - Add **Operator** -> `*`
+        - Add **Constant** -> `10`
+        - Add **Operator** -> `+`
+        - Add **Constant** -> `100`
 
 </details>
 
@@ -101,7 +110,7 @@ Display the **High Chancellor** image on the big screen and play the recorded "V
     -   Add a New Section: `Customs Declaration`.
     -   Add Field: `Declared Cargo` (Repeater).
     -   **Columns**:
-        1.  `Item Description` (Text). *(Note: Repeater currently does not support Select/Dropdown).*
+        1.  `Item Description` (Text).
         2.  `Quantity` (Number).
         3.  `Commercial Sample?` (Bool).
 
@@ -119,12 +128,16 @@ Display the **High Chancellor** image on the big screen and play the recorded "V
 4.  **The Routing Logic** (Stage 3 Logic & Rules)
     -   Select Stage 3 (`Bio-Hazard Quarantine`).
     -   Open the **"Logic & Rules"** tab (right panel).
-    -   **Skip Logic**: Skip this stage IF `CONFIRM BIO-HAZARD PRESENCE?` equals `No`.
-
+    -   Add a **Skip Logic** rule (in **Logic & Rules** tab):
+        -   If `CONFIRM BIO-HAZARD PRESENCE?` equals `Yes` -> Skip to `Bio-Hazard Quarantine`.
+        -   Else -> Proceed to Next Stage.
+    
 5.  **Audit Trail** (Stage 4: Final Adjudication)
     -   Select **Stage 4**.
     -   Add a `Case Summary (Read Only)` section.
-    -   Use **Mirror Fields** to display `Applicant Name`, `Species`, and `Risk Assessment` from previous sections.
+    - Add fields with Type **Static Text / Display**.
+    - Set **Data Source** to **Mirror Another Field**.
+    - Select source fields: `Applicant Name`, `Species`, `Risk Assessment`.
 
 </details>
 

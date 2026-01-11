@@ -324,7 +324,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         {/* Title/Label Input */}
                         <div>
-                            <label className={labelClass}>{selectedElement ? 'Field Label' : selectedSection ? 'Section Title' : 'Stage Title'}</label>
+                            <label className={labelClass}>
+                                {selectedElement
+                                    ? (selectedElement.type === 'static' ? 'Field Label / Static Text' : 'Field Label')
+                                    : selectedSection ? 'Section Title' : 'Stage Title'}
+                            </label>
                             <div className="relative">
                                 <input
                                     type="text"

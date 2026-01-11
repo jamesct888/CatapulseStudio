@@ -52,10 +52,10 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
             const targetRef = suggestion.newElement.sectionTitle;
             let added = false;
 
-            for (const stage of newDef.stages) {
-                if (added) break;
-                // If specific section requested
-                if (targetRef) {
+            // Strategy 1: Look for exact Section Title match
+            if (targetRef) {
+                for (const stage of newDef.stages) {
+                    if (added) break;
                     const sectionIdx = stage.sections.findIndex(s => s.title === targetRef);
                     if (sectionIdx !== -1) {
                         stage.sections[sectionIdx].elements.push({
@@ -65,6 +65,20 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
                         });
                         added = true;
                     }
+                }
+            }
+
+            // Strategy 2: Look for Stage Title match (Fallback)
+            if (!added && targetRef) {
+                // If the AI gave us a Stage name effectively, put it in the first section of that Stage.
+                const stage = newDef.stages.find(s => s.title === targetRef);
+                if (stage && stage.sections.length > 0) {
+                    stage.sections[0].elements.push({
+                        id: `el_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                        ...suggestion.newElement,
+                        type: suggestion.newElement.type
+                    });
+                    added = true;
                 }
             }
 
