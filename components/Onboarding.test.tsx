@@ -43,6 +43,10 @@ describe('Onboarding', () => {
     });
 
     it('renders gallery templates and handles click', () => {
+        // Enable workshop templates via Magic URL
+        const originalUrl = window.location.href;
+        window.history.pushState({}, 'Test Page', '/?workshop=true');
+
         render(<Onboarding {...defaultProps} />);
         // Check if at least one template title is rendered
         const templateTitle = GALLERY_TEMPLATES[0].title;
@@ -53,6 +57,9 @@ describe('Onboarding', () => {
         expect(mockHandleLoadTemplate).toHaveBeenCalledWith(expect.objectContaining({
             id: GALLERY_TEMPLATES[0].processDef.id
         }));
+
+        // Cleanup
+        window.history.pushState({}, 'Test Page', originalUrl);
     });
 
     it('triggers file input click when import button is clicked', async () => {
