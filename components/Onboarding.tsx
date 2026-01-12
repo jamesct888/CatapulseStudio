@@ -113,7 +113,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({
 
         {/* --- Template Gallery --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto mt-12">
-          {GALLERY_TEMPLATES.map(t => (
+          {GALLERY_TEMPLATES.filter(t => {
+            // MAGIC URL LOGIC: Only show Innovation Day Workshop if ?workshop=true
+            if (t.id === 'tmpl-innovation-day') {
+              const params = new URLSearchParams(window.location.search);
+              return params.get('workshop') === 'true';
+            }
+            return true;
+          }).map(t => (
             <button
               key={t.id}
               onClick={() => handleLoadTemplate(t.processDef)}
