@@ -301,7 +301,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 {renderHeader()}
 
                 {/* TABS */}
-                <div className="flex p-1 bg-gray-200/50 rounded-lg mt-4">
+                <div id="prop-tabs" className="flex p-1 bg-gray-200/50 rounded-lg mt-4">
                     <button
                         onClick={() => onTabChange('general')}
                         className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${activeTab === 'general' ? 'bg-white text-sw-teal shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -327,6 +327,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             <label className={labelClass}>{selectedElement ? 'Field Label' : selectedSection ? 'Section Title' : 'Stage Title'}</label>
                             <div className="relative">
                                 <input
+                                    id="prop-label"
                                     type="text"
                                     value={selectedElement ? selectedElement.label : selectedSection ? selectedSection.title : selectedStage ? selectedStage.title : ''}
                                     onChange={(e) => handleChange(selectedElement ? 'label' : 'title', e.target.value)}
@@ -356,7 +357,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             <>
                                 <div>
                                     <label className={labelClass}>Layout Columns</label>
-                                    <div className="flex bg-gray-100 p-1 rounded-lg gap-1">
+                                    <div id="prop-section-layout" className="flex bg-gray-100 p-1 rounded-lg gap-1">
                                         {[
                                             { id: '1col', label: '1 Column', icon: <div className="w-full h-2 bg-current rounded-sm opacity-40"></div> },
                                             { id: '2col', label: '2 Col', icon: <div className="flex gap-0.5"><div className="w-1/2 h-2 bg-current rounded-sm opacity-40"></div><div className="w-1/2 h-2 bg-current rounded-sm opacity-40"></div></div> },
@@ -382,7 +383,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
                                 <div>
                                     <label className={labelClass}>Section Style</label>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div id="prop-section-style" className="grid grid-cols-4 gap-2">
                                         {[
                                             { id: 'default', label: 'Std', bg: 'bg-white', border: 'border-gray-200', text: 'text-gray-700' },
                                             { id: 'info', label: 'Info', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
@@ -415,6 +416,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                 <div>
                                     <label className={labelClass}>Field Type</label>
                                     <select
+                                        id="prop-type"
                                         value={selectedElement.type}
                                         onChange={(e) => handleChange('type', e.target.value)}
                                         className={inputClass}
@@ -450,7 +452,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
                                 {/* Placeholder */}
                                 {['text', 'textarea', 'number', 'email'].includes(selectedElement.type) && (
-                                    <div>
+                                    <div id="prop-element-options">
                                         <label className={labelClass}>Placeholder / Hint</label>
                                         <input
                                             type="text"
@@ -465,7 +467,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                 {/* Options for Select/Radio */}
                                 {/* Options for Select/Radio/ManageRequirements */}
                                 {['select', 'radio', 'multiselect', 'manage_requirements'].includes(selectedElement.type) && (
-                                    <div>
+                                    <div id="prop-element-options">
                                         <label className={labelClass}>
                                             {selectedElement.type === 'manage_requirements' ? 'Appropriate Documents (Comma separated)' : 'Options (Comma separated)'}
                                         </label>
@@ -602,7 +604,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                         {/* 1. VISIBILITY LOGIC (Element & Section) */}
                         {(selectedElement || selectedSection) && (
-                            <div className="bg-sw-teal/5 p-4 rounded-xl border border-sw-teal/10">
+                            <div id="prop-logic-visibility" className="bg-sw-teal/5 p-4 rounded-xl border border-sw-teal/10">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <Eye size={18} className="text-sw-teal" />
@@ -626,7 +628,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
                         {/* 2. REQUIRED LOGIC (Element Only) */}
                         {selectedElement && (
-                            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                            <div id="prop-logic-mandatory" className="bg-amber-50 p-4 rounded-xl border border-amber-100">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <CheckCircle2 size={18} className="text-amber-600" />
@@ -650,7 +652,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
                         {/* 3. SKIP LOGIC (Stage Only - Strict) */}
                         {selectedStage && !selectedSection && !selectedElement && (
-                            <div className="bg-gray-100 p-4 rounded-xl border border-gray-200">
+                            <div id="prop-stage-skip" className="bg-gray-100 p-4 rounded-xl border border-gray-200">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <FastForward size={18} className="text-gray-600" />
@@ -674,7 +676,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
                         {/* 4. VALIDATION (Element Only) */}
                         {selectedElement && (
-                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                            <div id="prop-logic-validation" className="bg-blue-50 p-4 rounded-xl border border-blue-100">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <ShieldCheck size={18} className="text-blue-600" />
@@ -696,7 +698,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
                         {/* 5. SKILL ROUTING (Stage Only - Strict) */}
                         {selectedStage && !selectedSection && !selectedElement && (
-                            <div className="border-t border-gray-200 pt-6">
+                            <div id="prop-stage-routing" className="border-t border-gray-200 pt-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <label className={labelClass}>
                                         <ArrowRight className="inline mr-1" size={14} />

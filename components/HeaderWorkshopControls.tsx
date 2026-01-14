@@ -115,9 +115,29 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
         }
     };
 
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            if (event.target?.result) {
+                setTranscript(event.target.result as string);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
     return (
         <>
             <button
+                id="btn-workshop"
                 onClick={() => setShowDiscovery(true)}
                 className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
                 title="Workshop Review Mode"
@@ -142,15 +162,31 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
 
                             {/* Upload / Input Area */}
                             <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors group relative">
-                                <UploadCloud size={40} className="text-gray-300 group-hover:text-sw-teal mb-3" />
-                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Upload Transcript</span>
-                                <span className="text-[10px] text-gray-400">txt, docx, pdf supported</span>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                    accept=".txt,.md,.json,.csv,.log"
+                                />
+
+                                {!transcript && (
+                                    <div
+                                        className="flex flex-col items-center cursor-pointer relative z-30"
+                                        onClick={handleUploadClick}
+                                    >
+                                        <UploadCloud size={40} className="text-gray-300 group-hover:text-sw-teal mb-3" />
+                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Upload Transcript</span>
+                                        <span className="text-[10px] text-gray-400">txt, md, log supported</span>
+                                    </div>
+                                )}
+
                                 <textarea
                                     value={transcript}
                                     onChange={(e) => setTranscript(e.target.value)}
-                                    className={`absolute inset-0 w-full h-full p-6 text-xs text-gray-700 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-sw-teal rounded-xl transition-all ${transcript ? 'opacity-100 bg-white z-10' : 'opacity-0 cursor-pointer z-20'}`}
-                                    placeholder="Paste transcript here..."
-                                    title="Paste transcript here or drag file"
+                                    className={`absolute inset-0 w-full h-full p-6 text-xs text-gray-700 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-sw-teal rounded-xl transition-all ${transcript ? 'opacity-100 bg-white z-10' : 'opacity-0 cursor-text z-20'}`}
+                                    placeholder={!transcript ? "       " : "Paste transcript here..."} // Space to hide placeholder behind content if needed, but opacity 0 handles it
+                                    title="Paste transcript here"
                                 />
                             </div>
 

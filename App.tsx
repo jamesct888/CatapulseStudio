@@ -1,5 +1,6 @@
 import React, { Component, useState, useEffect, ErrorInfo, ReactNode, useRef } from 'react';
 import { Onboarding } from './components/Onboarding';
+import { demoProcess } from './services/demoData'; // Import Demo Data
 import { ModeEditor } from './components/ModeEditor';
 import { ModePreview } from './components/ModePreview';
 import { ModeSpec } from './components/ModeSpec';
@@ -12,6 +13,7 @@ import { GlobalSettingsPanel } from './components/GlobalSettingsPanel';
 import { AppHeader } from './components/AppHeader';
 import { AppFooter } from './components/AppFooter';
 import { LoadingOverlay } from './components/LoadingOverlay';
+import { GuideOverlay, DemoStep } from './components/GuideOverlay'; // Import Demo
 import { useProcessState } from './hooks/useProcessState';
 import { useAiOperations } from './hooks/useAiOperations';
 import { useAutoBackup } from './hooks/useAutoBackup'; // Import Backup Hook
@@ -129,7 +131,194 @@ const App: React.FC = () => {
     // Dirty State (Unsaved Changes)
     const [isDirty, setIsDirty] = useState(false);
 
-    // --- AUTO-SAVE & RESTORE ---
+    // --- DEMO STATE ---
+    const [demoStep, setDemoStep] = useState<DemoStep>('NONE');
+
+    const handleStartDemo = () => {
+        setProcessDef(demoProcess);
+        setStartPrompt('');
+        setFormData({});
+        setViewMode('editor');
+        setDemoStep('WELCOME');
+        // Select first stage for context
+        setSelectedStageId(demoProcess.stages[0]?.id || '');
+    };
+
+    const handlePrevDemoStep = () => {
+        const steps: DemoStep[] = [
+            'WELCOME', 'EDITOR_OVERVIEW', 'PROPERTIES_INTRO',
+            'PROPERTIES_STAGE', 'PROPERTIES_STAGE_LOGIC_SKIP', 'PROPERTIES_STAGE_ROUTING',
+            'PROPERTIES_SECTION', 'PROPERTIES_SECTION_LAYOUT', 'PROPERTIES_SECTION_STYLE', 'PROPERTIES_SECTION_VISIBILITY',
+            'PROPERTIES_ELEMENT', 'PROPERTIES_ELEMENT_TYPE', 'PROPERTIES_ELEMENT_OPTIONS', 'PROPERTIES_ELEMENT_LOGIC_INTRO', 'PROPERTIES_ELEMENT_VISIBILITY', 'PROPERTIES_ELEMENT_MANDATORY', 'PROPERTIES_ELEMENT_VALIDATION',
+            'AI_FEATURES',
+            'HEADER_INTRO', 'HEADER_WORKSHOP', 'HEADER_NEW', 'HEADER_UPLOAD', 'HEADER_DOWNLOAD', 'HEADER_SHARE', 'HEADER_RENAME', 'HEADER_SETTINGS',
+            'MODES', 'MODE_TABLE', 'MODE_FLOW', 'PREVIEW_MODE', 'MODE_SPEC',
+            'QA_MODE', 'QA_TAB_STORIES', 'QA_TAB_DICTIONARY', 'QA_TAB_CASES',
+            'PEGA_MODE', 'COMPLETE'
+        ];
+        const currentIdx = steps.indexOf(demoStep);
+        if (currentIdx > 0) {
+            const prevStep = steps[currentIdx - 1];
+            setDemoStep(prevStep);
+
+            // STATE MANAGEMENT
+            // Always set 'properties' panel active if we are in properties territory
+            if (prevStep.startsWith('PROPERTIES_')) setActiveSidePanel('properties');
+
+            // 1. STAGE CONTEXT
+            if (['PROPERTIES_INTRO', 'PROPERTIES_STAGE'].includes(prevStep)) {
+                setSelectedStageId('stg_details');
+                setSelectedSectionId(null);
+                setSelectedElementId(null);
+                setActivePropTab('general');
+            }
+            if (['PROPERTIES_STAGE_LOGIC_SKIP', 'PROPERTIES_STAGE_ROUTING'].includes(prevStep)) {
+                setSelectedStageId('stg_details');
+                setSelectedSectionId(null);
+                setSelectedElementId(null);
+                setActivePropTab('logic');
+            }
+
+            // 2. SECTION CONTEXT
+            if (['PROPERTIES_SECTION', 'PROPERTIES_SECTION_LAYOUT', 'PROPERTIES_SECTION_STYLE'].includes(prevStep)) {
+                setSelectedStageId('stg_details');
+                setSelectedSectionId('sec_personal');
+                setSelectedElementId(null);
+                setActivePropTab('general');
+            }
+            if (prevStep === 'PROPERTIES_SECTION_VISIBILITY') {
+                setSelectedStageId('stg_details');
+                setSelectedSectionId('sec_personal');
+                setSelectedElementId(null);
+                setActivePropTab('logic');
+            }
+
+            // 3. ELEMENT CONTEXT
+            if (['PROPERTIES_ELEMENT', 'PROPERTIES_ELEMENT_TYPE', 'PROPERTIES_ELEMENT_OPTIONS'].includes(prevStep)) {
+                setSelectedElementId('memberId');
+                setActivePropTab('general');
+            }
+            if (['PROPERTIES_ELEMENT_LOGIC_INTRO', 'PROPERTIES_ELEMENT_VISIBILITY', 'PROPERTIES_ELEMENT_MANDATORY', 'PROPERTIES_ELEMENT_VALIDATION'].includes(prevStep)) {
+                setSelectedElementId('memberId');
+                setActivePropTab('logic');
+            }
+
+            // HEADER & SETTINGS
+            if (['HEADER_INTRO', 'HEADER_WORKSHOP', 'HEADER_NEW', 'HEADER_UPLOAD', 'HEADER_DOWNLOAD', 'HEADER_SHARE', 'HEADER_RENAME'].includes(prevStep)) {
+                setActiveSidePanel('none');
+            }
+            if (prevStep === 'HEADER_SETTINGS') {
+                setActiveSidePanel('properties'); // Revert to properties? Or maybe 'none' if we just highlight the button.
+                // The description says "Toggle...". 
+                // Let's keep side panel closed or whatever user had, but ensure it's in Editor mode.
+                setActiveSidePanel('none');
+            }
+
+            // NON-PROPERTIES / MODES
+            if (prevStep === 'MODES') {
+                setViewMode('editor');
+                setActiveSidePanel('none');
+            }
+            if (prevStep === 'MODE_TABLE') setViewMode('table');
+            if (prevStep === 'MODE_FLOW') setViewMode('flow');
+            if (prevStep === 'PREVIEW_MODE') setViewMode('preview');
+            if (prevStep === 'MODE_SPEC') setViewMode('spec');
+
+            // QA
+            if (prevStep === 'QA_MODE') {
+                setViewMode('qa');
+                setQaTab('stories');
+            }
+            if (prevStep === 'QA_TAB_STORIES') setQaTab('stories');
+            if (prevStep === 'QA_TAB_DICTIONARY') setQaTab('dictionary');
+            if (prevStep === 'QA_TAB_CASES') setQaTab('cases');
+
+            if (prevStep === 'PEGA_MODE') setViewMode('pega');
+        }
+    };
+
+    const handleNextDemoStep = () => {
+        const steps: DemoStep[] = [
+            'WELCOME', 'EDITOR_OVERVIEW', 'PROPERTIES_INTRO',
+            'PROPERTIES_STAGE', 'PROPERTIES_STAGE_LOGIC_SKIP', 'PROPERTIES_STAGE_ROUTING',
+            'PROPERTIES_SECTION', 'PROPERTIES_SECTION_LAYOUT', 'PROPERTIES_SECTION_STYLE', 'PROPERTIES_SECTION_VISIBILITY',
+            'PROPERTIES_ELEMENT', 'PROPERTIES_ELEMENT_TYPE', 'PROPERTIES_ELEMENT_OPTIONS', 'PROPERTIES_ELEMENT_LOGIC_INTRO', 'PROPERTIES_ELEMENT_VISIBILITY', 'PROPERTIES_ELEMENT_MANDATORY', 'PROPERTIES_ELEMENT_VALIDATION',
+            'AI_FEATURES',
+            'HEADER_INTRO', 'HEADER_WORKSHOP', 'HEADER_NEW', 'HEADER_UPLOAD', 'HEADER_DOWNLOAD', 'HEADER_SHARE', 'HEADER_RENAME', 'HEADER_SETTINGS',
+            'MODES', 'MODE_TABLE', 'MODE_FLOW', 'PREVIEW_MODE', 'MODE_SPEC',
+            'QA_MODE', 'QA_TAB_STORIES', 'QA_TAB_DICTIONARY', 'QA_TAB_CASES',
+            'PEGA_MODE', 'COMPLETE'
+        ];
+        const currentIdx = steps.indexOf(demoStep);
+        if (currentIdx < steps.length - 1) {
+            const nextStep = steps[currentIdx + 1];
+            setDemoStep(nextStep);
+
+            // STATE MANAGEMENT
+            if (nextStep.startsWith('PROPERTIES_')) setActiveSidePanel('properties');
+
+            // 1. STAGE CONTEXT
+            if (nextStep === 'PROPERTIES_INTRO' || nextStep === 'PROPERTIES_STAGE') {
+                setSelectedStageId('stg_details');
+                setSelectedSectionId(null);
+                setSelectedElementId(null);
+                setActivePropTab('general');
+            }
+            if (['PROPERTIES_STAGE_LOGIC_SKIP', 'PROPERTIES_STAGE_ROUTING'].includes(nextStep)) {
+                setActivePropTab('logic');
+            }
+
+            // 2. SECTION CONTEXT
+            if (nextStep === 'PROPERTIES_SECTION') {
+                setSelectedSectionId('sec_personal');
+                setSelectedElementId(null);
+                setActivePropTab('general');
+            }
+            if (nextStep === 'PROPERTIES_SECTION_VISIBILITY') {
+                setActivePropTab('logic');
+            }
+
+            // 3. ELEMENT CONTEXT
+            if (nextStep === 'PROPERTIES_ELEMENT') {
+                setSelectedElementId('memberId');
+                setActivePropTab('general');
+            }
+            if (nextStep === 'PROPERTIES_ELEMENT_LOGIC_INTRO') {
+                setActivePropTab('logic');
+            }
+
+            // HEADER STEPS
+            if (['HEADER_INTRO', 'HEADER_WORKSHOP', 'HEADER_NEW', 'HEADER_UPLOAD', 'HEADER_DOWNLOAD', 'HEADER_SHARE', 'HEADER_RENAME', 'HEADER_SETTINGS'].includes(nextStep)) {
+                setActiveSidePanel('none'); // Close panel to focus on header
+            }
+
+            // MODES
+            if (nextStep === 'MODES') setActiveSidePanel('none');
+
+            if (nextStep === 'MODE_TABLE') setViewMode('table');
+            if (nextStep === 'MODE_FLOW') setViewMode('flow');
+            if (nextStep === 'PREVIEW_MODE') setViewMode('preview');
+            if (nextStep === 'MODE_SPEC') setViewMode('spec');
+
+            // QA
+            if (nextStep === 'QA_MODE') {
+                setViewMode('qa');
+                setQaTab('stories');
+            }
+            if (nextStep === 'QA_TAB_STORIES') setQaTab('stories');
+            if (nextStep === 'QA_TAB_DICTIONARY') setQaTab('dictionary');
+            if (nextStep === 'QA_TAB_CASES') setQaTab('cases');
+
+            if (nextStep === 'PEGA_MODE') setViewMode('pega');
+            if (nextStep === 'COMPLETE') setViewMode('editor'); // Ensure we end in editor for the final message
+        } else {
+            // User clicked "Get Started" - Return to Start Screen
+            setDemoStep('NONE');
+            setProcessDef(null);
+            setViewMode('onboarding');
+        }
+    };
+
     // --- AUTO-SAVE & RESTORE ---
     // (Restoration is now handled by the useAutoBackup hook's checkForBackup on mount)
 
@@ -342,6 +531,7 @@ const App: React.FC = () => {
                     startPrompt={startPrompt}
                     setStartPrompt={setStartPrompt}
                     handleStart={handleStart}
+                    handleStartDemo={handleStartDemo} // Pass Handler
                     handleLegacyFormUpload={handleLegacyFormUpload}
                     handleLoadTemplate={(def) => {
                         console.log("Loading template:", def.name);
@@ -471,6 +661,7 @@ const App: React.FC = () => {
 
                     {viewMode === 'editor' && (
                         <div
+                            id="properties-panel-container"
                             className={`fixed right-0 top-16 bottom-0 z-40 bg-white shadow-2xl border-l border-gray-200 transition-transform duration-300 ease-in-out ${activeSidePanel !== 'none' ? 'translate-x-0' : 'translate-x-full'}`}
                             style={{ width: activeSidePanel !== 'none' ? panelWidth : 0 }}
                         >
@@ -548,6 +739,12 @@ const App: React.FC = () => {
                 </div>
 
                 <AppFooter />
+                <GuideOverlay
+                    step={demoStep}
+                    onNext={handleNextDemoStep}
+                    onPrev={handlePrevDemoStep}
+                    onSkip={() => { setDemoStep('NONE'); setViewMode('editor'); }}
+                />
             </div>
         </ErrorBoundary>
     );

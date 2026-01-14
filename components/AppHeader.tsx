@@ -62,7 +62,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <div className="flex items-center gap-6">
                 <CatapulseLogo scale={0.8} />
                 <div className="h-6 w-px bg-gray-200"></div>
-                <nav className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                <nav id="header-modes" className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
                     {[
                         { id: 'editor', icon: Edit3, label: 'Design' },
                         { id: 'table', icon: TableIcon, label: 'Grid' },
@@ -109,7 +109,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
                 <div className="h-6 w-px bg-gray-200"></div>
 
-                <div className="text-right flex flex-col items-end">
+                <div id="header-process-name" className="text-right flex flex-col items-end">
                     {isRenaming ? (
                         <input
                             autoFocus
