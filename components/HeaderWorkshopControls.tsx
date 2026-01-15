@@ -197,7 +197,6 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
                                 <Plus size={10} /> Load Sample Transcript
                             </button>
 
-                            {/* Controls */}
                             <button
                                 onClick={handleAnalyzeDiscovery}
                                 disabled={isAnalyzingDiscovery || !transcript.trim()}
@@ -205,6 +204,13 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
                             >
                                 {isAnalyzingDiscovery ? <RefreshCw className="animate-spin" size={18} /> : <Wand2 size={18} />}
                                 Analyze
+                            </button>
+
+                            <button
+                                onClick={() => setShowDiscovery(false)}
+                                className="w-full bg-gray-100 text-gray-500 py-3 rounded-lg font-bold hover:bg-gray-200 hover:text-red-500 flex items-center justify-center gap-2 transition-all"
+                            >
+                                Exit Workshop
                             </button>
 
                             {/* Stats / Log */}

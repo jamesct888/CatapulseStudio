@@ -208,4 +208,7 @@ Speaker 1: "What do you mean?"
 Speaker 2: "We need to know if they received financial advice. So, a radio button for 'Have you received financial advice?'. If they answer 'Yes', then we must capture the 'Advisor Name'. It's a mandatory field in that case."
 Speaker 1: "Okay, so another conditional field. Advisor Name is visible and required only if Advice = Yes. Anything else?"
 Speaker 2: "Just the standard declaration checkboxes at the end. But those are the main data points for the initial request."
+Speaker 1: "Hold on, if they are transferring money in, don't we need their Bank Details? Or is it a direct transfer?"
+Speaker 2: "Ah, good catch. We need a section for 'Bank Details' just in case we need to refund or pay out. We need 'Account Name', 'Sort Code', and 'Account Number'. All mandatory."
+Speaker 1: "Okay, I'll add a Bank Details section with those three fields."
 `;
