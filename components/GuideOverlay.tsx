@@ -411,9 +411,12 @@ export const GuideOverlay: React.FC<GuideOverlayProps> = ({ step, onNext, onPrev
                 </p>
 
                 <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">
-                        {step === 'COMPLETE' ? 'Finish' : 'Next Step'}
-                    </span>
+                    <button
+                        onClick={onSkip}
+                        className="text-xs font-bold text-gray-400 hover:text-sw-red uppercase tracking-widest transition-colors flex items-center gap-1"
+                    >
+                        <X size={14} /> Exit Demo
+                    </button>
                     <div className="flex gap-2">
                         {step !== 'WELCOME' && (
                             <button

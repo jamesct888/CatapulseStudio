@@ -743,7 +743,11 @@ const App: React.FC = () => {
                     step={demoStep}
                     onNext={handleNextDemoStep}
                     onPrev={handlePrevDemoStep}
-                    onSkip={() => { setDemoStep('NONE'); setViewMode('editor'); }}
+                    onSkip={() => {
+                        setDemoStep('NONE');
+                        setProcessDef(null);
+                        setViewMode('onboarding');
+                    }}
                 />
             </div>
         </ErrorBoundary>
