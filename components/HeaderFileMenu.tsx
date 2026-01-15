@@ -112,6 +112,7 @@ export const HeaderFileMenu: React.FC<HeaderFileMenuProps> = ({
     return (
         <div className="flex gap-2">
             <button
+                id="btn-new-project"
                 onClick={handleNewProject}
                 className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
                 title="New Project (Reset)"
@@ -127,6 +128,7 @@ export const HeaderFileMenu: React.FC<HeaderFileMenuProps> = ({
                 <FileJson size={18} />
             </button>
             <button
+                id="btn-upload"
                 onClick={() => fileInputRef.current?.click()}
                 className="p-2 text-gray-400 hover:text-sw-teal hover:bg-gray-100 rounded-lg transition-colors"
                 title="Load Local File (JSON)"
@@ -134,6 +136,7 @@ export const HeaderFileMenu: React.FC<HeaderFileMenuProps> = ({
                 <Upload size={18} />
             </button>
             <button
+                id="btn-download"
                 onClick={handleExport}
                 className={`p-2 rounded-lg transition-colors relative ${isDirty ? 'text-amber-600 bg-amber-50 hover:bg-amber-100 hover:text-amber-700 animate-pulse' : 'text-gray-400 hover:text-sw-teal hover:bg-gray-100'}`}
                 title={isDirty ? "Unified File has Unsaved Changes (Click to Download)" : "Save Local File (JSON)"}
@@ -145,6 +148,7 @@ export const HeaderFileMenu: React.FC<HeaderFileMenuProps> = ({
             </button>
             <div className="w-px h-8 bg-gray-200 mx-1"></div>
             <button
+                id="btn-share"
                 onClick={handleExportHTML}
                 className="p-2 text-white bg-sw-teal hover:bg-sw-tealHover rounded-lg transition-colors flex items-center gap-2 text-xs font-bold px-3 shadow-md"
                 title="Export Standalone HTML Prototype"

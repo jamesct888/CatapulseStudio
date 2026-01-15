@@ -178,7 +178,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     };
 
     return (
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-10 shadow-sm">
+        <div id="sidebar-structure" className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-10 shadow-sm">
             <div className="p-5 border-b border-gray-100 bg-white">
                 <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Structure</h2>
                 <div className="space-y-4">
@@ -190,6 +190,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                         return (
                             <div
                                 key={stage.id}
+                                id={`stage-${stage.id}`}
                                 className={`relative group rounded-lg transition-all 
                             ${draggedStageIdx === idx ? 'opacity-40' : ''} 
                             ${isSectionDropTarget ? 'ring-1 ring-dashed ring-sw-teal/30 bg-sw-teal/5' : ''}
@@ -240,7 +241,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
                                             return (
                                                 <div
-                                                    id={isFirstGlobalSection ? 'section-header' : undefined}
+                                                    id={`section-${section.id}`}
                                                     key={section.id}
                                                     draggable
                                                     onDragStart={(e) => handleSectionDragStart(e, idx, secIdx)}

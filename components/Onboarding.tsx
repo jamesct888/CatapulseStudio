@@ -11,6 +11,7 @@ interface OnboardingProps {
   handleStart: (useDemo?: boolean) => void;
   handleLegacyFormUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleLoadTemplate: (def: any) => void; // New Prop
+  handleStartDemo: () => void; // New Prop
   showDemoDrop: boolean;
   isDetailedMode: boolean;
   setIsDetailedMode: (val: boolean) => void;
@@ -22,6 +23,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({
   handleStart,
   handleLegacyFormUpload,
   handleLoadTemplate,
+  handleStartDemo,
   showDemoDrop,
   isDetailedMode,
   setIsDetailedMode
@@ -156,6 +158,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({
           <div className="flex flex-col items-center gap-2">
             <button onClick={() => { setStartPrompt(''); handleStart(); }} className="text-sm font-bold text-gray-400 hover:text-sw-teal transition-colors">
               Skip & Start from Scratch
+            </button>
+            <button onClick={handleStartDemo} className="text-xs font-bold bg-sw-orange/10 text-sw-orange px-4 py-1.5 rounded-full hover:bg-sw-orange/20 transition-colors">
+              Try Interactive Demo
             </button>
           </div>
 

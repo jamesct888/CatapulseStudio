@@ -9,6 +9,7 @@ describe('Onboarding', () => {
     const mockHandleStart = vi.fn();
     const mockHandleLegacyFormUpload = vi.fn();
     const mockHandleLoadTemplate = vi.fn();
+    const mockHandleStartDemo = vi.fn();
     const mockSetIsDetailedMode = vi.fn();
 
     const defaultProps = {
@@ -17,6 +18,7 @@ describe('Onboarding', () => {
         handleStart: mockHandleStart,
         handleLegacyFormUpload: mockHandleLegacyFormUpload,
         handleLoadTemplate: mockHandleLoadTemplate,
+        handleStartDemo: mockHandleStartDemo,
         showDemoDrop: false,
         isDetailedMode: false,
         setIsDetailedMode: mockSetIsDetailedMode,
