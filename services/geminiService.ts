@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ProcessDefinition, StageDefinition, SectionDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage, DataObjectSuggestion, LogicGroup } from "../types";
 
 // @ts-ignore
-const apiKey = (typeof process !== 'undefined' && process.env?.VITE_API_KEY) || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_KEY) || 'TEST_KEY';
+const apiKey = (typeof process !== 'undefined' && process.env?.VITE_API_KEY) || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_KEY) || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || 'TEST_KEY';
 console.log('[GeminiService] Initialized with API Key present:', !!apiKey);
 const ai = new GoogleGenAI({ apiKey });
 
