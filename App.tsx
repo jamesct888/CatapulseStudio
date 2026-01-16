@@ -99,6 +99,11 @@ const App: React.FC = () => {
         }
     }, [checkForBackup, processDef]); // Run once on mount or when processDef is initially null
 
+    // --- GLOBAL PARTIES EXPOSE FOR PICKER ---
+    useEffect(() => {
+        (window as any).catapulseParties = processDef?.parties || [];
+    }, [processDef?.parties]);
+
     // UI State
     const [viewMode, setViewMode] = useState<'onboarding' | 'editor' | 'table' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega'>('onboarding');
     const [startPrompt, setStartPrompt] = useState('');
@@ -553,6 +558,7 @@ const App: React.FC = () => {
     if (isGenerating && !processDef) return <LoadingOverlay />;
     if (!processDef) return null;
 
+
     return (
         <ErrorBoundary>
             <div
@@ -635,6 +641,7 @@ const App: React.FC = () => {
                                     personaPrompt={personaPrompt}
                                     setPersonaPrompt={setPersonaPrompt}
                                     userStories={processDef.userStories || []} // Pass stories for overlay
+                                    setProcessDef={setProcessDef}
                                 />
                             </div>
                         )}

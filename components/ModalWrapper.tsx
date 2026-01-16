@@ -15,8 +15,8 @@ export const ModalWrapper: React.FC<ModalWrapperProps> = ({ title, icon: Icon, c
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div
-                className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative border border-gray-200"
-                style={{ width: modalSize.width, height: modalSize.height, maxWidth: '95vw', maxHeight: '95vh' }}
+                className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative border border-gray-200 w-full"
+                style={{ width: modalSize.width, height: modalSize.height === 'auto' ? 'auto' : modalSize.height, maxHeight: '90vh' }}
             >
                 {/* Modal Header */}
                 <div className="bg-sw-teal p-6 flex justify-between items-center text-white shrink-0">

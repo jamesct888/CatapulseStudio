@@ -32,6 +32,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({
   // UI-only state for now, as requested
   const [targetTech, setTargetTech] = React.useState<'pega' | 'other'>('pega');
 
+  // Check Config
+  const isAiEnabled = (window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false; // Default to true if missing? or strict false? Logic in service says Strict False. Here we should match.
+  // Actually, let's use the same logic as service service: strict false if missing.
+  // const isAiEnabled = (window as any).CATAPULSE_APP_CONFIG ? (window as any).CATAPULSE_APP_CONFIG.aiEnabled : false;
+  // Use a local helper or safe check.
+  const aiEnabled = (window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true;
+
   return (
     <div className="min-h-screen bg-sw-lighterGray flex flex-col justify-center items-center p-8 relative overflow-hidden">
       {/* Background Decoration - Concentric Circles */}
@@ -89,29 +96,33 @@ export const Onboarding: React.FC<OnboardingProps> = ({
         </h1>
 
         <p className="text-xl text-gray-500 max-w-2xl mx-auto font-light leading-relaxed">
-          Describe your business process, or start from a Golden Template.
+          {aiEnabled
+            ? "Describe your business process, or start from a Golden Template."
+            : "Select a Golden Template or start from scratch."}
         </p>
 
-        {/* Input Area - Floating Card Style */}
-        <div className="relative max-w-2xl mx-auto w-full mt-8 group">
-          <div className="relative bg-white p-2 rounded-2xl shadow-card hover:shadow-xl transition-all border border-gray-100 flex items-center">
-            <input
-              type="text"
-              className="flex-1 bg-transparent border-none focus:ring-0 text-xl px-4 py-3 text-sw-teal placeholder-gray-300 font-serif"
-              placeholder="e.g. Pension Transfer In, Health Claim..."
-              value={startPrompt}
-              onChange={(e) => setStartPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleStart()}
-            />
-            <button
-              onClick={() => handleStart()}
-              className="bg-sw-teal hover:bg-sw-tealHover text-white p-3 rounded-xl transition-all shadow-sm flex items-center justify-center"
-              aria-label="Generate Process"
-            >
-              <Sparkles size={24} />
-            </button>
+        {/* Input Area - Floating Card Style (ONLY IF AI ENABLED) */}
+        {aiEnabled && (
+          <div className="relative max-w-2xl mx-auto w-full mt-8 group">
+            <div className="relative bg-white p-2 rounded-2xl shadow-card hover:shadow-xl transition-all border border-gray-100 flex items-center">
+              <input
+                type="text"
+                className="flex-1 bg-transparent border-none focus:ring-0 text-xl px-4 py-3 text-sw-teal placeholder-gray-300 font-serif"
+                placeholder="e.g. Pension Transfer In, Health Claim..."
+                value={startPrompt}
+                onChange={(e) => setStartPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleStart()}
+              />
+              <button
+                onClick={() => handleStart()}
+                className="bg-sw-teal hover:bg-sw-tealHover text-white p-3 rounded-xl transition-all shadow-sm flex items-center justify-center"
+                aria-label="Generate Process"
+              >
+                <Sparkles size={24} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* --- Template Gallery --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto mt-12">
@@ -145,33 +156,56 @@ export const Onboarding: React.FC<OnboardingProps> = ({
 
 
         {/* Footer Links & Actions */}
-        <div className="pt-8 flex flex-col items-center gap-4">
+        <div className="pt-8 flex flex-col items-center gap-6">
+
+          {/* Primary Action: Start from Scratch */}
           <button
-            id="card-digitize"
-            onClick={() => legacyInputRef.current?.click()}
-            className="flex items-center gap-2 text-sw-teal bg-white border border-gray-200 px-6 py-2 rounded-full font-bold text-sm hover:shadow-md hover:border-sw-teal transition-all group"
+            onClick={() => { setStartPrompt(''); handleStart(); }}
+            className="group relative bg-sw-teal text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:bg-sw-tealHover transition-all flex items-center gap-3 transform hover:-translate-y-1"
           >
-            <ScanLine size={16} className="text-gray-400 group-hover:text-sw-teal transition-colors" />
-            Import from Document / Legacy Form
+            <div className="absolute inset-0 bg-white/20 rounded-full animate-pulse opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <Zap size={20} className="fill-current" />
+            <span>Skip & Start from Scratch</span>
+            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider opacity-80 group-hover:opacity-100">Fast</span>
           </button>
 
-          <div className="flex flex-col items-center gap-2">
-            <button onClick={() => { setStartPrompt(''); handleStart(); }} className="text-sm font-bold text-gray-400 hover:text-sw-teal transition-colors">
-              Skip & Start from Scratch
-            </button>
-            <button onClick={handleStartDemo} className="text-xs font-bold bg-sw-orange/10 text-sw-orange px-4 py-1.5 rounded-full hover:bg-sw-orange/20 transition-colors">
-              Try Interactive Demo
+          {/* Secondary Actions Row */}
+          <div className="flex items-center gap-6">
+            {aiEnabled && (
+              <button
+                id="card-digitize"
+                onClick={() => legacyInputRef.current?.click()}
+                className="flex items-center gap-2 text-gray-400 hover:text-sw-teal font-medium text-xs transition-all group/import"
+              >
+                <div className="p-2 bg-white border border-gray-200 rounded-full group-hover/import:border-sw-teal group-hover/import:shadow-sm transition-all">
+                  <ScanLine size={14} />
+                </div>
+                Import Document
+              </button>
+            )}
+
+            <button
+              onClick={handleStartDemo}
+              className="flex items-center gap-2 text-gray-400 hover:text-sw-orange font-medium text-xs transition-all group/demo"
+            >
+              <div className="p-2 bg-white border border-gray-200 rounded-full group-hover/demo:border-sw-orange group-hover/demo:shadow-sm transition-all">
+                <BrainCircuit size={14} />
+              </div>
+              Interactive Demo
             </button>
           </div>
 
         </div>
 
         <div className="text-center pt-8 space-y-1">
-          <p className="text-[10px] text-gray-300 font-mono">
-            Powered by Gemini 2.5 Flash • Enterprise Grade Security
-          </p>
+          {aiEnabled && (
+            <p className="text-[10px] text-gray-300 font-mono">
+              Powered by Gemini 2.5 Flash • Enterprise Grade Security
+            </p>
+          )}
           <p className="text-[10px] text-gray-300 font-mono opacity-60">
             Catapulse Studio v1.3.3 • Build {new Date().toISOString().split('T')[0]}
+            {!aiEnabled && " • Secure Offline Mode"}
           </p>
         </div>
       </div>

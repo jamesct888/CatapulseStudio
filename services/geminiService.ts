@@ -1,11 +1,25 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { ProcessDefinition, StageDefinition, SectionDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage, DataObjectSuggestion, LogicGroup } from "../types";
 
+// Helper to check Runtime Config
+export const getAiEnabled = (): boolean => {
+    if (typeof window !== 'undefined' && window.CATAPULSE_APP_CONFIG) {
+        return window.CATAPULSE_APP_CONFIG.aiEnabled;
+    }
+    // Default to TRUE if config is missing (Legacy behavior) OR force FALSE if desired for security default?
+    // Plan says "Default to FALSE for security" in config.js, but here if config is missing?
+    // Let's safe default to TRUE slightly for dev, but if the user wants strict security they will have the config file.
+    // Actually, implementation plan says: "Ensure it fails safe if config is missing (assume Disabled)"
+    return false;
+};
+
 // @ts-ignore
 const apiKey = (typeof process !== 'undefined' && process.env?.VITE_API_KEY) || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_KEY) || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || 'TEST_KEY';
-console.log('[GeminiService] Initialized with API Key present:', !!apiKey);
-const ai = new GoogleGenAI({ apiKey });
+
+// Initialize AI conditionally
+const ai = new GoogleGenAI({ apiKey }); // We instantiate, but will gate calls.
+
+console.log('[GeminiService] Initialized. AI Enabled:', getAiEnabled());
 
 const modelId = "gemini-3-flash-preview"; // User requested Gemini 3 Preview
 
@@ -108,6 +122,11 @@ const generateJSON = async <T>(
     } = {}
 ): Promise<T | null> => {
     const { maxTokens = 8192, retries = 2, systemInstruction, model = modelId, logLabel = "Generation" } = options;
+
+    if (!getAiEnabled()) {
+        console.warn(`[AI Service] 🔒 Security Block: AI is disabled in config.js.`);
+        return null;
+    }
 
     try {
         const response = await callWithRetry(async () => {

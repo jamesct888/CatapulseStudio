@@ -15,7 +15,10 @@ export type ElementType =
   | 'repeater'
   | 'calculated'
   | 'manage_requirements'
-  | 'mirror';
+  | 'mirror'
+  | 'party_picker' // New Party Picker
+  | 'party_bank_details' // Selected Party Bank Details
+  | 'party_picker_with_bank'; // Combined Picker + Details
 
 export type Operator = 'equals' | 'notEquals' | 'contains' | 'doesNotContain' | 'greaterThan' | 'lessThan' | 'isEmpty' | 'isNotEmpty';
 
@@ -129,6 +132,8 @@ export interface ProcessDefinition {
   name: string;
   description: string;
   stages: StageDefinition[];
+  // Global Parties Registry
+  parties?: Party[];
   // QA Persistence
   userStories?: UserStory[];
   testCases?: TestCase[];
@@ -221,4 +226,33 @@ export interface DataObjectSuggestion {
     elementId: string;
     suggestedProperty: string;
   }[];
+}
+
+// --- KEY PARTIES ---
+export type PartyRole = 'Solicitor' | 'Bank' | 'Beneficiary' | 'Claimant' | 'Doctor' | 'Employer' | 'Other';
+
+export interface BankDetails {
+  accountName: string;
+  sortCode: string;
+  accountNumber: string;
+  bankName?: string;
+}
+
+export interface Party {
+  id: string;
+  name: string; // Full Name or Org Name
+  role: PartyRole;
+  email?: string;
+  phone?: string;
+  address?: string;
+  bankDetails?: BankDetails;
+  notes?: string;
+}
+
+declare global {
+  interface Window {
+    CATAPULSE_APP_CONFIG?: {
+      aiEnabled: boolean;
+    };
+  }
 }

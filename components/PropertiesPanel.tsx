@@ -439,6 +439,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                 { val: 'radio', label: 'Radio Buttons' },
                                                 { val: 'checkbox', label: 'Checkbox' },
                                                 { val: 'repeater', label: 'Data Table (Repeater)' },
+                                                { val: 'party_picker', label: 'Party Picker' },
+                                                { val: 'party_picker_with_bank', label: 'Party Picker (w/ Bank Details)' },
+                                                { val: 'party_bank_details', label: 'SelectedParty Bank Details (Read-only)' },
                                                 { val: 'manage_requirements', label: 'Manage Requirements' }
                                             ];
                                             const staticOptions = [
@@ -449,6 +452,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                             if (isRestricted) {
                                                 return staticOptions.map(opt => <option key={opt.val} value={opt.val}>{opt.label}</option>);
                                             } else {
+                                                // Sort alphabetically or logically
                                                 return [...interactiveOptions, ...staticOptions].map(opt => <option key={opt.val} value={opt.val}>{opt.label}</option>);
                                             }
                                         })()}
@@ -469,7 +473,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                     </div>
                                 )}
 
-                                {/* Options for Select/Radio */}
                                 {/* Options for Select/Radio/ManageRequirements */}
                                 {['select', 'radio', 'multiselect', 'manage_requirements'].includes(selectedElement.type) && (
                                     <div id="prop-element-options">
@@ -477,12 +480,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                             {selectedElement.type === 'manage_requirements' ? 'Appropriate Documents (Comma separated)' : 'Options (Comma separated)'}
                                         </label>
                                         <textarea
-                                            // Handle complex options object vs simple string array
                                             value={Array.isArray(selectedElement.options)
                                                 ? selectedElement.options.map(o => typeof o === 'string' ? o : o.value).join(', ')
                                                 : ''}
                                             onChange={(e) => {
-                                                // Convert back to simple string array for now
                                                 handleChange('options', e.target.value.split(',').map(s => s.trim()));
                                             }}
                                             className={inputClass}
@@ -492,31 +493,46 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                     </div>
                                 )}
 
-                                {/* Static Data Source configuration */}
-                                {selectedElement.type === 'static' && (
+                                {/* Static Data Source configuration OR Party Bank Details Source */}
+                                {(selectedElement.type === 'static' || selectedElement.type === 'party_bank_details') && (
                                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                                         <div className="flex items-center gap-2 mb-2">
                                             <Globe size={16} className="text-blue-500" />
-                                            <label className="text-xs font-bold text-blue-700 uppercase">Data Source</label>
+                                            <label className="text-xs font-bold text-blue-700 uppercase">
+                                                {selectedElement.type === 'party_bank_details' ? 'Source Party Picker' : 'Data Source'}
+                                            </label>
                                         </div>
-                                        <select
-                                            value={selectedElement.staticDataSource || 'manual'}
-                                            onChange={(e) => handleChange('staticDataSource', e.target.value)}
-                                            className="w-full text-xs p-2 mb-2 rounded border border-blue-200"
-                                        >
-                                            <option value="manual">Manual Text</option>
-                                            <option value="field">Mirror Another Field</option>
-                                        </select>
 
-                                        {selectedElement.staticDataSource === 'field' && (
+                                        {selectedElement.type === 'static' && (
+                                            <select
+                                                value={selectedElement.staticDataSource || 'manual'}
+                                                onChange={(e) => handleChange('staticDataSource', e.target.value)}
+                                                className="w-full text-xs p-2 mb-2 rounded border border-blue-200"
+                                            >
+                                                <option value="manual">Manual Text</option>
+                                                <option value="field">Mirror Another Field</option>
+                                            </select>
+                                        )}
+
+                                        {(selectedElement.type === 'party_bank_details' || (selectedElement.type === 'static' && selectedElement.staticDataSource === 'field')) && (
                                             <select
                                                 value={selectedElement.sourceFieldId || ''}
                                                 onChange={(e) => handleChange('sourceFieldId', e.target.value)}
                                                 className="w-full text-xs p-2 rounded border border-blue-200"
                                             >
-                                                <option value="">Select Field...</option>
-                                                {allElements.filter(e => e.id !== selectedElement.id).map(e => (
-                                                    <option key={e.id} value={e.id}>{e.label}</option>
+                                                <option value="">
+                                                    {selectedElement.type === 'party_bank_details' ? 'Auto-detect (Nearest Previous)' : 'Select Field...'}
+                                                </option>
+                                                {allElements.filter(e => {
+                                                    // Filter for valid choices
+                                                    if (e.id === selectedElement.id) return false;
+                                                    if (selectedElement.type === 'party_bank_details') {
+                                                        // Only show party pickers
+                                                        return e.type === 'party_picker';
+                                                    }
+                                                    return true; // For static mirror, allow any field
+                                                }).map(e => (
+                                                    <option key={e.id} value={e.id}>{e.label} ({e.id})</option>
                                                 ))}
                                             </select>
                                         )}

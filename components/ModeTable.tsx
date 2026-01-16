@@ -561,6 +561,8 @@ export const ModeTable: React.FC<ModeTableProps> = ({ processDef, setProcessDef,
                                                                 <option value="checkbox">Checkbox</option>
                                                                 <option value="static">Static Text</option>
                                                                 <option value="repeater">Repeater</option>
+                                                                <option value="party_picker">Party Picker</option>
+                                                                <option value="party_bank_details">SelectedParty Bank Details</option>
                                                                 <option value="calculated">Calculated</option>
                                                             </select>
                                                         </td>

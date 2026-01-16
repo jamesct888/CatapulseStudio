@@ -5,6 +5,7 @@ import { ProcessDefinition, VisualTheme } from '../types';
 import { HeaderCloudControls } from './HeaderCloudControls';
 import { HeaderFileMenu } from './HeaderFileMenu';
 import { HeaderWorkshopControls } from './HeaderWorkshopControls';
+import { Users } from 'lucide-react';
 
 type ViewMode = 'editor' | 'table' | 'flow' | 'preview' | 'spec' | 'qa' | 'pega' | 'onboarding';
 
@@ -25,7 +26,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     isDirty, onExternalSave
 }) => {
 
-    // Renaming State
     const [isRenaming, setIsRenaming] = useState(false);
     const [tempName, setTempName] = useState(processDef?.name || '');
 
@@ -96,6 +96,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     setProcessDef={setProcessDef}
                 />
 
+
                 <div className="h-6 w-px bg-gray-200"></div>
 
                 <HeaderFileMenu
@@ -148,6 +149,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     </button>
                 )}
             </div>
+
         </header>
     );
 };

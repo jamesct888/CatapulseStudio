@@ -314,37 +314,40 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 </div>
             </div>
 
-            <div id="sidebar-copilot" className="p-5 mt-auto bg-sw-lightGray border-t border-gray-200">
-                <div className="flex items-center gap-2 mb-3 text-sw-teal">
-                    <Sparkles size={16} />
-                    <span className="text-xs font-bold uppercase tracking-widest">AI Copilot</span>
+            {/* AI Copilot Section - Hidden if Disabled */}
+            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false && (
+                <div id="sidebar-copilot" className="p-5 mt-auto bg-sw-lightGray border-t border-gray-200">
+                    <div className="flex items-center gap-2 mb-3 text-sw-teal">
+                        <Sparkles size={16} />
+                        <span className="text-xs font-bold uppercase tracking-widest">AI Copilot</span>
+                    </div>
+                    <div className="relative">
+                        <textarea
+                            value={aiPrompt}
+                            onChange={(e) => setAiPrompt(e.target.value)}
+                            disabled={isGenerating}
+                            placeholder={isGenerating ? "AI is thinking..." : "Describe a change (e.g. 'Add a comments field')..."}
+                            className={`w-full p-3 pr-10 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-sw-teal focus:border-transparent resize-none h-24 bg-white shadow-sm text-sw-text transition-opacity ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleAiModification();
+                                }
+                            }}
+                        />
+                        <button
+                            onClick={handleAiModification}
+                            disabled={isGenerating || !aiPrompt.trim()}
+                            className="absolute bottom-2 right-2 p-1.5 bg-sw-teal text-white rounded-lg hover:bg-sw-tealHover disabled:opacity-50 transition-colors shadow-sm flex items-center justify-center min-w-[28px] min-h-[28px]"
+                        >
+                            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
+                        Context: {selectedSectionId ? `Section: Active` : `Stage: ${selectedStage?.title}`}
+                    </p>
                 </div>
-                <div className="relative">
-                    <textarea
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        disabled={isGenerating}
-                        placeholder={isGenerating ? "AI is thinking..." : "Describe a change (e.g. 'Add a comments field')..."}
-                        className={`w-full p-3 pr-10 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-sw-teal focus:border-transparent resize-none h-24 bg-white shadow-sm text-sw-text transition-opacity ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleAiModification();
-                            }
-                        }}
-                    />
-                    <button
-                        onClick={handleAiModification}
-                        disabled={isGenerating || !aiPrompt.trim()}
-                        className="absolute bottom-2 right-2 p-1.5 bg-sw-teal text-white rounded-lg hover:bg-sw-tealHover disabled:opacity-50 transition-colors shadow-sm flex items-center justify-center min-w-[28px] min-h-[28px]"
-                    >
-                        {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
-                    </button>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
-                    Context: {selectedSectionId ? `Section: Active` : `Stage: ${selectedStage?.title}`}
-                </p>
-            </div>
+            )}
         </div>
     );
 };

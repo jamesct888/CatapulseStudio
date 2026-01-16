@@ -61,7 +61,7 @@ export const demoProcess: ProcessDefinition = {
             "sections": [
                 {
                     "id": "sec_scheme",
-                    "title": "Previous Scheme",
+                    "title": "Previous Schem Details",
                     "layout": "1col",
                     "elements": [
                         {
@@ -100,8 +100,46 @@ export const demoProcess: ProcessDefinition = {
                             }
                         }
                     ]
+                },
+                {
+                    "id": "sec_parties",
+                    "title": "Parties Involved",
+                    "layout": "1col",
+                    "elements": [
+                        {
+                            "id": "cedingSchemeAdmin",
+                            "label": "Select Ceding Scheme (Party)",
+                            "type": "party_picker_with_bank",
+                            "description": "Select the organization transferring the funds (Bank details will appear below).",
+                            "required": true
+                        }
+                    ]
                 }
             ]
+        }
+    ],
+    "parties": [
+        {
+            "id": "party_1",
+            "name": "Barclays Bank PLC",
+            "role": "Bank",
+            "bankDetails": {
+                "accountName": "Barclays Main",
+                "bankName": "Barclays",
+                "sortCode": "20-00-00",
+                "accountNumber": "12345678"
+            }
+        },
+        {
+            "id": "party_2",
+            "name": "Slaughter and May",
+            "role": "Solicitor",
+            "bankDetails": {
+                "accountName": "Slaughter and May Client Acct",
+                "bankName": "HSBC",
+                "sortCode": "40-00-00",
+                "accountNumber": "87654321"
+            }
         }
     ]
 };

@@ -28,7 +28,7 @@ const getOptionLabel = (opt: any): string => {
   return String(opt);
 };
 
-export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' }, formData }) => {
+export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' }, formData, allElements }) => {
   // --- RUNTIME SELF-HEALING ---
   // If the data has an invalid type (e.g. 'textInput'), map it to a valid one on the fly.
   let effectiveType = element.type;
@@ -806,9 +806,10 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                   </button>
                 </div>
               ))}
+
               {mrRows.length === 0 && (
                 <div className={`p-8 text-center text-sm italic text-gray-400 bg-gray-50/50`}>
-                  No requirements added yet.
+                  No documents listed.
                 </div>
               )}
             </div>
@@ -826,10 +827,197 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                       : 'border-gray-300 text-gray-500 hover:border-sw-teal hover:text-sw-teal hover:bg-white'
                   }`}
               >
-                <Plus size={14} /> Add Requirement
+                <Plus size={14} /> Add Document Requirement
               </button>
             </div>
+          </div >
+          <ErrorMsg />
+        </div >
+      );
+
+    case 'party_picker':
+      // NEW: Party Picker Element
+      // Use processDef.parties via context or assume passed down?
+      // Since we don't have processDef here easily, we might need to rely on 'formElements' being updated to pass it
+      // OR simply rely on the fact that for the prototype, we can fetch it or it's passed in formData?
+      // Actually, FormElementsProps doesn't have processDef.
+      // We need to pass 'parties' prop to RenderElement or access it via a hook/context.
+      // For now, let's assume we can pass it down through props or update the component signature.
+
+      // TEMPORARY FIX: Access global window/store or use empty list if not available
+      // In a real app, use Context.
+      const globalParties = (window as any).catapulseParties || [];
+
+      return (
+        <div className={`${d.wrapper} group`}>
+          <Label />
+          <div className="relative w-full">
+            <div className="absolute left-2 top-0 bottom-0 flex items-center text-gray-400 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+            </div>
+            <select
+              disabled={disabled}
+              className={`${baseClasses} ${errorClasses} pl-8`}
+              value={value || ''}
+              onChange={handleChange}
+              onBlur={onBlur}
+            >
+              <option value="" className="text-gray-500">Select Party...</option>
+              {globalParties.map((p: any) => (
+                <option key={p.id} value={p.id} className="text-gray-900">
+                  {p.name} ({p.role})
+                </option>
+              ))}
+            </select>
           </div>
+          <div className="mt-1 flex justify-end">
+            <button className="text-[10px] font-bold text-sw-teal hover:underline uppercase tracking-wider flex items-center gap-1">
+              <Plus size={10} /> Add New
+            </button>
+          </div>
+          <ErrorMsg />
+        </div>
+      );
+
+    case 'party_bank_details':
+      // 1. Get the source field ID
+      let sourceFieldId = element.sourceFieldId;
+
+      // 1b. Autolink Logic: If no sourceFieldId, find the nearest preceding 'party_picker'
+      if (!sourceFieldId && allElements) {
+        // Find current element index
+        const currentIndex = allElements.findIndex(e => e.id === element.id);
+        if (currentIndex > 0) {
+          // Search backwards from current element
+          for (let i = currentIndex - 1; i >= 0; i--) {
+            if (allElements[i].type === 'party_picker') {
+              sourceFieldId = allElements[i].id;
+              break;
+            }
+          }
+        }
+      }
+
+      // 2. Get the value of the source field (which should be a Party ID)
+      const selectedPartyId = sourceFieldId && formData ? formData[sourceFieldId] : null;
+
+      // 3. Find the party
+      // Using window global as per party_picker pattern
+      const globalPartiesForBank = (window as any).catapulseParties || [];
+      const selectedParty = selectedPartyId ? globalPartiesForBank.find((p: any) => p.id === selectedPartyId) : null;
+      const bankDetails = selectedParty?.bankDetails;
+
+      if (!sourceFieldId) {
+        return <div className="text-gray-400 text-xs italic p-2 border border-dashed border-gray-200 rounded">No source party picker found (Add one above this field)</div>;
+      }
+
+      if (!selectedPartyId) {
+        return <div className="text-gray-400 text-xs italic p-2 border border-dashed border-gray-200 rounded">No party selected</div>;
+      }
+
+      if (!selectedParty) {
+        return <div className="text-gray-400 text-xs italic p-2 border border-dashed border-gray-200 rounded">Party not found</div>;
+      }
+
+      if (!bankDetails) {
+        return <div className="text-gray-400 text-xs italic p-2 border border-dashed border-gray-200 rounded">No bank details on record for {selectedParty.name}</div>;
+      }
+
+      return (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
+          <div className="flex items-center gap-2 mb-2 text-sw-teal font-bold uppercase text-xs">
+            <Calculator size={14} /> Bank Details: {selectedParty.name}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="block text-[10px] text-gray-500 uppercase font-bold">Account Name</span>
+              <span className="font-mono text-gray-800">{bankDetails.accountName}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] text-gray-500 uppercase font-bold">Bank Name</span>
+              <span className="font-mono text-gray-800">{bankDetails.bankName || '-'}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] text-gray-500 uppercase font-bold">Sort Code</span>
+              <span className="font-mono text-gray-800">{bankDetails.sortCode}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] text-gray-500 uppercase font-bold">Account No.</span>
+              <span className="font-mono text-gray-800">{bankDetails.accountNumber}</span>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'party_picker_with_bank':
+      const globalPartiesWithBank = (window as any).catapulseParties || [];
+      const selectedPartyForBank = value ? globalPartiesWithBank.find((p: any) => p.id === value) : null;
+      const bankDetailsInfo = selectedPartyForBank?.bankDetails;
+
+      return (
+        <div className={`${d.wrapper} group`}>
+          <Label />
+          {/* 1. The Picker */}
+          <div className="relative w-full mb-3">
+            <div className="absolute left-2 top-0 bottom-0 flex items-center text-gray-400 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+            </div>
+            <select
+              disabled={disabled}
+              className={`${baseClasses} ${errorClasses} pl-8`}
+              value={value || ''}
+              onChange={handleChange}
+              onBlur={onBlur}
+            >
+              <option value="" className="text-gray-500">Select Party...</option>
+              {globalPartiesWithBank.map((p: any) => (
+                <option key={p.id} value={p.id} className="text-gray-900">
+                  {p.name} ({p.role})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. The Read-Only Bank Details (Conditionally Rendered) */}
+          {selectedPartyForBank && (
+            <div className={`transition-all duration-300 animate-in fade-in slide-in-from-top-2`}>
+              {bankDetailsInfo ? (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
+                    <svg className="w-16 h-16 text-indigo-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2 text-indigo-700 font-bold uppercase text-xs">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    Bank Details Detected
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 relative z-10">
+                    <div>
+                      <span className="block text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Account Name</span>
+                      <span className="font-mono font-medium text-indigo-900">{bankDetailsInfo.accountName}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Bank</span>
+                      <span className="font-mono font-medium text-indigo-900">{bankDetailsInfo.bankName || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Sort Code</span>
+                      <span className="font-mono font-medium text-indigo-900">{bankDetailsInfo.sortCode}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Account No.</span>
+                      <span className="font-mono font-medium text-indigo-900">{bankDetailsInfo.accountNumber}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-3 text-sm flex items-center justify-center gap-2 text-gray-400 italic">
+                  <span className="opacity-50 text-xl">🏦</span>
+                  No bank details on record for {selectedPartyForBank.name}
+                </div>
+              )}
+            </div>
+          )}
+
           <ErrorMsg />
         </div>
       );

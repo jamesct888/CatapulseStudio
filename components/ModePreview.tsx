@@ -7,6 +7,7 @@ import { generateFormData } from '../services/geminiService';
 import { User, Sparkles, PanelBottom, ArrowRight, AlertTriangle, Info, Shield, ChevronRight, ArrowLeft, Check, FastForward, Eye, EyeOff, Map, Link2 } from 'lucide-react';
 import { OperationsHUD } from './OperationsHUD';
 
+import { PartiesManager } from './PartiesManager';
 import { UserStory } from '../types'; // Import UserStory
 
 interface ModePreviewProps {
@@ -19,10 +20,11 @@ interface ModePreviewProps {
     personaPrompt: string;
     setPersonaPrompt: (val: string) => void;
     userStories: UserStory[];
+    setProcessDef?: React.Dispatch<React.SetStateAction<ProcessDefinition | null>>;
 }
 
 export const ModePreview: React.FC<ModePreviewProps> = ({
-    processDef, formData, setFormData, formErrors, setFormErrors, visualTheme, personaPrompt, setPersonaPrompt, userStories
+    processDef, formData, setFormData, formErrors, setFormErrors, visualTheme, personaPrompt, setPersonaPrompt, userStories, setProcessDef
 }) => {
     const [currentStageIdx, setCurrentStageIdx] = useState(0);
     // Removed local formErrors state
@@ -35,6 +37,9 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
     const [storyOverlayVisible, setStoryOverlayVisible] = useState(false); // Story Overlay Toggle
     const [activeSkill, setActiveSkill] = useState<string>('');
     const [skillReason, setSkillReason] = useState<string>('');
+
+    // Party Manager State
+    const [showParties, setShowParties] = useState(false);
 
     const currentStage = processDef.stages[currentStageIdx];
 
@@ -221,7 +226,8 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
 
     return (
         <div className={`h-full overflow-y-auto ${pageBg}`}>
-            <div className="w-[80%] max-w-[1000px] mx-auto py-12 px-6 relative flex flex-col gap-8 pb-32">
+            {/* MAIN CONTAINER: Top Nav followed by split content */}
+            <div className="w-[95%] max-w-[1400px] mx-auto py-12 px-6 relative flex flex-col gap-8 pb-32">
                 <OperationsHUD
                     key={`${currentStageIdx}-${isHudEnabled}`}
                     isVisible={hudVisible}
@@ -230,7 +236,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                     onDismiss={() => setHudVisible(false)}
                 />
 
-                {/* Top Navigation Bar */}
+                {/* Top Navigation Bar - Full Width */}
                 <div className="flex flex-col gap-6">
                     <div className="flex justify-between items-center">
                         <h2 className={`text-3xl font-serif ${headerTextColor}`}>{processDef.name}</h2>
@@ -340,127 +346,168 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                     </nav>
                 </div>
 
-                {/* Stage Title Banner */}
-                <div className={`p-6 rounded-xl shadow-md ${stageHeaderBg} text-white flex justify-between items-center`}>
-                    <div>
-                        <span className="text-xs font-bold uppercase tracking-widest opacity-80 block mb-1">Current Stage</span>
-                        <h3 className="text-2xl font-bold">{currentStage.title}</h3>
-                    </div>
-                    <div className="text-4xl font-serif opacity-20">{currentStageIdx + 1}</div>
-                </div>
+                {/* MAIN CONTENT + SIDEBAR CONTAINER */}
+                <div className="flex flex-col lg:flex-row items-start gap-8">
 
-                {/* Sections List - Separated Cards */}
-                <div className="flex flex-col gap-8">
-                    {visibleSections.map(section => (
-                        <MemoizedSection
-                            key={section.id}
-                            section={section}
-                            formData={formData}
-                            setFormData={setFormData}
-                            formErrors={formErrors}
-                            setFormErrors={setFormErrors}
-                            visualTheme={visualTheme}
-                            sectionTitleColor={sectionTitleColor}
-                            cardClass={cardClass}
-                            isLogicDebugEnabled={isLogicDebugEnabled}
-                            allElements={processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements)}
-                            hoveredFieldId={hoveredFieldId}
-                            setHoveredFieldId={setHoveredFieldId}
-                        />
-                    ))}
-                </div>
-
-                {/* Footer Actions */}
-                <div className="sticky bottom-4 mt-8 flex justify-between items-center bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-200 shadow-xl z-20">
-                    <button
-                        onClick={handleBack}
-                        disabled={currentStageIdx === 0}
-                        className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${backButtonClass}`}
-                    >
-                        <ArrowLeft size={18} /> Back
-                    </button>
-
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest hidden md:block">
-                        Stage {currentStageIdx + 1}
-                    </div>
-
-                    {/* Routing Forecast */}
-                    {isLogicDebugEnabled && (
-                        <div className="absolute -top-12 right-0 bg-white border border-gray-200 shadow-lg p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 z-30">
-                            <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
-                                <Map size={16} />
+                    {/* LEFT/MAIN COLUMN */}
+                    <div className="flex-1 w-full min-w-0 flex flex-col gap-8">
+                        {/* Stage Title Banner */}
+                        <div className={`p-6 rounded-xl shadow-md ${stageHeaderBg} text-white flex justify-between items-center`}>
+                            <div>
+                                <span className="text-xs font-bold uppercase tracking-widest opacity-80 block mb-1">Current Stage</span>
+                                <h3 className="text-2xl font-bold">{currentStage.title}</h3>
                             </div>
-                            <div className="text-right">
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Routing Forecast</div>
-                                {(() => {
-                                    const nextIdx = getNextValidStageIndex(currentStageIdx + 1);
-                                    if (nextIdx === null) return <div className="text-sm font-bold text-gray-800">Finish Application</div>;
-
-                                    const skippedCount = nextIdx - (currentStageIdx + 1);
-                                    const nextStage = processDef.stages[nextIdx];
-
-                                    return (
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-gray-800">Next: {nextStage.title}</span>
-                                            {skippedCount > 0 && (
-                                                <span className="text-[10px] text-orange-600 font-bold flex items-center justify-end gap-1">
-                                                    <FastForward size={8} /> Skips {skippedCount} Stage{skippedCount > 1 ? 's' : ''}
-                                                </span>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
+                            <div className="text-4xl font-serif opacity-20">{currentStageIdx + 1}</div>
                         </div>
-                    )}
 
-                    <button
-                        onClick={handleNext}
-                        className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 ${primaryButtonClass}`}
-                    >
-                        {getNextValidStageIndex(currentStageIdx + 1) === null ? 'Submit Application' : 'Next Step'}
-                        <ChevronRight size={18} />
-                    </button>
-                </div>
+                        {/* Sections List - Separated Cards */}
+                        <div className="flex flex-col gap-8">
+                            {visibleSections.map(section => (
+                                <MemoizedSection
+                                    key={section.id}
+                                    section={section}
+                                    formData={formData}
+                                    setFormData={setFormData}
+                                    formErrors={formErrors}
+                                    setFormErrors={setFormErrors}
+                                    visualTheme={visualTheme}
+                                    sectionTitleColor={sectionTitleColor}
+                                    cardClass={cardClass}
+                                    isLogicDebugEnabled={isLogicDebugEnabled}
+                                    allElements={processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements)}
+                                    hoveredFieldId={hoveredFieldId}
+                                    setHoveredFieldId={setHoveredFieldId}
+                                />
+                            ))}
+                        </div>
 
-                {/* Summary Footer Sections */}
-                {processDef.stages
-                    .filter((_, idx) => idx <= currentStageIdx)
-                    .flatMap(s => s.sections)
-                    .filter(s => s.variant === 'summary' && isSectionVisible(s, formData))
-                    .length > 0 && (
-                        <div className="mt-8 space-y-4 pt-8 border-t border-gray-200/50">
-                            <h5 className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center mb-4">Application Summary</h5>
-                            {processDef.stages
-                                .filter((_, idx) => idx <= currentStageIdx)
-                                .flatMap(s => s.sections)
-                                .filter(s => s.variant === 'summary' && isSectionVisible(s, formData))
-                                .map(summarySec => (
-                                    <div key={summarySec.id} className={`${isType2 ? 'bg-white border-[#ffe2e8]' : isType3 ? 'bg-white border-gray-200' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6`}>
-                                        <h4 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}`}>
-                                            <PanelBottom size={14} /> {summarySec.title}
-                                        </h4>
-                                        <div className={`grid gap-4 ${summarySec.layout === '2col' ? 'grid-cols-2' : summarySec.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
-                                            {summarySec.elements.filter(el => isElementVisible(el, formData)).map(el => {
-                                                // Ensure data is pulled for reflection fields in summary
-                                                let elementValue = formData[el.id];
-                                                if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
-                                                    elementValue = formData[el.sourceFieldId];
-                                                }
-                                                // Shared Data Logic
-                                                if (el.type === 'manage_requirements') {
-                                                    elementValue = formData['_global_requirements'];
-                                                }
-                                                return (
-                                                    <RenderElement key={el.id} element={el} value={elementValue} onChange={() => { }} disabled theme={{ ...visualTheme, density: 'compact', radius: 'small' }} formData={formData} />
-                                                );
-                                            })}
-                                        </div>
+                        {/* Footer Actions */}
+                        <div className="sticky bottom-4 mt-8 flex justify-between items-center bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-200 shadow-xl z-20">
+                            <button
+                                onClick={handleBack}
+                                disabled={currentStageIdx === 0}
+                                className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${backButtonClass}`}
+                            >
+                                <ArrowLeft size={18} /> Back
+                            </button>
+
+                            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest hidden md:block">
+                                Stage {currentStageIdx + 1}
+                            </div>
+
+                            {/* Routing Forecast */}
+                            {isLogicDebugEnabled && (
+                                <div className="absolute -top-12 right-0 bg-white border border-gray-200 shadow-lg p-3 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 z-30">
+                                    <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                                        <Map size={16} />
                                     </div>
-                                ))}
+                                    <div className="text-right">
+                                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Routing Forecast</div>
+                                        {(() => {
+                                            const nextIdx = getNextValidStageIndex(currentStageIdx + 1);
+                                            if (nextIdx === null) return <div className="text-sm font-bold text-gray-800">Finish Application</div>;
+
+                                            const skippedCount = nextIdx - (currentStageIdx + 1);
+                                            const nextStage = processDef.stages[nextIdx];
+
+                                            return (
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-gray-800">Next: {nextStage.title}</span>
+                                                    {skippedCount > 0 && (
+                                                        <span className="text-[10px] text-orange-600 font-bold flex items-center justify-end gap-1">
+                                                            <FastForward size={8} /> Skips {skippedCount} Stage{skippedCount > 1 ? 's' : ''}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleNext}
+                                className={`px-8 py-3 rounded-xl font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 ${primaryButtonClass}`}
+                            >
+                                {getNextValidStageIndex(currentStageIdx + 1) === null ? 'Submit Application' : 'Next Step'}
+                                <ChevronRight size={18} />
+                            </button>
                         </div>
-                    )}
+
+                        {/* Summary Footer Sections */}
+                        {processDef.stages
+                            .filter((_, idx) => idx <= currentStageIdx)
+                            .flatMap(s => s.sections)
+                            .filter(s => s.variant === 'summary' && isSectionVisible(s, formData))
+                            .length > 0 && (
+                                <div className="mt-8 space-y-4 pt-8 border-t border-gray-200/50">
+                                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center mb-4">Application Summary</h5>
+                                    {processDef.stages
+                                        .filter((_, idx) => idx <= currentStageIdx)
+                                        .flatMap(s => s.sections)
+                                        .filter(s => s.variant === 'summary' && isSectionVisible(s, formData))
+                                        .map(summarySec => (
+                                            <div key={summarySec.id} className={`${isType2 ? 'bg-white border-[#ffe2e8]' : isType3 ? 'bg-white border-gray-200' : 'bg-sw-teal/5 border-sw-teal/20'} border rounded-xl p-6`}>
+                                                <h4 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}`}>
+                                                    <PanelBottom size={14} /> {summarySec.title}
+                                                </h4>
+                                                <div className={`grid gap-4 ${summarySec.layout === '2col' ? 'grid-cols-2' : summarySec.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                                                    {summarySec.elements.filter(el => isElementVisible(el, formData)).map(el => {
+                                                        // Ensure data is pulled for reflection fields in summary
+                                                        let elementValue = formData[el.id];
+                                                        if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
+                                                            elementValue = formData[el.sourceFieldId];
+                                                        }
+                                                        // Shared Data Logic
+                                                        if (el.type === 'manage_requirements') {
+                                                            elementValue = formData['_global_requirements'];
+                                                        }
+                                                        return (
+                                                            <RenderElement key={el.id} element={el} value={elementValue} onChange={() => { }} disabled theme={{ ...visualTheme, density: 'compact', radius: 'small' }} formData={formData} />
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                </div>
+                            )}
+                    </div>
+
+                    {/* RIGHT SIDEBAR */}
+                    <div className="w-full lg:w-80 shrink-0 flex flex-col gap-6 lg:sticky lg:top-8 order-first lg:order-last">
+                        {/* Case Context / Parties Header */}
+                        <div className={`p-4 rounded-xl border flex flex-col gap-3 ${isType2 ? 'bg-white border-[#ffe2e8]' : isType3 ? 'bg-white border-gray-200' : 'bg-sw-teal/5 border-sw-teal/20'}`}>
+                            <div className="flex justify-between items-center">
+                                <h4 className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}`}>
+                                    <User size={14} /> Case Participants
+                                </h4>
+                                <button
+                                    onClick={() => setShowParties(true)}
+                                    className="text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-lg hover:border-sw-teal hover:text-sw-teal transition-colors font-medium shadow-sm"
+                                >
+                                    Manage Parties
+                                </button>
+                            </div>
+                            {/* Compact Party List */}
+                            <div className="flex flex-wrap gap-2">
+                                {(processDef.parties || []).length === 0 ? (
+                                    <span className="text-xs text-gray-400 italic">No parties defined.</span>
+                                ) : (
+                                    (processDef.parties || []).map(p => (
+                                        <div key={p.id} className="text-xs px-2 py-1 bg-white border border-gray-200 rounded text-gray-700 flex items-center gap-2 shadow-sm">
+                                            <span className="font-bold opacity-70">{p.role}:</span>
+                                            <span>{p.name}</span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
+
+
 
             {/* Story Coverage Overlay */}
             {storyOverlayVisible && (
@@ -491,6 +538,14 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                         )}
                     </div>
                 </div>
+            )}
+
+            {showParties && setProcessDef && (
+                <PartiesManager
+                    processDef={processDef}
+                    setProcessDef={setProcessDef}
+                    onClose={() => setShowParties(false)}
+                />
             )}
         </div>
     );
