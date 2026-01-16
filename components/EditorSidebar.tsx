@@ -315,7 +315,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             </div>
 
             {/* AI Copilot Section - Hidden if Disabled */}
-            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false && (
+            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true && (
                 <div id="sidebar-copilot" className="p-5 mt-auto bg-sw-lightGray border-t border-gray-200">
                     <div className="flex items-center gap-2 mb-3 text-sw-teal">
                         <Sparkles size={16} />

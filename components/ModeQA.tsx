@@ -319,7 +319,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
 
                             <div className="h-6 w-px bg-gray-200 mx-2"></div>
 
-                            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false && (
+                            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true && (
                                 <button
                                     onClick={handleInitialAdvisor}
                                     className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors text-sm ${showAdvisor ? 'bg-sw-teal text-white' : 'bg-sw-purpleLight text-sw-teal hover:bg-sw-teal/10'}`}
@@ -328,7 +328,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
                                 </button>
                             )}
 
-                            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false && (
+                            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true && (
                                 <button
                                     onClick={handleGenerateStories}
                                     disabled={isGenerating}
@@ -544,7 +544,7 @@ export const ModeQA: React.FC<ModeQAProps> = ({
             {qaTab === 'cases' && (
                 <div className="space-y-6">
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-end">
-                        {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false ? (
+                        {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true ? (
                             <button
                                 onClick={handleGenerateTests}
                                 disabled={isGenerating}
