@@ -1,14 +1,9 @@
-@tailwind base;
-
 /* Global Body Styles */
 body {
   color: #0b3239;
   /* sw-teal */
   font-feature-settings: "cv11", "ss01";
 }
-
-@tailwind components;
-@tailwind utilities;
 
 /* Custom Scrollbar for 'custom-scrollbar' class */
 .custom-scrollbar::-webkit-scrollbar {
