@@ -86,7 +86,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ story, onUpdate, onRefresh
                         <option value="Done">Done</option>
                     </select>
 
-                    {story.jiraId && (
+                    {story.jiraId && (window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true && (
                         <button
                             onClick={() => onRefresh(story)}
                             className="text-gray-400 hover:text-sw-teal transition-colors p-1 rounded hover:bg-gray-100"
