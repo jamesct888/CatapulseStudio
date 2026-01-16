@@ -543,7 +543,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
             {showParties && setProcessDef && (
                 <PartiesManager
                     processDef={processDef}
-                    setProcessDef={setProcessDef}
+                    setProcessDef={setProcessDef as React.Dispatch<React.SetStateAction<ProcessDefinition>>}
                     onClose={() => setShowParties(false)}
                 />
             )}
