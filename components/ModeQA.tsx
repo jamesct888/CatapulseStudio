@@ -319,21 +319,25 @@ export const ModeQA: React.FC<ModeQAProps> = ({
 
                             <div className="h-6 w-px bg-gray-200 mx-2"></div>
 
-                            <button
-                                onClick={handleInitialAdvisor}
-                                className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors text-sm ${showAdvisor ? 'bg-sw-teal text-white' : 'bg-sw-purpleLight text-sw-teal hover:bg-sw-teal/10'}`}
-                            >
-                                <BrainCircuit size={16} /> Strategy Advisor
-                            </button>
+                            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false && (
+                                <button
+                                    onClick={handleInitialAdvisor}
+                                    className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors text-sm ${showAdvisor ? 'bg-sw-teal text-white' : 'bg-sw-purpleLight text-sw-teal hover:bg-sw-teal/10'}`}
+                                >
+                                    <BrainCircuit size={16} /> Strategy Advisor
+                                </button>
+                            )}
 
-                            <button
-                                onClick={handleGenerateStories}
-                                disabled={isGenerating}
-                                className="ml-auto bg-sw-teal text-white px-6 py-2 rounded-lg font-bold hover:bg-sw-tealHover disabled:opacity-50 flex items-center gap-2"
-                            >
-                                {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                                Generate Stories
-                            </button>
+                            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false && (
+                                <button
+                                    onClick={handleGenerateStories}
+                                    disabled={isGenerating}
+                                    className="ml-auto bg-sw-teal text-white px-6 py-2 rounded-lg font-bold hover:bg-sw-tealHover disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                                    Generate Stories
+                                </button>
+                            )}
                         </div>
 
                         {/* Conversational Advisor Panel */}
@@ -540,14 +544,18 @@ export const ModeQA: React.FC<ModeQAProps> = ({
             {qaTab === 'cases' && (
                 <div className="space-y-6">
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-end">
-                        <button
-                            onClick={handleGenerateTests}
-                            disabled={isGenerating}
-                            className="bg-sw-teal text-white px-6 py-2 rounded-lg font-bold hover:bg-sw-tealHover disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                            Generate Test Cases
-                        </button>
+                        {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled !== false ? (
+                            <button
+                                onClick={handleGenerateTests}
+                                disabled={isGenerating}
+                                className="bg-sw-teal text-white px-6 py-2 rounded-lg font-bold hover:bg-sw-tealHover disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                                Generate Test Cases
+                            </button>
+                        ) : (
+                            <span className="text-gray-400 text-sm italic">AI Features Disabled (Offline Mode)</span>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">

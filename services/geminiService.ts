@@ -493,6 +493,9 @@ export const generateFormData = async (processDef: ProcessDefinition, personaDes
 }
 
 export const consultStrategyAdvisor = async (processDef: ProcessDefinition, chatHistory: ChatMessage[], userMessage: string): Promise<{ reply: string, recommendations: StrategyRecommendation[] }> => {
+    if (!getAiEnabled()) {
+        return { reply: "AI Advisor is offline.", recommendations: [] };
+    }
     if (!apiKey) return { reply: "AI Service Unavailable", recommendations: [] };
     const prompt = `
     ACT AS: A Senior Agile Coach and QA Strategist.
@@ -534,6 +537,10 @@ export const consultStrategyAdvisor = async (processDef: ProcessDefinition, chat
 };
 
 export const generateUserStories = async (processDef: ProcessDefinition, strategy: StoryStrategy): Promise<UserStory[]> => {
+    if (!getAiEnabled()) {
+        console.warn("[AI Service] generateUserStories blocked (AI Disabled)");
+        return [];
+    }
     if (!apiKey) return [];
 
     // ISTQB Certified Prompt
