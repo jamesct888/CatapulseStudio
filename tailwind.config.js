@@ -8,16 +8,31 @@ export default {
         extend: {
             colors: {
                 sw: {
-                    teal: '#009087',      // Primary Brand (Guessing hex based on name)
-                    tealHover: '#007A73', // Darker for hover
-                    lightGray: '#F3F4F6', // Backgrounds
-                    text: '#1F2937',      // Main text
-                    red: '#EF4444',       // Error / Delete
+                    teal: '#0b3239',       /* Primary Navy/Teal */
+                    tealHover: '#062126',
+                    red: '#e61126',        /* Primary Red */
+                    redHover: '#c40e20',
+                    gold: '#f5efe6',       /* Secondary Beige/Gold */
+                    lightGray: '#eee',
+                    lighterGray: '#fafafa',
+                    purpleLight: '#ede9ff',
+                    surface: '#ffffff',
+                    text: '#0b3239',
+                    error: '#db0f30'
                 }
             },
             fontFamily: {
-                serif: ['Georgia', 'Cambria', '"Times New Roman"', 'Times', 'serif'],
-                sans: ['Inter', 'system-ui', 'sans-serif'],
+                sans: ['"GT Ultra Standard"', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                serif: ['"ABC Arizona Flare"', 'Georgia', 'Times New Roman', 'serif'],
+            },
+            borderRadius: {
+                'xl': '12px',
+                '2xl': '16px',
+                'btn': '50px'
+            },
+            boxShadow: {
+                'card': '0 0 8px 0 rgba(11,50,57,.04), 0 2px 5px 0 rgba(11,50,57,.06)',
+                'input-focus': '0 0 0 2px #fff, 0 0 0 4px #0b3239'
             }
         },
     },

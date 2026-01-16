@@ -1,4 +1,12 @@
 @tailwind base;
+
+/* Global Body Styles */
+body {
+  color: #0b3239;
+  /* sw-teal */
+  font-feature-settings: "cv11", "ss01";
+}
+
 @tailwind components;
 @tailwind utilities;
 
@@ -6,22 +14,64 @@
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #CBD5E1;
   border-radius: 3px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: #94A3B8;
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
+
 .animate-in {
   animation: fadeIn 0.3s ease-out;
+}
+
+/* Fonts moved from index.html */
+@font-face {
+  font-family: 'ABC Arizona Flare';
+  src: url('/fonts/ABCArizonaFlare-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GT Ultra Standard';
+  src: url('/fonts/GT-Ultra-Standard-Lloyds-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GT Ultra Standard';
+  src: url('/fonts/GT-Ultra-Standard-Lloyds-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GT Ultra Standard';
+  src: url('/fonts/GT-Ultra-Standard-Lloyds-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
