@@ -436,6 +436,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                 { val: 'currency', label: 'Currency (GBP)' },
                                                 { val: 'date', label: 'Date Picker' },
                                                 { val: 'select', label: 'Dropdown (Select)' },
+                                                { val: 'multiselect', label: 'Multi-Select' },
                                                 { val: 'radio', label: 'Radio Buttons' },
                                                 { val: 'checkbox', label: 'Checkbox' },
                                                 { val: 'repeater', label: 'Data Table (Repeater)' },
