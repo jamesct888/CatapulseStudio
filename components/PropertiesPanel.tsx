@@ -485,7 +485,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                 ? selectedElement.options.map(o => typeof o === 'string' ? o : o.value).join(', ')
                                                 : ''}
                                             onChange={(e) => {
-                                                handleChange('options', e.target.value.split(',').map(s => s.trim()));
+                                                // Allow trailing spaces while typing (trimStart only)
+                                                handleChange('options', e.target.value.split(',').map(s => s.trimStart()));
+                                            }}
+                                            onBlur={() => {
+                                                // Full cleanup on blur
+                                                if (selectedElement.options && Array.isArray(selectedElement.options)) {
+                                                    const cleanOptions = selectedElement.options.map(o =>
+                                                        typeof o === 'string' ? o.trim() : o
+                                                    );
+                                                    handleChange('options', cleanOptions);
+                                                }
                                             }}
                                             className={inputClass}
                                             rows={3}
@@ -578,8 +588,19 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                             className="flex-1 text-xs p-1 rounded border min-w-[80px]"
                                                             onChange={(e) => {
                                                                 const newCols = [...(selectedElement.columns || [])];
-                                                                newCols[idx] = { ...col, options: e.target.value.split(',').map(s => s.trim()) };
+                                                                // Allow trailing spaces while typing
+                                                                newCols[idx] = { ...col, options: e.target.value.split(',').map(s => s.trimStart()) };
                                                                 handleRepeaterChange(newCols);
+                                                            }}
+                                                            onBlur={() => {
+                                                                const newCols = [...(selectedElement.columns || [])];
+                                                                if (col.options) {
+                                                                    newCols[idx] = {
+                                                                        ...col,
+                                                                        options: col.options.map(s => s.trim())
+                                                                    };
+                                                                    handleRepeaterChange(newCols);
+                                                                }
                                                             }}
                                                         />
                                                     )}
@@ -668,19 +689,54 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                         <CheckCircle2 size={18} className="text-amber-600" />
                                         <span className={`${labelClass.replace('mb-2', 'mb-0')} text-amber-700`}>Mandatory Rules</span>
                                     </div>
-                                    <button
-                                        onClick={() => {
-                                            ensureLogicGroup('requiredLogic');
-                                            setModals(m => ({ ...m, required: true }));
+                                </div>
+
+                                {/* Mode Selector */}
+                                <div className="mb-3">
+                                    <select
+                                        value={selectedElement.required ? 'always' : (selectedElement.requiredLogic ? 'conditional' : 'optional')}
+                                        onChange={(e) => {
+                                            const mode = e.target.value;
+                                            if (mode === 'optional') {
+                                                onUpdateElement({ ...selectedElement, required: false, requiredLogic: undefined });
+                                            } else if (mode === 'always') {
+                                                onUpdateElement({ ...selectedElement, required: true, requiredLogic: undefined });
+                                            } else if (mode === 'conditional') {
+                                                onUpdateElement({
+                                                    ...selectedElement,
+                                                    required: false,
+                                                    requiredLogic: selectedElement.requiredLogic || { id: 'root', operator: 'AND', conditions: [] }
+                                                });
+                                            }
                                         }}
-                                        className="text-xs bg-white border border-amber-500 text-amber-600 px-3 py-1 rounded-full hover:bg-amber-500 hover:text-white transition-colors"
+                                        className="w-full p-2 bg-white text-sm border border-amber-200 rounded text-amber-900 focus:outline-none focus:border-amber-500"
                                     >
-                                        Configure
-                                    </button>
+                                        <option value="optional">Optional (Never)</option>
+                                        <option value="always">Always Required</option>
+                                        <option value="conditional">Conditional (Logic)</option>
+                                    </select>
                                 </div>
-                                <div className="text-xs text-gray-500 bg-white p-3 rounded border border-gray-200">
-                                    {formatLogicSummary(selectedElement.requiredLogic || { id: 'dummy', operator: 'AND', conditions: [] }, allElements)}
-                                </div>
+
+                                {/* Conditional Config */}
+                                {selectedElement.requiredLogic && !selectedElement.required && (
+                                    <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Logic Summary</span>
+                                            <button
+                                                onClick={() => {
+                                                    ensureLogicGroup('requiredLogic');
+                                                    setModals(m => ({ ...m, required: true }));
+                                                }}
+                                                className="text-xs bg-white border border-amber-500 text-amber-600 px-3 py-1 rounded-full hover:bg-amber-500 hover:text-white transition-colors"
+                                            >
+                                                Configure Rules
+                                            </button>
+                                        </div>
+                                        <div className="text-xs text-gray-500 bg-white p-3 rounded border border-gray-200">
+                                            {formatLogicSummary(selectedElement.requiredLogic, allElements)}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
