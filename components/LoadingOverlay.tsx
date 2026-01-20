@@ -33,24 +33,24 @@ export const LoadingOverlay: React.FC = () => {
     return (
         <div className="fixed inset-0 z-[100] bg-sw-teal/95 backdrop-blur-xl flex flex-col items-center justify-center text-white p-8 animate-in fade-in duration-500 overflow-hidden">
 
-            {/* Dynamic Rotating Background Rings - REDESIGNED & BOLD */}
+            {/* Dynamic Rotating Background Rings - REDESIGNED & BOLD & RESIZED */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-90">
                 {/* Outer Circle - Slower - Massive Orbit */}
-                <div className="absolute w-[60rem] h-[60rem] border-4 border-dotted border-sw-gold/30 rounded-full animate-[spin_30s_linear_infinite]">
+                <div className="absolute w-[45rem] h-[45rem] border-4 border-dotted border-sw-gold/30 rounded-full animate-[spin_30s_linear_infinite]">
                     <div className="absolute top-1/2 -right-4">
                         <Sparkles size={48} className="text-sw-gold animate-pulse drop-shadow-[0_0_20px_rgba(245,239,230,1)]" />
                     </div>
                 </div>
 
                 {/* Middle Circle - Medium - Reverse Spin */}
-                <div className="absolute w-[45rem] h-[45rem] border-2 border-sw-gold/40 rounded-full animate-[spin_20s_linear_infinite_reverse]">
+                <div className="absolute w-[35rem] h-[35rem] border-2 border-sw-gold/40 rounded-full animate-[spin_20s_linear_infinite_reverse]">
                     <div className="absolute bottom-10 left-1/4">
                         <Sparkles size={32} className="text-white animate-pulse drop-shadow-[0_0_15px_rgba(255,255,255,1)]" />
                     </div>
                 </div>
 
                 {/* Inner Circle - Faster - Main Focus */}
-                <div className="absolute w-[30rem] h-[30rem] border-4 border-dashed border-sw-gold/60 rounded-full animate-[spin_10s_linear_infinite]">
+                <div className="absolute w-[25rem] h-[25rem] border-4 border-dashed border-sw-gold/60 rounded-full animate-[spin_10s_linear_infinite]">
                     <div className="absolute -top-6 left-1/2">
                         <Sparkles size={64} className="text-sw-gold animate-ping opacity-60" />
                         <Sparkles size={64} className="absolute top-0 left-0 text-white animate-pulse drop-shadow-[0_0_30px_rgba(245,239,230,1)]" />
