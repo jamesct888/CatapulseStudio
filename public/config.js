@@ -5,5 +5,5 @@
 window.CATAPULSE_APP_CONFIG = {
     // SECURITY: Controls whether AI features (Gemini) are enabled.
     // Set to 'false' to strictly disable all external AI calls and hide AI UI elements.
-    aiEnabled: false
+    aiEnabled: true
 };

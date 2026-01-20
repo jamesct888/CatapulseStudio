@@ -580,6 +580,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                                                         <option value="date">Date</option>
                                                         <option value="checkbox">Checkbox</option>
                                                         <option value="select">Select</option>
+                                                        <option value="party_picker">Party Picker</option>
                                                     </select>
                                                     {col.type === 'select' && (
                                                         <input

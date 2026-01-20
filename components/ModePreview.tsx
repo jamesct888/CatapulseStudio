@@ -377,6 +377,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                                     allElements={processDef.stages.flatMap(s => s.sections).flatMap(sec => sec.elements)}
                                     hoveredFieldId={hoveredFieldId}
                                     setHoveredFieldId={setHoveredFieldId}
+                                    parties={processDef.parties}
                                 />
                             ))}
                         </div>
@@ -463,7 +464,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
                                                             elementValue = formData['_global_requirements'];
                                                         }
                                                         return (
-                                                            <RenderElement key={el.id} element={el} value={elementValue} onChange={() => { }} disabled theme={{ ...visualTheme, density: 'compact', radius: 'small' }} formData={formData} />
+                                                            <RenderElement key={el.id} element={el} value={elementValue} onChange={() => { }} disabled theme={{ ...visualTheme, density: 'compact', radius: 'small' }} formData={formData} parties={processDef.parties} />
                                                         );
                                                     })}
                                                 </div>
@@ -565,10 +566,11 @@ interface SectionProps {
     allElements: any[];
     hoveredFieldId: string | null;
     setHoveredFieldId: (id: string | null) => void;
+    parties?: any[];
 }
 
 const SectionComponent: React.FC<SectionProps> = ({
-    section, formData, setFormData, formErrors, setFormErrors, visualTheme, sectionTitleColor, cardClass, isLogicDebugEnabled, allElements, hoveredFieldId, setHoveredFieldId
+    section, formData, setFormData, formErrors, setFormErrors, visualTheme, sectionTitleColor, cardClass, isLogicDebugEnabled, allElements, hoveredFieldId, setHoveredFieldId, parties = []
 }) => {
     // Filter out 'Summary' sections from main flow
     if (section.variant === 'summary') return null;
@@ -773,6 +775,7 @@ const SectionComponent: React.FC<SectionProps> = ({
                                     disabled={isHiddenDebug}
                                     theme={visualTheme}
                                     formData={formData}
+                                    parties={parties}
                                 />
                                 {(isDebugHidden || isDebugVisible) && debugTrace && (
                                     <div className={`mt-1 p-2 border rounded text-[10px] font-mono ${isDebugVisible ? 'bg-green-50 border-green-200 text-green-800' : 'bg-yellow-50 border-yellow-200 text-gray-600'}`}>

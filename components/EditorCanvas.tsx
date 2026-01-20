@@ -220,6 +220,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                                     onChange={() => { }}
                                                     disabled
                                                     theme={visualTheme}
+                                                    parties={processDef.parties}
                                                 />
                                             </div>
 

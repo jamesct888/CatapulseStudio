@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ElementDefinition, VisualTheme } from '../types';
+import { ElementDefinition, VisualTheme, Party } from '../types';
 import { Plus, Trash2, X, ChevronDown, Check, Calculator } from 'lucide-react';
 import { evaluateCalculation } from '../utils/logic';
 
@@ -18,6 +18,7 @@ interface FormElementProps {
   hoveredFieldId?: string | null;
   setHoveredFieldId?: (id: string | null) => void;
   allElements?: ElementDefinition[];
+  parties?: Party[]; // Transferred from ModePreview
 }
 
 const getOptionLabel = (opt: any): string => {
@@ -28,7 +29,7 @@ const getOptionLabel = (opt: any): string => {
   return String(opt);
 };
 
-export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' }, formData, allElements }) => {
+export const RenderElement: React.FC<FormElementProps> = ({ element, value, onChange, onBlur, error, disabled, theme = { mode: 'type1', density: 'default', radius: 'medium' }, formData, allElements, parties = [] }) => {
   // --- RUNTIME SELF-HEALING ---
   // If the data has an invalid type (e.g. 'textInput'), map it to a valid one on the fly.
   let effectiveType = element.type;
@@ -632,6 +633,18 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
                           onChange={(e) => handleRowChange(rowIdx, col.id, e.target.checked)}
                           className="mt-2"
                         />
+                      ) : col.type === 'party_picker' ? (
+                        <select
+                          disabled={disabled}
+                          className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
+                          value={row[col.id] || ''}
+                          onChange={(e) => handleRowChange(rowIdx, col.id, e.target.value)}
+                        >
+                          <option value="">Select Party...</option>
+                          {parties.map((p) => (
+                            <option key={p.id} value={p.name}>{p.role}: {p.name}</option>
+                          ))}
+                        </select>
                       ) : (
                         <input
                           type={col.type}
@@ -745,14 +758,17 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
 
                   {/* Party */}
                   <div>
-                    <input
-                      type="text"
+                    <select
                       disabled={disabled}
                       className={`w-full text-xs p-2 border rounded outline-none focus:ring-1 ${listInputClass}`}
                       value={row.party || ''}
                       onChange={(e) => handleMrRowChange(rowIdx, 'party', e.target.value)}
-                      placeholder="Party Name"
-                    />
+                    >
+                      <option value="">Select Party...</option>
+                      {parties.map((p) => (
+                        <option key={p.id} value={p.name}>{p.role}: {p.name}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Method */}

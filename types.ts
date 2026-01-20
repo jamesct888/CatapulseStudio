@@ -54,7 +54,7 @@ export interface SkillRule {
 export interface RepeaterColumn {
   id: string;
   label: string;
-  type: 'text' | 'date' | 'number' | 'select' | 'checkbox';
+  type: 'text' | 'date' | 'number' | 'select' | 'checkbox' | 'party_picker';
   options?: string[];
 }
 
