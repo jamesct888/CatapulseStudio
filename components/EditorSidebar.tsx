@@ -31,10 +31,12 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 }) => {
     const [draggedStageIdx, setDraggedStageIdx] = useState<number | null>(null);
     const [draggedSection, setDraggedSection] = useState<{ stageIdx: number, sectionIdx: number } | null>(null);
+    const [dropIndicator, setDropIndicator] = useState<{ type: 'stage' | 'section', index: number, parentIndex?: number, position: 'before' | 'after' } | null>(null);
 
     const resetDragState = () => {
         setDraggedStageIdx(null);
         setDraggedSection(null);
+        setDropIndicator(null);
     };
 
     // --- Stage Drag Handlers ---
@@ -46,9 +48,17 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         e.dataTransfer.setData('application/json', JSON.stringify({ type: 'stage', index }));
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
+    const handleDragOver = (e: React.DragEvent, index: number) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const position = e.clientY < midY ? 'before' : 'after';
+
+        if (!dropIndicator || dropIndicator.type !== 'stage' || dropIndicator.index !== index || dropIndicator.position !== position) {
+            setDropIndicator({ type: 'stage', index, position });
+        }
     };
 
     const handleDrop = (e: React.DragEvent, targetStageIdx: number) => {
@@ -99,12 +109,22 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         // --- CASE 2: Reordering STAGES ---
         if (draggedStageIdx !== null || (dragData && dragData.type === 'stage')) {
             const srcIdx = draggedStageIdx !== null ? draggedStageIdx : dragData.index;
-            if (srcIdx === targetStageIdx) return;
+            if (srcIdx === targetStageIdx) return; // Basic check, but need to handle offset with drop position
 
             const newStages = [...processDef.stages];
             const [movedStage] = newStages.splice(srcIdx, 1);
-            newStages.splice(targetStageIdx, 0, movedStage);
 
+            let finalTargetIndex = targetStageIdx;
+            if (dropIndicator?.position === 'after') {
+                finalTargetIndex++;
+            }
+
+            // Adjust if moving down
+            if (srcIdx < finalTargetIndex) {
+                finalTargetIndex--;
+            }
+
+            newStages.splice(finalTargetIndex, 0, movedStage);
             setProcessDef({ ...processDef, stages: newStages });
             resetDragState();
         }
@@ -119,10 +139,18 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         e.dataTransfer.setData('application/json', JSON.stringify({ type: 'section', stageIdx, sectionIdx }));
     };
 
-    const handleSectionDragOver = (e: React.DragEvent) => {
+    const handleSectionDragOver = (e: React.DragEvent, stageIdx: number, sectionIdx: number) => {
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
+
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        const position = e.clientY < midY ? 'before' : 'after';
+
+        if (!dropIndicator || dropIndicator.type !== 'section' || dropIndicator.index !== sectionIdx || dropIndicator.parentIndex !== stageIdx || dropIndicator.position !== position) {
+            setDropIndicator({ type: 'section', index: sectionIdx, parentIndex: stageIdx, position });
+        }
     };
 
     const handleSectionDrop = (e: React.DragEvent, stageIdx: number, targetSectionIdx: number) => {
@@ -164,8 +192,13 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
 
         // 4. Calculate Insertion
         let insertionIndex = targetSectionIdx;
+
+        if (dropIndicator?.position === 'after') {
+            insertionIndex++;
+        }
+
         // If moving within the same list and moving downwards, adjust index
-        if (srcStageIdx === stageIdx && srcSecIdx < targetSectionIdx) {
+        if (srcStageIdx === stageIdx && srcSecIdx < insertionIndex) {
             insertionIndex--;
         }
 
@@ -254,10 +287,16 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                         `}
                                 draggable={!isLoading}
                                 onDragStart={(e) => !isLoading && handleDragStart(e, idx)}
-                                onDragOver={handleDragOver}
+                                onDragOver={(e) => handleDragOver(e, idx)}
                                 onDrop={(e) => !isLoading && handleDrop(e, idx)}
                                 onDragEnd={resetDragState}
                             >
+                                {dropIndicator?.type === 'stage' && dropIndicator?.index === idx && dropIndicator.position === 'before' && (
+                                    <div className="absolute top-0 left-0 right-0 h-1 bg-sw-teal rounded-full z-20 pointer-events-none" />
+                                )}
+                                {dropIndicator?.type === 'stage' && dropIndicator?.index === idx && dropIndicator.position === 'after' && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-sw-teal rounded-full z-20 pointer-events-none" />
+                                )}
                                 {/* Connection Line (Hide for last item) */}
                                 {idx < processDef.stages.length - 1 && (
                                     <div className="absolute left-3 top-8 bottom-[-16px] w-px bg-gray-100"></div>
@@ -302,7 +341,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                                     key={section.id}
                                                     draggable
                                                     onDragStart={(e) => handleSectionDragStart(e, idx, secIdx)}
-                                                    onDragOver={handleSectionDragOver}
+                                                    onDragOver={(e) => handleSectionDragOver(e, idx, secIdx)}
                                                     onDrop={(e) => handleSectionDrop(e, idx, secIdx)}
                                                     onDragEnd={(e) => { e.stopPropagation(); resetDragState(); }}
                                                     onClick={(e) => {
@@ -319,6 +358,12 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                     ${draggedSection?.stageIdx === idx && draggedSection?.sectionIdx === secIdx ? 'opacity-40' : ''}
                                 `}
                                                 >
+                                                    {dropIndicator?.type === 'section' && dropIndicator?.index === secIdx && dropIndicator?.parentIndex === idx && dropIndicator.position === 'before' && (
+                                                        <div className="absolute top-0 left-0 right-0 h-1 bg-sw-teal rounded-full z-20 pointer-events-none" />
+                                                    )}
+                                                    {dropIndicator?.type === 'section' && dropIndicator?.index === secIdx && dropIndicator?.parentIndex === idx && dropIndicator.position === 'after' && (
+                                                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-sw-teal rounded-full z-20 pointer-events-none" />
+                                                    )}
                                                     {section.variant === 'summary' ? <PanelBottom size={14} className="opacity-70 shrink-0" /> : <RectangleVertical size={14} className="opacity-70 shrink-0" />}
                                                     <span className="truncate flex-1">{section.title}</span>
 

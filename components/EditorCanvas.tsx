@@ -28,7 +28,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     loadingStageIds
 }) => {
     const [draggedItem, setDraggedItem] = useState<{ sectionId: string, index: number } | null>(null);
-    const [dropIndicator, setDropIndicator] = useState<{ sectionId: string, index: number, position: 'before' | 'after' } | null>(null);
+    const dropIndicator = null; // Removed drop indicator state
     const sectionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
     // Explicitly check if this specific stage is loading
@@ -49,26 +49,42 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
         setDraggedItem({ sectionId, index });
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', JSON.stringify({ sectionId, index }));
-        // Create a custom drag image if needed, or stick with default ghost
     };
 
-    const handleElementDragOver = (e: React.DragEvent, sectionId: string, index: number) => {
+    const handleElementDragOver = (e: React.DragEvent, targetSectionId: string, targetIndex: number) => {
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
 
-        // Calculate position relative to element center
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        const position = e.clientY < midY ? 'before' : 'after';
+        if (!draggedItem) return;
 
-        // Only update if changed to avoid renders
-        if (!dropIndicator || dropIndicator.sectionId !== sectionId || dropIndicator.index !== index || dropIndicator.position !== position) {
-            setDropIndicator({ sectionId, index, position });
+        // If dragging over a different item (or different section)
+        if (draggedItem.sectionId !== targetSectionId || draggedItem.index !== targetIndex) {
+
+            const newDef = { ...processDef };
+            const stage = newDef.stages.find(s => s.id === selectedStageId);
+            if (!stage) return;
+
+            const sourceSec = stage.sections.find(s => s.id === draggedItem.sectionId);
+            const targetSec = stage.sections.find(s => s.id === targetSectionId);
+
+            if (sourceSec && targetSec) {
+                // Remove from source
+                const [item] = sourceSec.elements.splice(draggedItem.index, 1);
+                // Insert at target
+                targetSec.elements.splice(targetIndex, 0, item);
+
+                setProcessDef(newDef);
+                // Update dragged item state to track its new position
+                setDraggedItem({ sectionId: targetSectionId, index: targetIndex });
+
+                if (selectedElementId === item.id) {
+                    setSelectedSectionId(targetSectionId);
+                }
+            }
         }
     };
 
-    // Keep generic handler for container areas
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
@@ -76,66 +92,12 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
 
     const handleDragEnd = () => {
         setDraggedItem(null);
-        setDropIndicator(null);
     };
 
-    const handleDrop = (e: React.DragEvent, targetSectionId: string, targetIndex: number, specificPosition?: 'before' | 'after') => {
+    const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
-        e.stopPropagation(); // Stop bubbling
-        if (!draggedItem) return;
-
-        const newDef = { ...processDef };
-        const stage = newDef.stages.find(s => s.id === selectedStageId);
-        if (!stage) return;
-
-        const sourceSec = stage.sections.find(s => s.id === draggedItem.sectionId);
-        const targetSec = stage.sections.find(s => s.id === targetSectionId);
-
-        if (sourceSec && targetSec) {
-            // Calculate actual insertion index
-            let finalTargetIndex = targetIndex;
-
-            // If dropping via indicator
-            if (specificPosition) {
-                if (specificPosition === 'after') {
-                    finalTargetIndex = targetIndex + 1;
-                }
-                // If 'before', index is correct as is
-            }
-
-            // Adjust for removing from the same array before inserting
-            // But standard splice strategy: remove then insert. 
-            // If same section and moving down, indices shift.
-
-            const [item] = sourceSec.elements.splice(draggedItem.index, 1);
-
-            // If same list and source index < target index, we need to adjust because removal shifted everything up
-            // BUT, if we use the visual position logic:
-            // [A, B, C]. Drag A (0). Drop After B (1). Target 2.
-            // Splice 0. [B, C]. Insert at 2? B, C, A. Correct.
-            // Drag A (0). Drop Before B (1). Target 1.
-            // Splice 0. [B, C]. Insert at 1. B, A, C. Correct? Wait.
-            // Original: A(0), B(1), C(2). Drop before B(1).
-            // Splice 0. [B, C]. B is now at 0. Insert at 1. -> B, A, C. YES.
-
-            // Adjust index if we are in the same section and the removal affected the target index?
-            // "targetIndex" passed in for handleElementDragOver is the static index of the element we hovered.
-            // If we remove an item BEFORE that index, the indices shift.
-
-            if (draggedItem.sectionId === targetSectionId) {
-                if (draggedItem.index < finalTargetIndex) {
-                    finalTargetIndex--;
-                }
-            }
-
-            targetSec.elements.splice(finalTargetIndex, 0, item);
-            setProcessDef(newDef);
-            if (selectedElementId === item.id) {
-                setSelectedSectionId(targetSectionId);
-            }
-        }
+        e.stopPropagation();
         setDraggedItem(null);
-        setDropIndicator(null);
     };
 
     return (
@@ -246,197 +208,186 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
                                         displayValue = target ? `[${target.label}]` : '[Unlinked Field]';
                                     }
 
-                                    const showIndicatorBefore = dropIndicator?.sectionId === section.id && dropIndicator?.index === index && dropIndicator?.position === 'before';
-                                    const showIndicatorAfter = dropIndicator?.sectionId === section.id && dropIndicator?.index === index && dropIndicator?.position === 'after';
+                                    const isCurrentDragTarget = draggedItem?.sectionId === section.id && draggedItem.index === index;
 
                                     return (
-                                        <React.Fragment key={element.id}>
-                                            {showIndicatorBefore && (
-                                                <div className="h-1.5 bg-sw-teal rounded-full my-1 transition-all animate-in fade-in zoom-in duration-200" />
-                                            )}
-                                            <div
-                                                id={element.id}
-                                                draggable
-                                                onDragStart={(e) => handleDragStart(e, section.id, index)}
-                                                onDragOver={(e) => handleElementDragOver(e, section.id, index)}
-                                                onDrop={(e) => handleDrop(e, section.id, index, dropIndicator?.position)}
-                                                onDragEnd={handleDragEnd}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedElementId(element.id);
-                                                    setSelectedSectionId(section.id);
-                                                }}
-                                                className={`relative group rounded-xl transition-all p-4 border-2 cursor-pointer
+                                        <div
+                                            key={element.id}
+                                            id={element.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, section.id, index)}
+                                            onDragOver={(e) => handleElementDragOver(e, section.id, index)}
+                                            onDrop={handleDrop}
+                                            onDragEnd={handleDragEnd}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedElementId(element.id);
+                                                setSelectedSectionId(section.id);
+                                            }}
+                                            className={`relative group rounded-xl transition-all p-4 border-2 cursor-pointer
                                                 ${isSelected
-                                                        ? 'border-sw-teal bg-sw-teal/5'
-                                                        : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
-                                                    }
-                                                ${isDragging ? 'opacity-40 border-dashed border-gray-400 bg-gray-50' : ''}
+                                                    ? 'border-sw-teal bg-sw-teal/5'
+                                                    : 'border-transparent hover:border-gray-200 hover:bg-gray-50'
+                                                }
+                                                ${isCurrentDragTarget ? 'opacity-20 border-dashed border-gray-400 bg-gray-100' : ''}
                                             `}
+                                        >
+                                            <div
+                                                className="absolute top-4 left-2 text-gray-300 cursor-grab active:cursor-grabbing hover:text-sw-teal z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Drag to reorder"
                                             >
-                                                <div
-                                                    className="absolute top-4 left-2 text-gray-300 cursor-grab active:cursor-grabbing hover:text-sw-teal z-20 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    title="Drag to reorder"
-                                                >
-                                                    <GripVertical size={16} />
-                                                </div>
+                                                <GripVertical size={16} />
+                                            </div>
 
-                                                <div className="pointer-events-none pl-6">
-                                                    <RenderElement
-                                                        element={element}
-                                                        value={displayValue}
-                                                        onChange={() => { }}
-                                                        disabled
-                                                        theme={visualTheme}
-                                                        parties={processDef.parties}
-                                                    />
-                                                </div>
+                                            <div className="pointer-events-none pl-6">
+                                                <RenderElement
+                                                    element={element}
+                                                    value={displayValue}
+                                                    onChange={() => { }}
+                                                    disabled
+                                                    theme={visualTheme}
+                                                    parties={processDef.parties}
+                                                />
+                                            </div>
 
-                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {element.type === 'calculated' && (
-                                                        <div className="bg-orange-100 text-orange-600 p-1 rounded-md" title="Calculated Field">
-                                                            <Calculator size={12} />
-                                                        </div>
-                                                    )}
-                                                    {element.type === 'static' && element.staticDataSource === 'field' && (
-                                                        <div className="bg-blue-100 text-blue-600 p-1 rounded-md" title="Linked Data Field">
-                                                            <Database size={12} />
-                                                        </div>
-                                                    )}
-                                                    {element.visibility && (element.visibility.conditions.length > 0 || (element.visibility.groups && element.visibility.groups.length > 0)) && (
-                                                        <div className="bg-sw-purpleLight text-sw-teal p-1 rounded-md" title="Has Visibility Logic">
-                                                            <Eye size={12} />
-                                                        </div>
-                                                    )}
-                                                    {element.requiredLogic && (element.requiredLogic.conditions.length > 0 || (element.requiredLogic.groups && element.requiredLogic.groups.length > 0)) && (
-                                                        <div className="bg-red-100 text-sw-red p-1 rounded-md" title="Has Mandatory Logic">
-                                                            <CheckCircle2 size={12} />
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {element.type === 'calculated' && (
+                                                    <div className="bg-orange-100 text-orange-600 p-1 rounded-md" title="Calculated Field">
+                                                        <Calculator size={12} />
+                                                    </div>
+                                                )}
+                                                {element.type === 'static' && element.staticDataSource === 'field' && (
+                                                    <div className="bg-blue-100 text-blue-600 p-1 rounded-md" title="Linked Data Field">
+                                                        <Database size={12} />
+                                                    </div>
+                                                )}
+                                                {element.visibility && (element.visibility.conditions.length > 0 || (element.visibility.groups && element.visibility.groups.length > 0)) && (
+                                                    <div className="bg-sw-purpleLight text-sw-teal p-1 rounded-md" title="Has Visibility Logic">
+                                                        <Eye size={12} />
+                                                    </div>
+                                                )}
+                                                {element.requiredLogic && (element.requiredLogic.conditions.length > 0 || (element.requiredLogic.groups && element.requiredLogic.groups.length > 0)) && (
+                                                    <div className="bg-red-100 text-sw-red p-1 rounded-md" title="Has Mandatory Logic">
+                                                        <CheckCircle2 size={12} />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        {
-                                        showIndicatorAfter && (
-                                            <div className="h-1.5 bg-sw-teal rounded-full my-1 transition-all animate-in fade-in zoom-in duration-200" />
-                                        )
-                                    }
-                                        </React.Fragment>
-                            );
+                                    );
                                 })}
 
-                            <div className="border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center p-6 min-h-[100px] hover:border-sw-teal hover:bg-sw-teal/5 transition-all cursor-pointer group"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    const newEl: ElementDefinition = {
-                                        id: `el_${Date.now()}`,
-                                        label: 'New Field',
-                                        type: 'text',
-                                        required: false
-                                    };
-                                    const newDef = { ...processDef };
-                                    newDef.stages.find(s => s.id === selectedStageId)?.sections.find(s => s.id === section.id)?.elements.push(newEl);
-                                    setProcessDef(newDef);
-                                    setSelectedElementId(newEl.id);
-                                    setSelectedSectionId(section.id);
-                                }}
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => {
-                                    e.preventDefault();
-                                    if (!draggedItem) return;
-                                    const newDef = { ...processDef };
-                                    const stage = newDef.stages.find(s => s.id === selectedStageId);
-                                    if (!stage) return;
-                                    const sourceSec = stage.sections.find(s => s.id === draggedItem.sectionId);
-                                    const targetSec = stage.sections.find(s => s.id === section.id);
-                                    if (sourceSec && targetSec) {
-                                        const [item] = sourceSec.elements.splice(draggedItem.index, 1);
-                                        targetSec.elements.push(item);
+                                <div className="border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center p-6 min-h-[100px] hover:border-sw-teal hover:bg-sw-teal/5 transition-all cursor-pointer group"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const newEl: ElementDefinition = {
+                                            id: `el_${Date.now()}`,
+                                            label: 'New Field',
+                                            type: 'text',
+                                            required: false
+                                        };
+                                        const newDef = { ...processDef };
+                                        newDef.stages.find(s => s.id === selectedStageId)?.sections.find(s => s.id === section.id)?.elements.push(newEl);
                                         setProcessDef(newDef);
-                                    }
-                                    setDraggedItem(null);
-                                }}
-                            >
-                                <div className="text-center text-gray-400 group-hover:text-sw-teal pointer-events-none">
-                                    <Plus size={24} className="mx-auto mb-2" />
-                                    <span className="text-sm font-bold">Add Field</span>
+                                        setSelectedElementId(newEl.id);
+                                        setSelectedSectionId(section.id);
+                                    }}
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (!draggedItem) return;
+                                        const newDef = { ...processDef };
+                                        const stage = newDef.stages.find(s => s.id === selectedStageId);
+                                        if (!stage) return;
+                                        const sourceSec = stage.sections.find(s => s.id === draggedItem.sectionId);
+                                        const targetSec = stage.sections.find(s => s.id === section.id);
+                                        if (sourceSec && targetSec) {
+                                            const [item] = sourceSec.elements.splice(draggedItem.index, 1);
+                                            targetSec.elements.push(item);
+                                            setProcessDef(newDef);
+                                        }
+                                        setDraggedItem(null);
+                                    }}
+                                >
+                                    <div className="text-center text-gray-400 group-hover:text-sw-teal pointer-events-none">
+                                        <Plus size={24} className="mx-auto mb-2" />
+                                        <span className="text-sm font-bold">Add Field</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        </div>
                     ))}
 
-                <div id="toolbox" className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 border border-gray-200 flex items-center gap-2 z-30 animate-in slide-in-from-bottom-4">
-                    {(() => {
-                        // Enforce content rules
-                        const currentSection = processDef.stages
-                            .find(s => s.id === selectedStageId)
-                            ?.sections.find(s => s.id === selectedSectionId);
+                    <div id="toolbox" className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-2xl p-2 border border-gray-200 flex items-center gap-2 z-30 animate-in slide-in-from-bottom-4">
+                        {(() => {
+                            // Enforce content rules
+                            const currentSection = processDef.stages
+                                .find(s => s.id === selectedStageId)
+                                ?.sections.find(s => s.id === selectedSectionId);
 
-                        const isRestricted = currentSection?.variant && ['info', 'warning', 'summary'].includes(currentSection.variant);
+                            const isRestricted = currentSection?.variant && ['info', 'warning', 'summary'].includes(currentSection.variant);
 
-                        return [
-                            { type: 'text', icon: FileText, label: 'Text', interactive: true },
-                            { type: 'number', icon: Hash, label: 'Number', interactive: true },
-                            { type: 'date', icon: Calendar, label: 'Date', interactive: true },
-                            { type: 'select', icon: List, label: 'Select', interactive: true },
-                            { type: 'radio', icon: CircleDot, label: 'Radio', interactive: true },
-                            { type: 'checkbox', icon: CheckSquare, label: 'Check', interactive: true },
-                            { type: 'calculated', icon: Calculator, label: 'Calc', interactive: false },
-                            { type: 'repeater', icon: Table, label: 'List', interactive: true },
-                            { type: 'static', icon: MessageSquare, label: 'Static', interactive: false }
-                        ].map(tool => {
-                            const isDisabled = isRestricted && tool.interactive;
+                            return [
+                                { type: 'text', icon: FileText, label: 'Text', interactive: true },
+                                { type: 'number', icon: Hash, label: 'Number', interactive: true },
+                                { type: 'date', icon: Calendar, label: 'Date', interactive: true },
+                                { type: 'select', icon: List, label: 'Select', interactive: true },
+                                { type: 'radio', icon: CircleDot, label: 'Radio', interactive: true },
+                                { type: 'checkbox', icon: CheckSquare, label: 'Check', interactive: true },
+                                { type: 'calculated', icon: Calculator, label: 'Calc', interactive: false },
+                                { type: 'repeater', icon: Table, label: 'List', interactive: true },
+                                { type: 'static', icon: MessageSquare, label: 'Static', interactive: false }
+                            ].map(tool => {
+                                const isDisabled = isRestricted && tool.interactive;
 
-                            return (
-                                <button
-                                    key={tool.type}
-                                    disabled={isDisabled}
-                                    className={`p-3 rounded-full transition-colors flex flex-col items-center gap-1 w-16 group relative
+                                return (
+                                    <button
+                                        key={tool.type}
+                                        disabled={isDisabled}
+                                        className={`p-3 rounded-full transition-colors flex flex-col items-center gap-1 w-16 group relative
                                             ${isDisabled
-                                            ? 'text-gray-300 cursor-not-allowed bg-gray-50'
-                                            : 'hover:bg-sw-lightGray text-sw-teal'
-                                        }
-                                        `}
-                                    onClick={() => {
-                                        if (isDisabled) return;
-                                        if (selectedSectionId) {
-                                            const newEl: ElementDefinition = {
-                                                id: `el_${Date.now()}`,
-                                                label: tool.type === 'repeater' ? 'New List' : tool.type === 'calculated' ? 'New Calc' : 'New Field',
-                                                type: tool.type as any,
-                                                required: false,
-                                                columns: tool.type === 'repeater' ? [{ id: 'col1', label: 'Item Name', type: 'text' }] : undefined,
-                                                calculation: tool.type === 'calculated' ? [] : undefined
-                                            };
-                                            const newDef = { ...processDef };
-                                            for (const stg of newDef.stages) {
-                                                const sec = stg.sections.find(s => s.id === selectedSectionId);
-                                                if (sec) {
-                                                    sec.elements.push(newEl);
-                                                    break;
-                                                }
+                                                ? 'text-gray-300 cursor-not-allowed bg-gray-50'
+                                                : 'hover:bg-sw-lightGray text-sw-teal'
                                             }
-                                            setProcessDef(newDef);
-                                            setSelectedElementId(newEl.id);
-                                        } else {
-                                            alert("Select a section first!");
-                                        }
-                                    }}
-                                >
-                                    <tool.icon size={20} />
-                                    <span className={`text-[10px] font-bold transition-opacity absolute -top-8 px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100
+                                        `}
+                                        onClick={() => {
+                                            if (isDisabled) return;
+                                            if (selectedSectionId) {
+                                                const newEl: ElementDefinition = {
+                                                    id: `el_${Date.now()}`,
+                                                    label: tool.type === 'repeater' ? 'New List' : tool.type === 'calculated' ? 'New Calc' : 'New Field',
+                                                    type: tool.type as any,
+                                                    required: false,
+                                                    columns: tool.type === 'repeater' ? [{ id: 'col1', label: 'Item Name', type: 'text' }] : undefined,
+                                                    calculation: tool.type === 'calculated' ? [] : undefined
+                                                };
+                                                const newDef = { ...processDef };
+                                                for (const stg of newDef.stages) {
+                                                    const sec = stg.sections.find(s => s.id === selectedSectionId);
+                                                    if (sec) {
+                                                        sec.elements.push(newEl);
+                                                        break;
+                                                    }
+                                                }
+                                                setProcessDef(newDef);
+                                                setSelectedElementId(newEl.id);
+                                            } else {
+                                                alert("Select a section first!");
+                                            }
+                                        }}
+                                    >
+                                        <tool.icon size={20} />
+                                        <span className={`text-[10px] font-bold transition-opacity absolute -top-8 px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100
                                             ${isDisabled ? 'bg-gray-800 text-white' : 'bg-sw-teal text-white'}
                                         `}>
-                                        {isDisabled ? 'Static Only' : tool.label}
-                                    </span>
-                                </button>
-                            );
-                        });
-                    })()}
+                                            {isDisabled ? 'Static Only' : tool.label}
+                                        </span>
+                                    </button>
+                                );
+                            });
+                        })()}
+                    </div>
                 </div>
             </div>
         </div>
-        </div >
     );
 };
