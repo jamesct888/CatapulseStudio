@@ -24,6 +24,11 @@ describe('Onboarding', () => {
         setIsDetailedMode: mockSetIsDetailedMode,
     };
 
+    // Mock AI config
+    beforeAll(() => {
+        vi.stubGlobal('CATAPULSE_APP_CONFIG', { aiEnabled: true });
+    });
+
     it('renders the welcome message and input field', () => {
         render(<Onboarding {...defaultProps} />);
         expect(screen.getByText(/What do you want to build?/i)).toBeInTheDocument();
@@ -66,7 +71,7 @@ describe('Onboarding', () => {
 
     it('triggers file input click when import button is clicked', async () => {
         render(<Onboarding {...defaultProps} />);
-        const importBtn = screen.getByText(/Import from Document/i);
+        const importBtn = screen.getByText(/Import Document/i);
 
         // Mock the file input click
         const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;

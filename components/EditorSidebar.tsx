@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { ProcessDefinition, StageDefinition, SectionDefinition } from '../types';
-import { Plus, Sparkles, ArrowRight, PanelBottom, RectangleVertical, GripVertical, Loader2 } from 'lucide-react';
+import { exportSectionToJSON, importSectionFromJSON } from '../utils/importExport';
+import { Plus, Sparkles, ArrowRight, PanelBottom, RectangleVertical, GripVertical, Loader2, Download, Upload } from 'lucide-react';
 
 interface EditorSidebarProps {
     processDef: ProcessDefinition;
@@ -177,8 +178,64 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
         setSelectedStageId(newStages[stageIdx].id);
     };
 
+    // --- JSON Export Handler ---
+    const handleExportSection = (e: React.MouseEvent, section: SectionDefinition) => {
+        e.stopPropagation();
+        const jsonStr = exportSectionToJSON(section);
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${section.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_snippet.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    // --- JSON Import Handler ---
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [importTargetStageIdx, setImportTargetStageIdx] = useState<number | null>(null);
+
+    const triggerImport = (stageIdx: number) => {
+        setImportTargetStageIdx(stageIdx);
+        if (fileInputRef.current) fileInputRef.current.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || importTargetStageIdx === null) return;
+
+        const text = await file.text();
+        const newSection = importSectionFromJSON(text);
+
+        if (newSection) {
+            const newStages = [...processDef.stages];
+            const targetStage = { ...newStages[importTargetStageIdx] };
+            targetStage.sections = [...targetStage.sections, newSection];
+            newStages[importTargetStageIdx] = targetStage;
+
+            setProcessDef({ ...processDef, stages: newStages });
+            setSelectedSectionId(newSection.id);
+        } else {
+            alert("Failed to import section. Invalid format.");
+        }
+
+        // Reset
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setImportTargetStageIdx(null);
+    };
+
     return (
         <div id="sidebar-structure" className="w-80 bg-white border-r border-gray-200 flex flex-col h-full z-10 shadow-sm">
+            {/* Hidden File Input for Imports */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".json"
+                onChange={handleFileChange}
+            />
             <div className="p-5 border-b border-gray-100 bg-white">
                 <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Structure</h2>
                 <div className="space-y-4">
@@ -266,8 +323,17 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                                     <span className="truncate flex-1">{section.title}</span>
 
                                                     {/* Section Drag Handle */}
-                                                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing ${selectedSectionId === section.id ? 'text-sw-teal' : 'text-gray-400'}`}>
-                                                        <GripVertical size={12} />
+                                                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 ${selectedSectionId === section.id ? 'text-sw-teal' : 'text-gray-400'}`}>
+                                                        <button
+                                                            onClick={(e) => handleExportSection(e, section)}
+                                                            className="hover:text-sw-teal p-1 rounded hover:bg-black/5"
+                                                            title="Export Snippet"
+                                                        >
+                                                            <Download size={12} />
+                                                        </button>
+                                                        <div className="cursor-grab active:cursor-grabbing">
+                                                            <GripVertical size={12} />
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )
@@ -291,8 +357,18 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                         >
                                             <Plus size={12} /> Add Section
                                         </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                triggerImport(idx);
+                                            }}
+                                            className="flex items-center gap-2 text-xs text-gray-400 hover:text-sw-teal px-2 py-1.5 transition-colors w-full text-left"
+                                        >
+                                            <Upload size={12} /> Import JSON
+                                        </button>
                                     </div>
-                                )}
+                                )
+                                }
                             </div>
                         );
                     })}
@@ -315,39 +391,41 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
             </div>
 
             {/* AI Copilot Section - Hidden if Disabled */}
-            {(window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true && (
-                <div id="sidebar-copilot" className="p-5 mt-auto bg-sw-lightGray border-t border-gray-200">
-                    <div className="flex items-center gap-2 mb-3 text-sw-teal">
-                        <Sparkles size={16} />
-                        <span className="text-xs font-bold uppercase tracking-widest">AI Copilot</span>
+            {
+                (window as any).CATAPULSE_APP_CONFIG?.aiEnabled === true && (
+                    <div id="sidebar-copilot" className="p-5 mt-auto bg-sw-lightGray border-t border-gray-200">
+                        <div className="flex items-center gap-2 mb-3 text-sw-teal">
+                            <Sparkles size={16} />
+                            <span className="text-xs font-bold uppercase tracking-widest">AI Copilot</span>
+                        </div>
+                        <div className="relative">
+                            <textarea
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                disabled={isGenerating}
+                                placeholder={isGenerating ? "AI is thinking..." : "Describe a change (e.g. 'Add a comments field')..."}
+                                className={`w-full p-3 pr-10 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-sw-teal focus:border-transparent resize-none h-24 bg-white shadow-sm text-sw-text transition-opacity ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleAiModification();
+                                    }
+                                }}
+                            />
+                            <button
+                                onClick={handleAiModification}
+                                disabled={isGenerating || !aiPrompt.trim()}
+                                className="absolute bottom-2 right-2 p-1.5 bg-sw-teal text-white rounded-lg hover:bg-sw-tealHover disabled:opacity-50 transition-colors shadow-sm flex items-center justify-center min-w-[28px] min-h-[28px]"
+                            >
+                                {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                            </button>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
+                            Context: {selectedSectionId ? `Section: Active` : `Stage: ${selectedStage?.title}`}
+                        </p>
                     </div>
-                    <div className="relative">
-                        <textarea
-                            value={aiPrompt}
-                            onChange={(e) => setAiPrompt(e.target.value)}
-                            disabled={isGenerating}
-                            placeholder={isGenerating ? "AI is thinking..." : "Describe a change (e.g. 'Add a comments field')..."}
-                            className={`w-full p-3 pr-10 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-sw-teal focus:border-transparent resize-none h-24 bg-white shadow-sm text-sw-text transition-opacity ${isGenerating ? 'opacity-50 cursor-wait' : ''}`}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleAiModification();
-                                }
-                            }}
-                        />
-                        <button
-                            onClick={handleAiModification}
-                            disabled={isGenerating || !aiPrompt.trim()}
-                            className="absolute bottom-2 right-2 p-1.5 bg-sw-teal text-white rounded-lg hover:bg-sw-tealHover disabled:opacity-50 transition-colors shadow-sm flex items-center justify-center min-w-[28px] min-h-[28px]"
-                        >
-                            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
-                        </button>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
-                        Context: {selectedSectionId ? `Section: Active` : `Stage: ${selectedStage?.title}`}
-                    </p>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };

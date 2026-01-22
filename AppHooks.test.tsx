@@ -16,7 +16,7 @@ describe('App Hook Regression', () => {
         expect(screen.getByText(/What do you want to build/i)).toBeInTheDocument();
 
         // 2. Trigger state change: Onboarding -> Editor
-        const demoBtn = screen.getByText(/Try Interactive Demo/i);
+        const demoBtn = screen.getByText(/Interactive Demo/i);
         demoBtn.click();
 
         // 3. Wait for Editor to appear
