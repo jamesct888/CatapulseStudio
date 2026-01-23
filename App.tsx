@@ -1,5 +1,5 @@
 import React, { Component, useState, useEffect, ErrorInfo, ReactNode, useRef } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronsLeft } from 'lucide-react';
 import { Onboarding } from './components/Onboarding';
 import { demoProcess } from './services/demoData'; // Import Demo Data
 import { ModeEditor } from './components/ModeEditor';
@@ -748,10 +748,10 @@ const App: React.FC = () => {
                     {viewMode === 'editor' && activeSidePanel === 'none' && (
                         <button
                             onClick={() => setActiveSidePanel('properties')}
-                            className="fixed right-0 top-24 z-30 bg-white border border-gray-200 border-r-0 shadow-md p-2 rounded-l-lg hover:bg-gray-50 text-sw-teal transition-all hover:pr-3"
+                            className="fixed right-0 top-1/2 -translate-y-1/2 z-30 bg-sw-teal border border-sw-teal border-r-0 shadow-md p-3 rounded-l-lg text-white transition-all hover:pr-4 hover:shadow-lg hover:brightness-110"
                             title="Open Properties Panel"
                         >
-                            <ChevronLeft size={20} />
+                            <ChevronsLeft size={24} />
                         </button>
                     )}
                 </div>
