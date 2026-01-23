@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ProcessDefinition, TestCase, UserStory, StoryStrategy, ChatMessage } from '../types';
 import { BookOpen, ClipboardList, RefreshCw, Sparkles, Split, BrainCircuit, ThumbsUp, ThumbsDown, Send, FileText, Bot, User, LayoutGrid, Network, Copy, TableProperties, Download, Upload } from 'lucide-react';
-import { generateUserStories, generateTestCases, consultStrategyAdvisor } from '../services/geminiService';
+import { generateTestCases, consultStrategyAdvisor } from '../services/geminiService';
+import { generateUserStories } from '../services/agileService';
 import { downloadJiraCsv, parseJiraCsv } from '../utils/jiraExport';
 import { StoryDependencyGraph } from './StoryDependencyGraph';
 import StoryMapFlow from './StoryMapFlow'; // NEW

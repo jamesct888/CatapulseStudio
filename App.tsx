@@ -482,8 +482,8 @@ const App: React.FC = () => {
         handleStartGeneration(startPrompt);
     };
 
-    const onAiModification = () => {
-        handleAiModification(aiPrompt, { selectedStageId, selectedSectionId }, () => setAiPrompt(''));
+    const onAiModification = (overridePrompt?: string) => {
+        handleAiModification(overridePrompt || aiPrompt, { selectedStageId, selectedSectionId }, () => setAiPrompt(''));
     };
 
     // --- GLOBAL OPTION SYNC ---

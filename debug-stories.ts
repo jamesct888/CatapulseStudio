@@ -17,7 +17,7 @@ try {
 
 // Dynamic import to ensure env is set first
 // @ts-ignore
-const { generateUserStories } = await import('./services/geminiService');
+const { generateUserStories } = await import('./services/agileService');
 
 // Mock Process
 const mockProcess: ProcessDefinition = {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquare, UploadCloud, Plus, RefreshCw, Wand2, CheckCircle, Clock, Trash2, Edit2 } from 'lucide-react';
 import { ProcessDefinition, WorkshopSuggestion } from '../types';
 import { ModalWrapper } from './ModalWrapper';
-import { analyzeTranscript } from '../services/geminiService';
+import { analyzeTranscript, getAiEnabled } from '../services/geminiService';
 import { demoTranscript } from '../services/demoData';
 
 interface HeaderWorkshopControlsProps {
@@ -20,6 +20,8 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
     const [isAnalyzingDiscovery, setIsAnalyzingDiscovery] = useState(false);
     const [appliedCount, setAppliedCount] = useState(0);
     const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+
+    const isAiEnabled = getAiEnabled();
 
     const activeSuggestions = discoverySuggestions.filter(s => !dismissedIds.includes(s.id) && !s.applied);
 
@@ -161,7 +163,12 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
                         <div className="col-span-4 flex flex-col gap-6 border-r border-gray-200 pr-6">
 
                             {/* Upload / Input Area */}
-                            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors group relative">
+                            <div className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl transition-colors group relative ${!isAiEnabled ? 'bg-gray-100 opacity-60' : 'bg-white hover:bg-gray-50'}`}>
+                                {!isAiEnabled && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-gray-100/50 backdrop-blur-[1px] rounded-xl cursor-not-allowed">
+                                        <p className="font-bold text-gray-500 uppercase tracking-widest text-xs">AI Features Disabled</p>
+                                    </div>
+                                )}
                                 <input
                                     type="file"
                                     ref={fileInputRef}
@@ -199,7 +206,7 @@ export const HeaderWorkshopControls: React.FC<HeaderWorkshopControlsProps> = ({
 
                             <button
                                 onClick={handleAnalyzeDiscovery}
-                                disabled={isAnalyzingDiscovery || !transcript.trim()}
+                                disabled={!isAiEnabled || isAnalyzingDiscovery || !transcript.trim()}
                                 className="w-full bg-sw-teal text-white py-3 rounded-lg font-bold hover:bg-sw-tealHover disabled:opacity-50 flex items-center justify-center gap-2 shadow-md transition-all"
                             >
                                 {isAnalyzingDiscovery ? <RefreshCw className="animate-spin" size={18} /> : <Wand2 size={18} />}

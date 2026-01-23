@@ -15,7 +15,7 @@ interface ModeEditorProps {
     setSelectedElementId: (id: string | null) => void;
     aiPrompt: string;
     setAiPrompt: (val: string) => void;
-    handleAiModification: () => void;
+    handleAiModification: (overridePrompt?: string) => void;
     isGenerating: boolean;
     visualTheme: VisualTheme;
     isSettingsOpen: boolean;
@@ -31,12 +31,12 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
     visualTheme, isSettingsOpen,
     loadingStageIds
 }) => {
-    
+
     const selectedStage = processDef.stages.find(s => s.id === selectedStageId);
 
     return (
         <>
-            <EditorSidebar 
+            <EditorSidebar
                 processDef={processDef}
                 setProcessDef={setProcessDef}
                 selectedStageId={selectedStageId}
@@ -51,7 +51,7 @@ export const ModeEditor: React.FC<ModeEditorProps> = ({
                 selectedStage={selectedStage}
                 loadingStageIds={loadingStageIds}
             />
-            <EditorCanvas 
+            <EditorCanvas
                 processDef={processDef}
                 setProcessDef={setProcessDef}
                 selectedStageId={selectedStageId}
