@@ -547,7 +547,8 @@ export const RenderElement: React.FC<FormElementProps> = ({ element, value, onCh
 
       return (
         <div className={`${d.wrapper} group`}>
-          <label className={`flex items-center gap-3 cursor-pointer group/checkbox ${d.checkboxWrapper} border ${r} transition-colors ${checkWrapperClass}`}>
+          <div className={`block font-bold ${d.labelSize} ${d.labelMb}`}>&nbsp;</div>
+          <label className={`flex items-center gap-3 cursor-pointer group/checkbox ${d.checkboxWrapper} ${r} transition-colors ${checkWrapperClass}`}>
             <div className={`${d.checkboxSize} border ${radiusConfig.small} flex items-center justify-center ${(value === true || value === 'true') ? checkSquareActive : checkSquareClass}`}>
               {(value === true || value === 'true') && (
                 <svg className={`${d.iconSize} text-white`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
