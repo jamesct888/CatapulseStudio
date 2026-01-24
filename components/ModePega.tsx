@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProcessDefinition, ElementDefinition, DataObjectSuggestion, StageDefinition, LogicGroup, Condition, CalculationPart } from '../types';
-import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode, Calculator, Workflow, User, CheckSquare, Mail, Play, AlertTriangle, Briefcase, Grid, Server, Activity, Plug, Globe } from 'lucide-react';
+import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode, Calculator, Workflow, User, CheckSquare, Mail, Play, AlertTriangle, Briefcase, Grid } from 'lucide-react';
 import { CatapulseLogo } from './Shared';
 import { generateDataMapping } from '../services/geminiService';
 import { formatLogicSummary } from '../utils/logic';
@@ -30,9 +30,7 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
     const [activeRuleFilter, setActiveRuleFilter] = useState<PegaRuleType | 'ALL'>('ALL');
     const [baseClass, setBaseClass] = useState('MyOrg-MyApp-Work'); // Default base class
 
-    // Connectivity State
-    const [sorStatus, setSorStatus] = useState<'connected' | 'connecting' | 'offline'>('connected');
-    const [activeSor, setActiveSor] = useState('PEG-Policy-Admin-v8');
+
 
     const handleAnalyzeData = async () => {
         setIsAnalyzing(true);
@@ -487,63 +485,7 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
             {pegaTab === 'data' && (
                 <div className="space-y-6 animate-in fade-in">
 
-                    {/* NEW: System Connectivity Panel */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                    <Server size={18} className="text-sw-teal" />
-                                    System Connectivity & Integration
-                                </h3>
-                                <p className="text-sm text-gray-500">Manage System of Record (SOR) bindings and active connectors.</p>
-                            </div>
-                            <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-100">
-                                <Activity size={14} /> System Healthy
-                            </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Primary SOR</div>
-                                <div className="flex items-center gap-3 mb-2">
-                                    <Database size={24} className="text-sw-teal" />
-                                    <select
-                                        value={activeSor}
-                                        onChange={(e) => setActiveSor(e.target.value)}
-                                        className="bg-white border border-gray-300 rounded text-sm font-bold p-1.5 focus:ring-sw-teal focus:border-sw-teal flex-1"
-                                    >
-                                        <option value="PEG-Policy-Admin-v8">PEG-Policy-Admin-v8</option>
-                                        <option value="EXT-Legacy-Mainframe">EXT-Legacy-Mainframe</option>
-                                        <option value="SIM-Mock-Data">SIM-Mock-Data</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-green-600 font-medium">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                    Connected (14ms latency)
-                                </div>
-                            </div>
-
-                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Active Integrations</div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between text-sm bg-white p-2 rounded border border-gray-100">
-                                        <span className="flex items-center gap-2"><Globe size={14} className="text-blue-500" /> Experian Check</span>
-                                        <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">REST</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm bg-white p-2 rounded border border-gray-100">
-                                        <span className="flex items-center gap-2"><Plug size={14} className="text-orange-500" /> SAP Finance</span>
-                                        <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">SOAP</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col justify-center text-center">
-                                <div className="text-2xl font-bold text-sw-teal mb-1">{processDef.stages.length * 4 + 12}</div>
-                                <div className="text-xs text-gray-500 font-medium">Mapped Data Elements</div>
-                                <button className="mt-3 text-xs text-sw-teal font-bold hover:underline">View Mapping Report</button>
-                            </div>
-                        </div>
-                    </div>
 
                     {/* Data Object Normalizer Header Card */}
                     <div className="bg-sw-teal rounded-xl shadow-lg p-8 text-white relative overflow-hidden">
