@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { ProcessDefinition, StageDefinition, SectionDefinition } from '../types';
 import { exportSectionToJSON, importSectionFromJSON } from '../utils/importExport';
 import { analyzeChangeRequest, ChangePlan } from '../services/geminiService'; // Import new service
-import { Plus, Sparkles, ArrowRight, PanelBottom, RectangleVertical, GripVertical, Loader2, Download, Upload } from 'lucide-react';
+import { Plus, Sparkles, ArrowRight, PanelBottom, RectangleVertical, GripVertical, Loader2, Download, Upload, ChevronRight, ChevronDown } from 'lucide-react';
 
 interface EditorSidebarProps {
     processDef: ProcessDefinition;
@@ -38,6 +38,28 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
     const [copilotState, setCopilotState] = useState<'idle' | 'analyzing' | 'review' | 'applying'>('idle');
     const [changePlan, setChangePlan] = useState<ChangePlan | null>(null);
     const [chatHistory, setChatHistory] = useState<string[]>([]);
+
+    // Expansion State
+    const [expandedStageIds, setExpandedStageIds] = useState<Set<string>>(new Set([selectedStageId]));
+
+    // Auto-expand selected stage
+    React.useEffect(() => {
+        if (selectedStageId && !expandedStageIds.has(selectedStageId)) {
+            setExpandedStageIds(prev => new Set(prev).add(selectedStageId));
+        }
+    }, [selectedStageId]);
+
+    const toggleStageExpansion = (stageId: string) => {
+        setExpandedStageIds(prev => {
+            const next = new Set(prev);
+            if (next.has(stageId)) {
+                next.delete(stageId);
+            } else {
+                next.add(stageId);
+            }
+            return next;
+        });
+    };
 
     const resetDragState = () => {
         setDraggedStageIdx(null);
@@ -275,7 +297,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                 accept=".json"
                 onChange={handleFileChange}
             />
-            <div className="p-5 border-b border-gray-100 bg-white">
+            <div className="p-5 border-b border-gray-100 bg-white flex-1 overflow-y-auto min-h-0">
                 <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Structure</h2>
                 <div className="space-y-4">
                     {processDef.stages.map((stage, idx) => {
@@ -317,10 +339,21 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                     onClick={() => {
                                         if (isLoading) return;
                                         setSelectedStageId(stage.id);
+                                        // Ensure expanded on select
+                                        setExpandedStageIds(prev => new Set(prev).add(stage.id));
                                         setSelectedSectionId(null);
                                         setSelectedElementId(null);
                                     }}
                                 >
+                                    <div
+                                        className="mr-2 text-sw-teal/50 hover:text-sw-teal transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleStageExpansion(stage.id);
+                                        }}
+                                    >
+                                        {expandedStageIds.has(stage.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                    </div>
                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${selectedStageId === stage.id ? 'bg-white text-sw-teal' : 'bg-sw-teal text-white'}`}>
                                         {isLoading ? <Loader2 size={12} className="animate-spin" /> : idx + 1}
                                     </div>
@@ -334,7 +367,7 @@ export const EditorSidebar: React.FC<EditorSidebarProps> = ({
                                     )}
                                 </div>
 
-                                {selectedStageId === stage.id && (
+                                {expandedStageIds.has(stage.id) && (
                                     <div className="ml-9 mt-2 space-y-1">
                                         {stage.sections.map((section, secIdx) => {
                                             // Safe check for first section ID to assign the 'section-header' ID for tutorials/demos

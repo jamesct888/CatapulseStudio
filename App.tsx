@@ -584,6 +584,11 @@ const App: React.FC = () => {
                     visualTheme={visualTheme}
                     isDirty={isDirty}
                     onExternalSave={() => setIsDirty(false)}
+                    onUploadComplete={(def) => {
+                        setSelectedStageId(def.stages[0]?.id || '');
+                        setSelectedSectionId(null);
+                        setSelectedElementId(null);
+                    }}
                 />
 
                 <div className="flex-1 flex overflow-hidden relative">

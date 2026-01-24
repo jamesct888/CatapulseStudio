@@ -12,10 +12,11 @@ interface HeaderFileMenuProps {
     onExternalSave: () => void;
     isDirty: boolean;
     visualTheme?: VisualTheme;
+    onUploadComplete?: (def: ProcessDefinition) => void;
 }
 
 export const HeaderFileMenu: React.FC<HeaderFileMenuProps> = ({
-    processDef, setProcessDef, setViewMode, onExternalSave, isDirty, visualTheme
+    processDef, setProcessDef, setViewMode, onExternalSave, isDirty, visualTheme, onUploadComplete
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,6 +81,7 @@ export const HeaderFileMenu: React.FC<HeaderFileMenuProps> = ({
                 const json = JSON.parse(event.target?.result as string);
                 if (json.stages && Array.isArray(json.stages)) {
                     setProcessDef(json);
+                    if (onUploadComplete) onUploadComplete(json);
                 } else {
                     alert("Invalid Catapulse Process Definition file.");
                 }

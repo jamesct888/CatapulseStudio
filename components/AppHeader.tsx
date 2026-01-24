@@ -19,11 +19,12 @@ interface AppHeaderProps {
     visualTheme?: VisualTheme;
     isDirty: boolean;
     onExternalSave: () => void;
+    onUploadComplete?: (def: ProcessDefinition) => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
     processDef, setProcessDef, viewMode, setViewMode, isSettingsOpen, setIsSettingsOpen, visualTheme,
-    isDirty, onExternalSave
+    isDirty, onExternalSave, onUploadComplete
 }) => {
 
     const [isRenaming, setIsRenaming] = useState(false);
@@ -106,6 +107,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     onExternalSave={onExternalSave}
                     isDirty={isDirty}
                     visualTheme={visualTheme}
+                    onUploadComplete={onUploadComplete}
                 />
 
                 <div className="h-6 w-px bg-gray-200"></div>
