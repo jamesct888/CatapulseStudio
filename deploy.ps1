@@ -1,6 +1,6 @@
 # Deploy to Google Cloud Run
 $ServiceName = "catapulse-studio"
-$Region = "us-central1" # Match existing deployment region
+$Region = "europe-west2" # Match existing deployment region
 
 Write-Host "Checking gcloud installation..." -ForegroundColor Cyan
 if (-not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
