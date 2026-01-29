@@ -10,23 +10,8 @@
 ### 2.1 High-Level Architecture
 Catapulse Studio operates primarily as a **Single Page Application (SPA)** built with React and Vite. It interacts directly with AI services and acts as a localized "studio" environment.
 
-```mermaid
-graph TD
-    User[Business User] -->|Interacts with| UI[Catapulse Studio UI]
-    UI -->|Manages State| Store[Local State / React Context]
-    UI -->|Requests Generation| AI[Gemini Service Layer]
-    AI -->|API Calls| Google[Google Gemini API]
-    
-    subgraph Client Workstation
-        UI
-        Store
-        AI
-    end
-    
-    subgraph Cloud Services
-        Google
-    end
-```
+> **[Diagram 1: System High-Level Architecture]**
+> *See `DIAGRAMS.md` for the Mermaid code.*
 
 ### 2.2 Technology Stack
 - **Frontend Framework**: React 19 + Vite (Fast HMR & Bundling)
@@ -42,55 +27,8 @@ graph TD
 
 The core of the application is the `ProcessDefinition`, a hierarchical JSON structure that encapsulates the entire business process, including UI layout, logic, and data requirements.
 
-```mermaid
-classDiagram
-    class ProcessDefinition {
-        +String id
-        +String name
-        +String description
-        +StageDefinition[] stages
-        +Party[] parties
-        +UserStory[] userStories
-        +TestCase[] testCases
-    }
-
-    class StageDefinition {
-        +String id
-        +String title
-        +SectionDefinition[] sections
-        +LogicGroup skipLogic
-    }
-
-    class SectionDefinition {
-        +String id
-        +String title
-        +String layout
-        +ElementDefinition[] elements
-        +LogicGroup visibility
-    }
-
-    class ElementDefinition {
-        +String id
-        +String label
-        +ElementType type
-        +String[] options
-        +ValidationRule validation
-        +LogicGroup requiredLogic
-        +LogicGroup visibility
-    }
-
-    class Party {
-        +String id
-        +String name
-        +PartyRole role
-        +BankDetails bankDetails
-    }
-
-    ProcessDefinition *-- StageDefinition
-    ProcessDefinition *-- Party
-    StageDefinition *-- SectionDefinition
-    SectionDefinition *-- ElementDefinition
-```
+> **[Diagram 2: Data Model Design]**
+> *See `DIAGRAMS.md` for the Mermaid code.*
 
 ### Key Entities
 - **ProcessDefinition**: The root aggregate root.
@@ -107,30 +45,8 @@ The `GeminiService` provides a robust abstraction layer over the raw AI API, han
 ### 4.1 Generation Workflow (Sequence Diagram)
 This diagram illustrates the "Monolithic Generation" flow where a user describes a process and the system builds it entirely.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant UI as ProcessEditor UI
-    participant Service as GeminiService
-    participant API as Google Gemini API
-
-    User->>UI: Enters Description ("Create a Pension Transfer process")
-    UI->>Service: generateMonolithicProcess(description)
-    Service->>Service: validateConfig(apiKey)
-    
-    Service->>API: POST /generateContent (Prompt + System Instructions)
-    activate API
-    API-->>Service: JSON Response (Raw Text)
-    deactivate API
-
-    Service->>Service: cleanAndParseJSON(response)
-    Service->>Service: sanitizeProcessData(data)
-    Note right of Service: Ensures IDs exist,\nfixes option arrays,\nsanitizes logic structures
-    
-    Service-->>UI: ProcessDefinition Object
-    UI->>UI: Update Application State
-    UI-->>User: Renders Process Diagram & Forms
-```
+> **[Diagram 3: AI Service Generation Flow]**
+> *See `DIAGRAMS.md` for the Mermaid code.*
 
 ### 4.2 AI Capabilities
 1.  **Process Generation**: Creates high-level stages or detailed field definitions.
@@ -179,27 +95,8 @@ Supports a wide range of data types tailored for business apps:
 ### 7.2 Deployment Workflow
 The application is deployed to **Google Cloud Run** using automated PowerShell scripts (`deploy-both.ps1`).
 
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Script as deploy-both.ps1
-    participant GCB as Google Cloud Build
-    participant GCR as Google Container Registry
-    participant CloudRun as Cloud Run (europe-west2)
-
-    Dev->>Script: Run ./deploy-both.ps1
-    Script->>Script: npm run build (Clean & Build)
-    
-    loop For Each Variant (AI / Standard)
-        Script->>Script: Update dist/config.js (Toggle AI)
-        Script->>GCB: gcloud builds submit .
-        GCB->>GCB: Build Docker Image (nginx + dist)
-        GCB->>GCR: Push Image
-        Script->>CloudRun: gcloud run deploy
-    end
-    
-    CloudRun-->>Dev: Service URL
-```
+> **[Diagram 4: DevOps & Deployment Workflow]**
+> *See `DIAGRAMS.md` for the Mermaid code.*
 
 ### 7.3 Testing Strategy
 - **Unit/Integration**: `Vitest` (`npm test`) validation of utility functions and service logic.
