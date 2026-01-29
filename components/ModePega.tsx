@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { ProcessDefinition, ElementDefinition, DataObjectSuggestion, StageDefinition, LogicGroup, Condition, CalculationPart } from '../types';
-import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode, Calculator, Workflow, User, CheckSquare, Mail, Play, AlertTriangle, Briefcase, Grid } from 'lucide-react';
+import { ProcessDefinition, ElementDefinition, DataObjectSuggestion, StageDefinition, LogicGroup, Condition, CalculationPart, DictionaryEntry } from '../types';
+import { Rocket, Hammer, Copy, Database, Sparkles, ArrowRight, Edit2, Check, RefreshCw, Table as TableIcon, ClipboardList, Eye, ShieldCheck, Layout, GitMerge, FileCode, Calculator, Workflow, User, CheckSquare, Mail, Play, AlertTriangle, Briefcase, Grid, Upload, FileText, ChevronDown } from 'lucide-react';
 import { CatapulseLogo } from './Shared';
 import { generateDataMapping } from '../services/geminiService';
 import { formatLogicSummary } from '../utils/logic';
+import DataNormalizerTab from './DataNormalizerTab';
 
 interface ModePegaProps {
     processDef: ProcessDefinition;
@@ -30,6 +31,98 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
     const [activeRuleFilter, setActiveRuleFilter] = useState<PegaRuleType | 'ALL'>('ALL');
     const [baseClass, setBaseClass] = useState('MyOrg-MyApp-Work'); // Default base class
 
+    // --- Data Dictionary State ---
+    const [dictionary, setDictionary] = useState<DictionaryEntry[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [overrideMenuOpen, setOverrideMenuOpen] = useState<{ idx: number, mIdx: number } | null>(null);
+    // Interaction State
+    const [highlightedFieldId, setHighlightedFieldId] = useState<string | null>(null);
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result as string;
+            if (!text) return;
+
+            // Simple CSV Parser (Assumes standard CSV format)
+            // Headers expected: Class, Property, Type, Label (optional)
+            try {
+                const lines = text.split(/\r?\n/);
+                const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+
+                const classIdx = headers.findIndex(h => h.includes('class'));
+                const propIdx = headers.findIndex(h => h.includes('property'));
+                const typeIdx = headers.findIndex(h => h.includes('type'));
+                const labelIdx = headers.findIndex(h => h.includes('label'));
+
+                if (classIdx === -1 || propIdx === -1) {
+                    alert('Invalid CSV Format. Please ensure headers include "Class" and "Property".');
+                    setIsUploading(false);
+                    return;
+                }
+
+                const entries: DictionaryEntry[] = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const row = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
+                    if (row.length < 2) continue;
+
+                    entries.push({
+                        className: row[classIdx] || 'Unknown',
+                        property: row[propIdx] || 'Unknown',
+                        type: typeIdx !== -1 ? row[typeIdx] : 'Text',
+                        label: labelIdx !== -1 ? row[labelIdx] : undefined
+                    });
+                }
+                setDictionary(entries);
+                console.log(`Parsed ${entries.length} dictionary entries.`);
+            } catch (err) {
+                console.error("CSV Parse Error", err);
+                alert("Failed to parse CSV.");
+            } finally {
+                setIsUploading(false);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleOverrideMapping = (groupIndex: number, mappingIndex: number, entry: DictionaryEntry | string) => {
+        const newSuggestions = [...dataSuggestions];
+        const mapping = newSuggestions[groupIndex].mappings[mappingIndex];
+
+        if (typeof entry === 'string') {
+            // Manual Text Override
+            mapping.suggestedProperty = entry;
+            mapping.manualOverride = entry;
+            mapping.source = 'manual';
+            mapping.status = 'modified';
+            mapping.dictionaryMatch = undefined;
+        } else {
+            // Dictionary Selection
+            mapping.suggestedProperty = entry.property;
+            mapping.dictionaryMatch = entry;
+            mapping.source = 'dictionary';
+            console.log("Dictionary Match Selected:", entry);
+        }
+
+        // Auto-accept when manually changed
+        if (!mapping.status || mapping.status === 'pending') {
+            mapping.status = entry === 'string' ? 'modified' : 'accepted';
+        }
+
+        setDataSuggestions(newSuggestions);
+        setOverrideMenuOpen(null);
+    };
+
+    const handleAcceptMapping = (groupIndex: number, mappingIndex: number) => {
+        const newSuggestions = [...dataSuggestions];
+        newSuggestions[groupIndex].mappings[mappingIndex].status = 'accepted';
+        setDataSuggestions(newSuggestions);
+    };
+
 
 
     const handleAnalyzeData = async () => {
@@ -44,7 +137,7 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                 return;
             }
 
-            const suggestions = await generateDataMapping(allElements, baseClass);
+            const suggestions = await generateDataMapping(allElements, baseClass, dictionary);
             if (suggestions && suggestions.length > 0) {
                 setDataSuggestions(suggestions);
             } else {
@@ -483,110 +576,24 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
             )}
 
             {pegaTab === 'data' && (
-                <div className="space-y-6 animate-in fade-in">
-
-
-
-                    {/* Data Object Normalizer Header Card */}
-                    <div className="bg-sw-teal rounded-xl shadow-lg p-8 text-white relative overflow-hidden">
-                        <div className="relative z-10">
-                            <h2 className="text-2xl font-bold mb-2 flex items-center gap-2"><Database /> Data Object Normalizer</h2>
-                            <p className="opacity-80 max-w-xl">
-                                Automatically group flat form fields into reusable Data Objects (Classes).
-                                Map these to your existing framework to ensure compliance.
-                            </p>
-
-                            <button
-                                onClick={handleAnalyzeData}
-                                disabled={isAnalyzing}
-                                className="mt-6 bg-white text-sw-teal px-6 py-3 rounded-lg font-bold hover:bg-sw-lightGray transition-colors flex items-center gap-2 shadow-lg"
-                            >
-                                {isAnalyzing ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                                {dataSuggestions.length > 0 ? 'Re-Analyze Data Model' : 'Analyze & Map to Common Data Model'}
-                            </button>
-                        </div>
-
-                        {/* Base Class Input Overlay */}
-                        <div className="absolute top-6 right-6 z-20 bg-white/10 backdrop-blur-md p-3 rounded-lg border border-white/20">
-                            <label className="block text-[10px] uppercase font-bold text-white/80 mb-1">Base Class Context</label>
-                            <input
-                                type="text"
-                                value={baseClass}
-                                onChange={(e) => setBaseClass(e.target.value)}
-                                className="bg-black/20 text-white border border-white/30 rounded px-2 py-1 text-xs font-mono w-48 focus:outline-none focus:border-white"
-                                placeholder="Org-App-Work"
-                            />
-                        </div>
-
-                        <Database size={120} className="absolute -right-6 -bottom-6 opacity-10" />
-                    </div>
-
-                    {/* Results Grid */}
-                    {dataSuggestions.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {dataSuggestions.map((group, idx) => (
-                                <div key={idx} className="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden flex flex-col">
-                                    <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-2 bg-sw-purpleLight rounded text-sw-teal">
-                                                <Database size={16} />
-                                            </div>
-                                            {editingClassIndex === idx ? (
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        autoFocus
-                                                        type="text"
-                                                        value={tempClassName}
-                                                        onChange={(e) => setTempClassName(e.target.value)}
-                                                        className="text-sm font-bold border border-sw-teal rounded px-2 py-1"
-                                                    />
-                                                    <button onClick={() => handleSaveClassName(idx)} className="text-green-600 hover:bg-green-50 p-1 rounded"><Check size={16} /></button>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2 cursor-pointer hover:text-sw-teal" onClick={() => { setTempClassName(group.className); setEditingClassIndex(idx); }}>
-                                                        {group.className} <Edit2 size={12} className="opacity-30" />
-                                                    </h3>
-                                                    <p className="text-xs text-gray-500">Reusable Data Type</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="p-4 flex-1">
-                                        <p className="text-xs text-gray-500 mb-4 italic">{group.description}</p>
-                                        <div className="space-y-2">
-                                            {(group.mappings || []).map((mapping, mIdx) => {
-                                                const el = getElementDetails(mapping.elementId);
-                                                return (
-                                                    <div key={mIdx} className="flex items-center justify-between text-sm p-2 rounded hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
-                                                            <span className="text-gray-700">{el?.label || 'Unknown Field'}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 text-sw-teal font-mono text-xs">
-                                                            <ArrowRight size={12} className="text-gray-300" />
-                                                            {mapping.suggestedProperty}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                    <div className="bg-gray-50 p-3 text-center border-t border-gray-200 text-xs text-gray-400 font-medium">
-                                        {(group.mappings || []).length} Fields Mapped
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {dataSuggestions.length === 0 && !isAnalyzing && (
-                        <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
-                            <p>No mapping generated yet. Click analyze to start.</p>
-                        </div>
-                    )}
-                </div>
+                <DataNormalizerTab
+                    processDef={processDef}
+                    dataSuggestions={dataSuggestions}
+                    dictionary={dictionary}
+                    baseClass={baseClass}
+                    setBaseClass={setBaseClass}
+                    isAnalyzing={isAnalyzing}
+                    isUploading={isUploading}
+                    onAnalyze={handleAnalyzeData}
+                    onFileUpload={handleFileUpload}
+                    onSaveClassName={(idx, name) => {
+                        const newSuggestions = [...dataSuggestions];
+                        newSuggestions[idx].className = name;
+                        setDataSuggestions(newSuggestions);
+                    }}
+                    onOverrideMapping={handleOverrideMapping}
+                    onAcceptMapping={handleAcceptMapping}
+                />
             )}
 
             {pegaTab === 'logic' && (

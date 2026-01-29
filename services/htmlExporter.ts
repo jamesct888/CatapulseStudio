@@ -1,20 +1,22 @@
 
 import { ProcessDefinition, VisualTheme } from '../types';
 
-export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: VisualTheme): string => {
-  const processJson = JSON.stringify(processDef);
-  const themeJson = JSON.stringify(theme);
+import { TAILWIND_SCRIPT, REACT_SCRIPT, REACT_DOM_SCRIPT, BABEL_SCRIPT } from './offlineAssets';
 
-  return `<!DOCTYPE html>
+export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: VisualTheme): string => {
+    const processJson = JSON.stringify(processDef);
+    const themeJson = JSON.stringify(theme);
+
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${processDef.name} - Prototype</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>${TAILWIND_SCRIPT}</script>
+    <script>${REACT_SCRIPT}</script>
+    <script>${REACT_DOM_SCRIPT}</script>
+    <script>${BABEL_SCRIPT}</script>
     <script>
       tailwind.config = {
         theme: {

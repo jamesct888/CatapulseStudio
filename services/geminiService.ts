@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ProcessDefinition, StageDefinition, SectionDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage, DataObjectSuggestion, LogicGroup } from "../types";
+import { ProcessDefinition, StageDefinition, SectionDefinition, ElementDefinition, FormState, WorkshopSuggestion, TestCase, UserStory, StoryStrategy, StrategyRecommendation, ChatMessage, DataObjectSuggestion, LogicGroup, DictionaryEntry } from "../types";
 
 // Helper to check Runtime Config
 export const getAiEnabled = (): boolean => {
@@ -663,8 +663,17 @@ export const analyzeTranscript = async (processDef: ProcessDefinition, transcrip
     } catch (e) { return []; }
 };
 
-export const generateDataMapping = async (elements: { id: string; label: string; type: string }[], baseClass?: string): Promise<DataObjectSuggestion[]> => {
+export const generateDataMapping = async (elements: { id: string; label: string; type: string }[], baseClass?: string, dictionary: DictionaryEntry[] = []): Promise<DataObjectSuggestion[]> => {
     if (!apiKey) return [];
+
+    // Optimize Dictionary Context: If dictionary is huge, we might need to filter or RAG it. 
+    // For now, we assume it's reasonable size (< 500 fields) or we take top relevance.
+    // To be safe, let's limit the dictionary string size if needed, but for MVP pass it all.
+    const dictionaryContext = dictionary.length > 0
+        ? `EXISTING DATA DICTIONARY (Prioritize these matches):
+           ${JSON.stringify(dictionary.map(d => ({ class: d.className, prop: d.property, label: d.label || d.property })))}`
+        : "No existing data dictionary provided.";
+
     const prompt = `
     ACT AS: A Senior Pega System Architect.
     GOAL: Group the provided fields into logical Pega Data Classes (Data Objects).
@@ -673,6 +682,8 @@ export const generateDataMapping = async (elements: { id: string; label: string;
     INPUT FIELDS:
     ${JSON.stringify(elements)}
 
+    ${dictionaryContext}
+
     OUTPUT REQUIREMENT:
     Return a JSON Array of objects with this structure AND NOTHING ELSE:
     [
@@ -680,17 +691,26 @@ export const generateDataMapping = async (elements: { id: string; label: string;
             "className": "${baseClass ? baseClass + '-Data-Customer' : 'Customer'}", 
             "description": "Customer personal details",
             "mappings": [
-                { "elementId": "field_id_input", "suggestedProperty": "FirstName" },
-                { "elementId": "field_id_input2", "suggestedProperty": "LastName" }
+                { 
+                    "elementId": "field_id_input", 
+                    "suggestedProperty": "FirstName",
+                    "source": "dictionary" (if matched) OR "ai" (if new),
+                    "dictionaryMatch": { "className": "...", "property": "...", "type": "..." } (ONLY if matched)
+                }
             ]
         }
     ]
     
     STRATEGIC GUIDELINES:
-    1. **GROUPING IS CRITICAL**: Do NOT just list all fields in one class. Analyze the field labels to group them by business entity (e.g., 'Customer', 'Policy', 'Vehicle', 'Claim').
-    2. **Naming**: PREFIX class names with the provided Base Class if applicable (e.g. "${baseClass}-Data-Customer"). Use Pega-compliant property names (CamelCase) for \`suggestedProperty\`.
-    3. **Completeness**: Ensure EVERY input field is mapped to exactly one class.
-    4. **Context**: Use the field label to determine the best \`suggestedProperty\` name (e.g. if specific label 'Cust Name' -> 'CustomerName').
+    1. **GROUPING IS CRITICAL**: Do NOT just list all fields in one class. Analyze the field labels to group them by business entity.
+    2. **PRIORITIZE DICTIONARY**: If an input field label is semantically similar to a Dictionary Entry, USE THAT ENTRY. 
+       - Set source: "dictionary".
+       - Use the EXACT className and property from the dictionary.
+    3. **FALLBACK to AI**: If no dictionary match found:
+       - Set source: "ai".
+       - Generate a COMPLIANT class name (Prefix with Base Class).
+       - Generate a COMPLIANT property name (CamelCase).
+    4. **Completeness**: Ensure EVERY input field is mapped to exactly one class.
     `;
 
     try {

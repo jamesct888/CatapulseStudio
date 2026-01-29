@@ -219,12 +219,23 @@ export interface UserStory {
   dataElements?: StoryDataElement[];
 }
 
+export interface DictionaryEntry {
+  className: string;
+  property: string;
+  type: string;
+  label?: string; // Optional user friendly label from CSV
+}
+
 export interface DataObjectSuggestion {
   className: string;
   description: string;
   mappings: {
     elementId: string;
-    suggestedProperty: string;
+    suggestedProperty: string; // The property name
+    source: 'ai' | 'dictionary' | 'manual'; // Where this suggestion came from
+    dictionaryMatch?: DictionaryEntry; // If matched to dictionary
+    status?: 'pending' | 'accepted' | 'modified'; // Track user acceptance
+    manualOverride?: string; // If user types a custom property
   }[];
 }
 

@@ -165,3 +165,49 @@ Supports a wide range of data types tailored for business apps:
   - The application appears to use a "Load/Save" mechanism (likely JSON export/import or Supabase sync).
   - **Logic**: All business logic (visibility, validation) is serializable to JSON, allowing the definition to be portable (e.g., for export to Pega or other platforms).
 
+---
+
+## 7. DevOps & Lifecycle
+
+### 7.1 Build & Packaging
+- **Build System**: Vite (`npm run build`) produces highly optimized static assets (HTML/CSS/JS) in the `dist/` directory.
+- **Containerization**: 
+    - Uses a lightweight `nginx:alpine` Docker image.
+    - **Strategy**: "Static Asset Injection". The app is built on the host/build server, and the resulting `dist` folder is `COPY`'d into the Nginx container.
+- **Runtime Configuration**: uses a `config.js` file for feature flags (specifically `aiEnabled`), allowing the same build artifact to be deployed in different modes (Standard vs AI) without recompiling.
+
+### 7.2 Deployment Workflow
+The application is deployed to **Google Cloud Run** using automated PowerShell scripts (`deploy-both.ps1`).
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Script as deploy-both.ps1
+    participant GCB as Google Cloud Build
+    participant GCR as Google Container Registry
+    participant CloudRun as Cloud Run (europe-west2)
+
+    Dev->>Script: Run ./deploy-both.ps1
+    Script->>Script: npm run build (Clean & Build)
+    
+    loop For Each Variant (AI / Standard)
+        Script->>Script: Update dist/config.js (Toggle AI)
+        Script->>GCB: gcloud builds submit .
+        GCB->>GCB: Build Docker Image (nginx + dist)
+        GCB->>GCR: Push Image
+        Script->>CloudRun: gcloud run deploy
+    end
+    
+    CloudRun-->>Dev: Service URL
+```
+
+### 7.3 Testing Strategy
+- **Unit/Integration**: `Vitest` (`npm test`) validation of utility functions and service logic.
+- **End-to-End**: `Playwright` (`npm run test:e2e`) for full browser-based verification of user flows.
+- **Pre-Deploy Checks**: The `deploy.ps1` script enforces `npm test` passing before attempting deployment.
+
+### 7.4 Infrastructure
+- **Platform**: Serverless (Cloud Run).
+- **Regions**: `europe-west2` (London).
+- **Routing**: Nginx handles SPA routing (`try_files $uri /index.html`) and caching policies (long cache for hashed assets, no-cache for `index.html` and `config.js`).
+
