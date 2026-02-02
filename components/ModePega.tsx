@@ -586,7 +586,7 @@ export const ModePega: React.FC<ModePegaProps> = ({ processDef, pegaTab, setPega
                     isUploading={isUploading}
                     onAnalyze={handleAnalyzeData}
                     onFileUpload={handleFileUpload}
-                    onSaveClassName={(idx, name) => {
+                    onSaveClassName={(idx: number, name: string) => {
                         const newSuggestions = [...dataSuggestions];
                         newSuggestions[idx].className = name;
                         setDataSuggestions(newSuggestions);
