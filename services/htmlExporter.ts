@@ -423,7 +423,7 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             const [isCompleted, setIsCompleted] = useState(false);
             
             // HUD State
-            const [isHudEnabled, setIsHudEnabled] = useState(true);
+            const [isHudEnabled, setIsHudEnabled] = useState(false);
             const [hudVisible, setHudVisible] = useState(false);
             const [activeSkill, setActiveSkill] = useState('');
             const [skillReason, setSkillReason] = useState('');

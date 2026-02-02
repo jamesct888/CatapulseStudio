@@ -32,7 +32,7 @@ export const ModePreview: React.FC<ModePreviewProps> = ({
     const [historyStack, setHistoryStack] = useState<number[]>([0]);
 
     // HUD State
-    const [isHudEnabled, setIsHudEnabled] = useState(true);
+    const [isHudEnabled, setIsHudEnabled] = useState(false);
     const [hudVisible, setHudVisible] = useState(false);
     const [storyOverlayVisible, setStoryOverlayVisible] = useState(false); // Story Overlay Toggle
     const [activeSkill, setActiveSkill] = useState<string>('');
