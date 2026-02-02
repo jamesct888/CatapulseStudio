@@ -406,8 +406,18 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             );
         };
 
+        // --- STAGE NAVIGATION ---
+        const getNextValidStageIndex = (startIndex, currentFormData) => {
+            if (startIndex >= PROCESS_DEF.stages.length) return null;
+            const stage = PROCESS_DEF.stages[startIndex];
+            const shouldSkip = stage.skipLogic && evaluateLogicGroup(stage.skipLogic, currentFormData);
+            if (shouldSkip) return getNextValidStageIndex(startIndex + 1, currentFormData);
+            return startIndex;
+        };
+
         const App = () => {
             const [currentStageIdx, setCurrentStageIdx] = useState(0);
+            const [historyStack, setHistoryStack] = useState([0]);
             const [formData, setFormData] = useState({});
             const [formErrors, setFormErrors] = useState({});
             const [isCompleted, setIsCompleted] = useState(false);
@@ -483,12 +493,24 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                 setFormErrors(errors);
                 
                 if (isValid) {
-                    if (currentStageIdx < PROCESS_DEF.stages.length - 1) {
-                        setCurrentStageIdx(prev => prev + 1);
+                    const nextIndex = getNextValidStageIndex(currentStageIdx + 1, formData);
+                    if (nextIndex !== null) {
+                        setHistoryStack(prev => [...prev, nextIndex]);
+                        setCurrentStageIdx(nextIndex);
                         window.scrollTo(0, 0);
                     } else {
                         setIsCompleted(true);
                     }
+                }
+            };
+
+            const handleBack = () => {
+                if (historyStack.length > 1) {
+                    const newStack = [...historyStack];
+                    newStack.pop();
+                    const prevIndex = newStack[newStack.length - 1];
+                    setHistoryStack(newStack);
+                    setCurrentStageIdx(prevIndex);
                 }
             };
             
@@ -498,16 +520,16 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
 
             if (isCompleted) {
                 return (
-                    <div className={\`min-h-screen \${isType2 ? 'bg-[#e0e0e0]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-[#fafafa]'}\`}>
+                    <div className={`min - h - screen ${ isType2 ? 'bg-[#e0e0e0]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-[#fafafa]' } `}>
                          <header className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-50 shadow-sm flex items-center justify-between">
                              <div className="flex items-center gap-6">
                                 <img src="https://www.lloydsbankinggroup.com/assets/images/our-brands/scottish-widows/sw-logo-1000x5501.png" alt="Scottish Widows" className="h-12" />
                                 <div className="h-8 w-px bg-gray-200"></div>
-                                <h1 className={\`text-lg font-serif font-bold \${isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}\`}>{PROCESS_DEF.name}</h1>
+                                <h1 className={`text - lg font - serif font - bold ${ isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal' } `}>{PROCESS_DEF.name}</h1>
                              </div>
                          </header>
                          <div className="max-w-4xl mx-auto py-12 px-6 flex items-center justify-center min-h-[60vh]">
-                            <div className={\`w-full \${stageHeaderClass} p-12 rounded-2xl shadow-2xl text-center space-y-8\`}>
+                            <div className={`w - full ${ stageHeaderClass } p - 12 rounded - 2xl shadow - 2xl text - center space - y - 8`}>
                                 <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto text-sw-purpleLight">
                                     <Icons.Check width={40} height={40} />
                                 </div>
@@ -521,9 +543,9 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
             }
 
             return (
-                <div className={\`min-h-screen \${isType2 ? 'bg-[#e0e0e0]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-[#fafafa]'}\`}>
+                <div className={`min - h - screen ${ isType2 ? 'bg-[#e0e0e0]' : isType3 ? 'bg-[#f1f1f1]' : 'bg-[#fafafa]' } `}>
                     <OperationsHUD 
-                        key={\`\${currentStageIdx}-\${isHudEnabled}\`}
+                        key={`${ currentStageIdx } -${ isHudEnabled } `}
                         isVisible={hudVisible} 
                         requiredSkill={activeSkill} 
                         reason={skillReason}
@@ -533,12 +555,12 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                          <div className="flex items-center gap-6">
                             <img src="https://www.lloydsbankinggroup.com/assets/images/our-brands/scottish-widows/sw-logo-1000x5501.png" alt="Scottish Widows" className="h-12" />
                             <div className="h-8 w-px bg-gray-200"></div>
-                            <h1 className={\`text-lg font-serif font-bold \${isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal'}\`}>{PROCESS_DEF.name}</h1>
+                            <h1 className={`text - lg font - serif font - bold ${ isType2 ? 'text-[#0b3239]' : isType3 ? 'text-[#006a4d]' : 'text-sw-teal' } `}>{PROCESS_DEF.name}</h1>
                          </div>
                          <div className="flex items-center gap-4">
                              <button 
                                 onClick={() => setIsHudEnabled(!isHudEnabled)}
-                                className={\`p-2 rounded-lg transition-all flex items-center justify-center \${isHudEnabled ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}\`}
+                                className={`p - 2 rounded - lg transition - all flex items - center justify - center ${ isHudEnabled ? 'bg-sw-teal text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100' } `}
                                 title={isHudEnabled ? "Operations HUD: ON" : "Operations HUD: OFF"}
                             >
                                 <Icons.Shield size={16} />
@@ -551,16 +573,16 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                         {/* Breadcrumbs */}
                         <nav className="flex items-center space-x-2 mb-12 text-sm overflow-x-auto pb-2 scrollbar-thin">
                             {PROCESS_DEF.stages.map((s, i) => {
-                                const isPast = i < currentStageIdx;
+                                const isPast = historyStack.includes(i) && i !== currentStageIdx;
                                 const isCurrent = i === currentStageIdx;
                                 return (
                                     <React.Fragment key={s.id}>
-                                        <div className={\`flex items-center gap-2 whitespace-nowrap \${isCurrent ? (isType2 ? 'text-[#e61126] font-bold' : isType3 ? 'text-[#006a4d] font-bold' : 'text-sw-teal font-bold') : isPast ? 'text-gray-500' : 'text-gray-400'}\`}>
-                                            <div className={\`w-6 h-6 rounded-full flex items-center justify-center text-xs border transition-colors \${
-                                                isPast ? (isType2 ? 'bg-[#e61126] text-white border-[#e61126]' : isType3 ? 'bg-[#006a4d] text-white border-[#006a4d]' : 'bg-sw-teal text-white border-sw-teal') :
-                                                isCurrent ? (isType2 ? 'bg-white text-[#e61126] border-[#e61126] ring-4 ring-[#e61126]/10' : isType3 ? 'bg-white text-[#006a4d] border-[#006a4d] ring-4 ring-[#006a4d]/10' : 'bg-white text-sw-teal border-sw-teal ring-4 ring-sw-teal/10') :
-                                                'bg-white text-gray-400 border-gray-300'
-                                            }\`}>
+                                        <div className={`flex items - center gap - 2 whitespace - nowrap ${ isCurrent ? (isType2 ? 'text-[#e61126] font-bold' : isType3 ? 'text-[#006a4d] font-bold' : 'text-sw-teal font-bold') : isPast ? 'text-gray-500' : 'text-gray-400' } `}>
+                                            <div className={`w - 6 h - 6 rounded - full flex items - center justify - center text - xs border transition - colors ${
+        isPast ? (isType2 ? 'bg-[#e61126] text-white border-[#e61126]' : isType3 ? 'bg-[#006a4d] text-white border-[#006a4d]' : 'bg-sw-teal text-white border-sw-teal') :
+            isCurrent ? (isType2 ? 'bg-white text-[#e61126] border-[#e61126] ring-4 ring-[#e61126]/10' : isType3 ? 'bg-white text-[#006a4d] border-[#006a4d] ring-4 ring-[#006a4d]/10' : 'bg-white text-sw-teal border-sw-teal ring-4 ring-sw-teal/10') :
+                'bg-white text-gray-400 border-gray-300'
+    } `}>
                                                 {isPast ? <Icons.Check width={12} height={12} strokeWidth={3} /> : i + 1}
                                             </div>
                                             <span>{s.title}</span>
@@ -573,8 +595,8 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
                             })}
                         </nav>
 
-                        <div className={\`bg-white shadow-card rounded-2xl border overflow-hidden min-h-[600px] relative \${isType2 ? 'border-[#e0e0e0]' : isType3 ? 'border-gray-200' : 'border-gray-100'}\`}>
-                            <div className={\`p-6 \${stageHeaderClass}\`}>
+                        <div className={`bg - white shadow - card rounded - 2xl border overflow - hidden min - h - [600px] relative ${ isType2 ? 'border-[#e0e0e0]' : isType3 ? 'border-gray-200' : 'border-gray-100' } `}>
+                            <div className={`p - 6 ${ stageHeaderClass } `}>
                                 <h3 className="text-xl font-bold">{currentStage.title}</h3>
                             </div>
                             
@@ -589,12 +611,12 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
 
                                     if (isSpecial) {
                                         return (
-                                            <div key={section.id} className={\`p-4 rounded-xl border \${isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}\`}>
+                                            <div key={section.id} className={`p - 4 rounded - xl border ${ isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200' } `}>
                                                 <div className="flex items-center gap-2 mb-3">
                                                     {isWarning ? <span className="text-amber-600"><Icons.Warning/></span> : <span className="text-blue-600"><Icons.Info/></span>}
-                                                    <h4 className={\`font-bold uppercase text-sm tracking-wide \${isWarning ? 'text-amber-700' : 'text-blue-700'}\`}>{section.title}</h4>
+                                                    <h4 className={`font - bold uppercase text - sm tracking - wide ${ isWarning ? 'text-amber-700' : 'text-blue-700' } `}>{section.title}</h4>
                                                 </div>
-                                                <div className={\`grid gap-x-8 gap-y-2 \${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}\`}>
+                                                <div className={`grid gap - x - 8 gap - y - 2 ${ section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1' } `}>
                                                     {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
                                                         let elementValue = formData[el.id];
                                                         if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
@@ -611,8 +633,8 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
 
                                     return (
                                         <div key={section.id}>
-                                            <h4 className={\`font-bold border-b border-gray-100 pb-2 mb-6 uppercase text-sm tracking-wide \${isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-800'}\`}>{section.title}</h4>
-                                            <div className={\`grid gap-x-8 gap-y-2 \${section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1'}\`}>
+                                            <h4 className={`font - bold border - b border - gray - 100 pb - 2 mb - 6 uppercase text - sm tracking - wide ${ isType2 ? 'text-[#e61126]' : isType3 ? 'text-[#006a4d]' : 'text-gray-800' } `}>{section.title}</h4>
+                                            <div className={`grid gap - x - 8 gap - y - 2 ${ section.layout === '2col' ? 'grid-cols-2' : section.layout === '3col' ? 'grid-cols-3' : 'grid-cols-1' } `}>
                                                 {section.elements.filter(el => isElementVisible(el, formData)).map(el => {
                                                     let elementValue = formData[el.id];
                                                     if (el.type === 'static' && el.staticDataSource === 'field' && el.sourceFieldId) {
@@ -644,17 +666,17 @@ export const generateStandaloneHTML = (processDef: ProcessDefinition, theme: Vis
 
                             <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
                                 <button 
-                                    onClick={() => setCurrentStageIdx(prev => Math.max(0, prev - 1))}
-                                    disabled={currentStageIdx === 0}
+                                    onClick={handleBack}
+                                    disabled={historyStack.length <= 1}
                                     className="px-6 py-2 rounded-lg font-bold text-gray-500 hover:text-sw-teal disabled:opacity-30"
                                 >
                                     Back
                                 </button>
                                 <button 
                                     onClick={handleNext}
-                                    className={\`px-8 py-3 rounded-full font-bold shadow-lg transition-all flex items-center gap-2 \${btnPrimaryClass}\`}
+                                    className={`px - 8 py - 3 rounded - full font - bold shadow - lg transition - all flex items - center gap - 2 ${ btnPrimaryClass } `}
                                 >
-                                    {currentStageIdx === PROCESS_DEF.stages.length - 1 ? 'Submit' : 'Next Step'}
+                                    {getNextValidStageIndex(currentStageIdx + 1, formData) === null ? 'Submit' : 'Next Step'}
                                     <Icons.ArrowRight />
                                 </button>
                             </div>
